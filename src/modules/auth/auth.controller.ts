@@ -47,6 +47,9 @@ import {
   AuthSessionResponseDto,
   LogoutAllResponseDto,
 } from './dto/auth-session-response.dto';
+import { Roles } from '../authorization/decorators/roles.decorator';
+import { RolesGuard } from '../authorization/guards/roles.guard';
+import { UserRole } from '../users/enums/user-role.enum';
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -143,7 +146,8 @@ export class AuthController {
   }
 
   @Get('me')
-  @UseGuards(JwtAuthGuard)
+  @Roles(...Object.values(UserRole))
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiBearerAuth()
   @ApiOperation({
     summary: 'Obtener el usuario autenticado',
@@ -153,6 +157,9 @@ export class AuthController {
   })
   @ApiUnauthorizedResponse({
     description: 'Token inexistente, inválido o vencido',
+  })
+  @ApiForbiddenResponse({
+    description: 'El usuario no posee un rol permitido',
   })
   me(@CurrentUser() user: AuthenticatedUser): AuthenticatedUser {
     return user;
