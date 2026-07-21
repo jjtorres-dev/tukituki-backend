@@ -10,6 +10,7 @@ import { RedisModule } from './infrastructure/redis/redis.module';
 import { AuthSessionsModule } from './modules/auth-sessions/auth-sessions.module';
 import { PassengersModule } from './modules/passengers/passengers.module';
 import { DriversModule } from './modules/drivers/drivers.module';
+import { AdminDriversModule } from './modules/admin-drivers/admin-drivers.module';
 
 @Module({
   imports: [
@@ -60,6 +61,8 @@ import { DriversModule } from './modules/drivers/drivers.module';
     PassengersModule,
 
     DriversModule,
+
+    AdminDriversModule,
   ],
 })
 export class AppModule {}
