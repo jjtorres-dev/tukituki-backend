@@ -11,6 +11,7 @@ import { PasswordService } from './password.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { AuthSessionsModule } from '../auth-sessions/auth-sessions.module';
 import { AuthorizationModule } from '../authorization/authorization.module';
+import { JwtAuthGuard } from './guards/jwt-auth.guard';
 
 @Module({
   imports: [
@@ -40,8 +41,14 @@ import { AuthorizationModule } from '../authorization/authorization.module';
 
   controllers: [AuthController],
 
-  providers: [AuthService, PasswordService, OtpService, JwtStrategy],
+  providers: [
+    AuthService,
+    PasswordService,
+    OtpService,
+    JwtStrategy,
+    JwtAuthGuard,
+  ],
 
-  exports: [AuthService, PasswordService, JwtModule],
+  exports: [AuthService, PasswordService, JwtModule, JwtAuthGuard],
 })
 export class AuthModule {}
