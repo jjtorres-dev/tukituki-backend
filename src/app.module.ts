@@ -9,6 +9,7 @@ import { AuthModule } from './modules/auth/auth.module';
 import { RedisModule } from './infrastructure/redis/redis.module';
 import { AuthSessionsModule } from './modules/auth-sessions/auth-sessions.module';
 import { PassengersModule } from './modules/passengers/passengers.module';
+import { DriversModule } from './modules/drivers/drivers.module';
 
 @Module({
   imports: [
@@ -57,6 +58,8 @@ import { PassengersModule } from './modules/passengers/passengers.module';
     AuthSessionsModule,
 
     PassengersModule,
+
+    DriversModule,
   ],
 })
 export class AppModule {}

@@ -6,6 +6,7 @@ import { DataSource } from 'typeorm';
 import { User } from '../modules/users/entities/user.entity';
 import { AuthSession } from '../modules/auth-sessions/entities/auth-session.entity';
 import { PassengerProfile } from '../modules/passengers/entities/passenger-profile.entity';
+import { DriverProfile } from '../modules/drivers/entities/driver-profile.entity';
 
 function getRequiredEnvironmentVariable(name: string): string {
   const value = process.env[name];
@@ -40,7 +41,7 @@ const AppDataSource = new DataSource({
         }
       : false,
 
-  entities: [User, AuthSession, PassengerProfile],
+  entities: [User, AuthSession, PassengerProfile, DriverProfile],
 
   migrations: [join(__dirname, 'migrations', '*.js')],
 
