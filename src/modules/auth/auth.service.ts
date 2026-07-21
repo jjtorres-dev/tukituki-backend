@@ -90,8 +90,15 @@ export class AuthService {
       );
     }
 
+    const session = await this.authSessionsService.create({
+      userId: user.id,
+      ipAddress: context.ipAddress ?? null,
+      userAgent: context.userAgent ?? null,
+    });
+
     const payload: JwtPayload = {
       sub: user.id,
+      sid: session.sessionId,
       phoneE164: user.phoneE164,
       roles: user.roles,
       type: 'access',
@@ -102,12 +109,6 @@ export class AuthService {
     const expiresIn = this.configService.getOrThrow<number>(
       'JWT_ACCESS_TTL_SECONDS',
     );
-
-    const session = await this.authSessionsService.create({
-      userId: user.id,
-      ipAddress: context.ipAddress ?? null,
-      userAgent: context.userAgent ?? null,
-    });
 
     await this.usersService.markLastLogin(user.id);
 
@@ -137,6 +138,7 @@ export class AuthService {
 
     const payload: JwtPayload = {
       sub: user.id,
+      sid: rotatedSession.sessionId,
       phoneE164: user.phoneE164,
       roles: user.roles,
       type: 'access',

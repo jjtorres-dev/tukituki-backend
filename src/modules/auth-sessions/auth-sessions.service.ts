@@ -1,4 +1,8 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import {
@@ -7,7 +11,7 @@ import {
   randomUUID,
   timingSafeEqual,
 } from 'node:crypto';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, IsNull, MoreThan, Repository } from 'typeorm';
 
 import { UserStatus } from '../users/enums/user-status.enum';
 import { AuthSession } from './entities/auth-session.entity';
@@ -130,6 +134,66 @@ export class AuthSessionsService {
         user: session.user,
       };
     });
+  }
+
+  async isActive(sessionId: string, userId: string): Promise<boolean> {
+    const session = await this.authSessionsRepository.findOne({
+      select: {
+        id: true,
+      },
+      where: {
+        id: sessionId,
+        userId,
+        revokedAt: IsNull(),
+        expiresAt: MoreThan(new Date()),
+      },
+    });
+
+    return session !== null;
+  }
+
+  findActiveByUser(userId: string): Promise<AuthSession[]> {
+    return this.authSessionsRepository.find({
+      where: {
+        userId,
+        revokedAt: IsNull(),
+        expiresAt: MoreThan(new Date()),
+      },
+      order: {
+        createdAt: 'DESC',
+      },
+    });
+  }
+
+  async revoke(userId: string, sessionId: string): Promise<void> {
+    const result = await this.authSessionsRepository.update(
+      {
+        id: sessionId,
+        userId,
+        revokedAt: IsNull(),
+      },
+      {
+        revokedAt: new Date(),
+      },
+    );
+
+    if (!result.affected) {
+      throw new NotFoundException('La sesión no existe o ya fue cerrada');
+    }
+  }
+
+  async revokeAll(userId: string): Promise<number> {
+    const result = await this.authSessionsRepository.update(
+      {
+        userId,
+        revokedAt: IsNull(),
+      },
+      {
+        revokedAt: new Date(),
+      },
+    );
+
+    return result.affected ?? 0;
   }
 
   private generateRefreshSecret(): string {

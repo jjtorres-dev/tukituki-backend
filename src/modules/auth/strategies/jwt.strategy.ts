@@ -3,16 +3,18 @@ import { ConfigService } from '@nestjs/config';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 
+import { AuthSessionsService } from '../../auth-sessions/auth-sessions.service';
 import { UserStatus } from '../../users/enums/user-status.enum';
 import { UsersService } from '../../users/users.service';
-import { AuthenticatedUser } from '../interfaces/authenticated-user.interface';
-import { JwtPayload } from '../interfaces/jwt-payload.interface';
+import type { AuthenticatedUser } from '../interfaces/authenticated-user.interface';
+import type { JwtPayload } from '../interfaces/jwt-payload.interface';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
   constructor(
     configService: ConfigService,
     private readonly usersService: UsersService,
+    private readonly authSessionsService: AuthSessionsService,
   ) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
@@ -24,7 +26,11 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
   }
 
   async validate(payload: JwtPayload): Promise<AuthenticatedUser> {
-    if (typeof payload.sub !== 'string' || payload.type !== 'access') {
+    if (
+      typeof payload.sub !== 'string' ||
+      typeof payload.sid !== 'string' ||
+      payload.type !== 'access'
+    ) {
       throw new UnauthorizedException('El token proporcionado no es válido');
     }
 
@@ -38,8 +44,18 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       throw new UnauthorizedException('La cuenta no está habilitada');
     }
 
+    const sessionIsActive = await this.authSessionsService.isActive(
+      payload.sid,
+      user.id,
+    );
+
+    if (!sessionIsActive) {
+      throw new UnauthorizedException('La sesión ha expirado o fue cerrada');
+    }
+
     return {
       id: user.id,
+      sessionId: payload.sid,
       phoneE164: user.phoneE164,
       roles: user.roles,
       status: user.status,

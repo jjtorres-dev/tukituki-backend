@@ -3,6 +3,7 @@ import { UserStatus } from '../../users/enums/user-status.enum';
 
 export interface AuthenticatedUser {
   id: string;
+  sessionId: string;
   phoneE164: string;
   roles: UserRole[];
   status: UserStatus;
