@@ -5,6 +5,8 @@ import {
 } from '@nestjs/common';
 import { DataSource, EntityManager, Repository } from 'typeorm';
 
+import { DriverOperationalState } from '../driver-operations/entities/driver-operational-state.entity';
+import { DriverOperationalStatus } from '../driver-operations/enums/driver-operational-status.enum';
 import { DriverDocument } from '../drivers/entities/driver-document.entity';
 import { DriverProfile } from '../drivers/entities/driver-profile.entity';
 import { DriverVehicle } from '../drivers/entities/driver-vehicle.entity';
@@ -67,12 +69,12 @@ export class AdminDriverReviewService {
     adminUserId: string,
   ): Promise<void> {
     const profileRepository = manager.getRepository(DriverProfile);
-
     const vehicleRepository = manager.getRepository(DriverVehicle);
-
     const documentRepository = manager.getRepository(DriverDocument);
-
     const userRepository = manager.getRepository(User);
+    const operationalStateRepository = manager.getRepository(
+      DriverOperationalState,
+    );
 
     const profile = await this.lockProfile(profileRepository, driverProfileId);
 
@@ -87,12 +89,15 @@ export class AdminDriverReviewService {
     }
 
     const documents = await this.lockDocuments(documentRepository, profile.id);
-
     const user = await this.lockUser(userRepository, profile.userId);
 
     this.assertUserCanBecomeDriver(user);
-
     this.assertApprovalRequirements(vehicle, documents);
+
+    const operationalState = await this.getOrCreateOperationalState(
+      operationalStateRepository,
+      profile.id,
+    );
 
     const reviewedAt = new Date();
 
@@ -105,12 +110,10 @@ export class AdminDriverReviewService {
     profile.suspendedByUserId = null;
 
     vehicle.status = VehicleStatus.APPROVED;
-
     vehicle.rejectionReason = null;
 
     for (const document of documents) {
       document.status = DriverDocumentStatus.APPROVED;
-
       document.rejectionReason = null;
       document.reviewedAt = reviewedAt;
       document.reviewedByUserId = adminUserId;
@@ -118,9 +121,15 @@ export class AdminDriverReviewService {
 
     user.roles = Array.from(new Set([...user.roles, UserRole.DRIVER]));
 
+    operationalState.status = DriverOperationalStatus.OFFLINE;
+    operationalState.connectedAt = null;
+    operationalState.disconnectedAt = null;
+    operationalState.lastSeenAt = null;
+
     await userRepository.save(user);
     await vehicleRepository.save(vehicle);
     await documentRepository.save(documents);
+    await operationalStateRepository.save(operationalState);
     await profileRepository.save(profile);
   }
 
@@ -133,9 +142,7 @@ export class AdminDriverReviewService {
     this.assertRejectionHasObservations(dto);
 
     const profileRepository = manager.getRepository(DriverProfile);
-
     const vehicleRepository = manager.getRepository(DriverVehicle);
-
     const documentRepository = manager.getRepository(DriverDocument);
 
     const profile = await this.lockProfile(profileRepository, driverProfileId);
@@ -151,14 +158,11 @@ export class AdminDriverReviewService {
     }
 
     const documents = await this.lockDocuments(documentRepository, profile.id);
-
     const documentReasons = this.createDocumentReasonMap(documents, dto);
-
     const reviewedAt = new Date();
 
     profile.status = DriverStatus.REJECTED;
     profile.rejectionReason = dto.profileReason ?? null;
-
     profile.approvedAt = null;
     profile.approvedByUserId = null;
     profile.suspensionReason = null;
@@ -167,11 +171,9 @@ export class AdminDriverReviewService {
 
     if (dto.vehicleReason) {
       vehicle.status = VehicleStatus.REJECTED;
-
       vehicle.rejectionReason = dto.vehicleReason;
     } else {
       vehicle.status = VehicleStatus.DRAFT;
-
       vehicle.rejectionReason = null;
     }
 
@@ -180,15 +182,11 @@ export class AdminDriverReviewService {
 
       if (reason) {
         document.status = DriverDocumentStatus.REJECTED;
-
         document.rejectionReason = reason;
-
         document.reviewedAt = reviewedAt;
-
         document.reviewedByUserId = adminUserId;
       } else {
         document.status = DriverDocumentStatus.DRAFT;
-
         document.rejectionReason = null;
         document.reviewedAt = null;
         document.reviewedByUserId = null;
@@ -207,10 +205,11 @@ export class AdminDriverReviewService {
     reason: string,
   ): Promise<void> {
     const profileRepository = manager.getRepository(DriverProfile);
-
     const vehicleRepository = manager.getRepository(DriverVehicle);
-
     const userRepository = manager.getRepository(User);
+    const operationalStateRepository = manager.getRepository(
+      DriverOperationalState,
+    );
 
     const profile = await this.lockProfile(profileRepository, driverProfileId);
 
@@ -229,23 +228,29 @@ export class AdminDriverReviewService {
     }
 
     const user = await this.lockUser(userRepository, profile.userId);
+    const operationalState = await this.getOrCreateOperationalState(
+      operationalStateRepository,
+      profile.id,
+    );
 
     const suspendedAt = new Date();
 
     profile.status = DriverStatus.SUSPENDED;
-
     profile.suspensionReason = reason;
     profile.suspendedAt = suspendedAt;
     profile.suspendedByUserId = adminUserId;
 
     vehicle.status = VehicleStatus.SUSPENDED;
-
     vehicle.rejectionReason = null;
 
     user.roles = user.roles.filter((role) => role !== UserRole.DRIVER);
 
+    operationalState.status = DriverOperationalStatus.OFFLINE;
+    operationalState.disconnectedAt = suspendedAt;
+
     await userRepository.save(user);
     await vehicleRepository.save(vehicle);
+    await operationalStateRepository.save(operationalState);
     await profileRepository.save(profile);
   }
 
@@ -312,6 +317,31 @@ export class AdminDriverReviewService {
     }
 
     return user;
+  }
+
+  private async getOrCreateOperationalState(
+    repository: Repository<DriverOperationalState>,
+    driverProfileId: string,
+  ): Promise<DriverOperationalState> {
+    const existingState = await repository
+      .createQueryBuilder('state')
+      .where('state.driver_profile_id = :driverProfileId', {
+        driverProfileId,
+      })
+      .setLock('pessimistic_write')
+      .getOne();
+
+    if (existingState) {
+      return existingState;
+    }
+
+    return repository.create({
+      driverProfileId,
+      status: DriverOperationalStatus.OFFLINE,
+      connectedAt: null,
+      disconnectedAt: null,
+      lastSeenAt: null,
+    });
   }
 
   private assertPendingReview(profile: DriverProfile): void {

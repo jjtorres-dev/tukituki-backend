@@ -11,6 +11,7 @@ import { AuthSessionsModule } from './modules/auth-sessions/auth-sessions.module
 import { PassengersModule } from './modules/passengers/passengers.module';
 import { DriversModule } from './modules/drivers/drivers.module';
 import { AdminDriversModule } from './modules/admin-drivers/admin-drivers.module';
+import { DriverOperationsModule } from './modules/driver-operations/driver-operations.module';
 
 @Module({
   imports: [
@@ -63,6 +64,8 @@ import { AdminDriversModule } from './modules/admin-drivers/admin-drivers.module
     DriversModule,
 
     AdminDriversModule,
+
+    DriverOperationsModule,
   ],
 })
 export class AppModule {}

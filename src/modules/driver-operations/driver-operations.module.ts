@@ -6,16 +6,13 @@ import { AuthorizationModule } from '../authorization/authorization.module';
 import { DriverDocument } from '../drivers/entities/driver-document.entity';
 import { DriverProfile } from '../drivers/entities/driver-profile.entity';
 import { DriverVehicle } from '../drivers/entities/driver-vehicle.entity';
-import { User } from '../users/entities/user.entity';
-import { AdminDriversController } from './admin-drivers.controller';
-import { AdminDriversService } from './admin-drivers.service';
-import { AdminDriverReviewService } from './admin-driver-review.service';
-import { DriverOperationalState } from '../driver-operations/entities/driver-operational-state.entity';
+import { DriverOperationsController } from './driver-operations.controller';
+import { DriverOperationsService } from './driver-operations.service';
+import { DriverOperationalState } from './entities/driver-operational-state.entity';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([
-      User,
       DriverProfile,
       DriverVehicle,
       DriverDocument,
@@ -24,8 +21,8 @@ import { DriverOperationalState } from '../driver-operations/entities/driver-ope
     AuthModule,
     AuthorizationModule,
   ],
-  controllers: [AdminDriversController],
-  providers: [AdminDriversService, AdminDriverReviewService],
-  exports: [AdminDriversService, AdminDriverReviewService],
+  controllers: [DriverOperationsController],
+  providers: [DriverOperationsService],
+  exports: [DriverOperationsService],
 })
-export class AdminDriversModule {}
+export class DriverOperationsModule {}
