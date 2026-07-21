@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { DataSource } from 'typeorm';
 
 import { User } from '../modules/users/entities/user.entity';
+import { AuthSession } from '../modules/auth-sessions/entities/auth-session.entity';
 
 function getRequiredEnvironmentVariable(name: string): string {
   const value = process.env[name];
@@ -38,7 +39,7 @@ const AppDataSource = new DataSource({
         }
       : false,
 
-  entities: [User],
+  entities: [User, AuthSession],
 
   migrations: [join(__dirname, 'migrations', '*.js')],
 

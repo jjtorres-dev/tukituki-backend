@@ -7,6 +7,7 @@ import { HealthModule } from './modules/health/health.module';
 import { UsersModule } from './modules/users/users.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { RedisModule } from './infrastructure/redis/redis.module';
+import { AuthSessionsModule } from './modules/auth-sessions/auth-sessions.module';
 
 @Module({
   imports: [
@@ -51,6 +52,8 @@ import { RedisModule } from './infrastructure/redis/redis.module';
     AuthModule,
 
     RedisModule,
+
+    AuthSessionsModule,
   ],
 })
 export class AppModule {}
