@@ -144,30 +144,6 @@ export class DriversService {
     }
   }
 
-  async submitMyProfile(userId: string): Promise<DriverProfile> {
-    const profile = await this.getMyProfile(userId);
-
-    if (
-      profile.status !== DriverStatus.DRAFT &&
-      profile.status !== DriverStatus.REJECTED
-    ) {
-      throw new BadRequestException(
-        'La solicitud no puede enviarse a revisión en su estado actual',
-      );
-    }
-
-    this.assertAdult(profile.birthDate);
-
-    profile.status = DriverStatus.PENDING_REVIEW;
-
-    profile.submittedAt = new Date();
-    profile.rejectionReason = null;
-    profile.approvedAt = null;
-    profile.approvedByUserId = null;
-
-    return this.driverProfilesRepository.save(profile);
-  }
-
   private assertEditable(profile: DriverProfile): void {
     const editableStatuses = [DriverStatus.DRAFT, DriverStatus.REJECTED];
 

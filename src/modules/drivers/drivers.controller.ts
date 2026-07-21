@@ -31,6 +31,7 @@ import { CreateDriverProfileDto } from './dto/create-driver-profile.dto';
 import { DriverProfileResponseDto } from './dto/driver-profile-response.dto';
 import { UpdateDriverProfileDto } from './dto/update-driver-profile.dto';
 import { DriversService } from './drivers.service';
+import { DriverApplicationSubmissionService } from './driver-application-submission.service';
 
 @ApiTags('Drivers')
 @ApiBearerAuth()
@@ -38,7 +39,11 @@ import { DriversService } from './drivers.service';
 @Roles(UserRole.PASSENGER, UserRole.DRIVER)
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class DriversController {
-  constructor(private readonly driversService: DriversService) {}
+  constructor(
+    private readonly driversService: DriversService,
+
+    private readonly submissionService: DriverApplicationSubmissionService,
+  ) {}
 
   @Post('me')
   @ApiOperation({
@@ -107,21 +112,22 @@ export class DriversController {
   @Post('me/submit')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
-    summary: 'Enviar la solicitud a revisión administrativa',
+    summary: 'Enviar la solicitud completa a revisión administrativa',
   })
   @ApiOkResponse({
-    description: 'Solicitud enviada a revisión',
+    description: 'Perfil, vehículo y documentos enviados a revisión',
     type: DriverProfileResponseDto,
   })
   @ApiBadRequestResponse({
-    description: 'La solicitud no puede enviarse en su estado actual',
+    description:
+      'La solicitud está incompleta, contiene requisitos inválidos o no puede enviarse',
   })
   @ApiNotFoundResponse({
-    description: 'La solicitud todavía no existe',
+    description: 'La solicitud del conductor todavía no existe',
   })
   submitMyProfile(
     @CurrentUser() user: AuthenticatedUser,
   ): Promise<DriverProfileResponseDto> {
-    return this.driversService.submitMyProfile(user.id);
+    return this.submissionService.submit(user.id);
   }
 }

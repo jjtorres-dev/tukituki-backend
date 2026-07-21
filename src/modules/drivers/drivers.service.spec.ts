@@ -112,18 +112,6 @@ describe('DriversService', () => {
     ).rejects.toBeInstanceOf(ConflictException);
   });
 
-  it('debe enviar la solicitud a revisión', async () => {
-    repository.findOne.mockResolvedValue({
-      ...profile,
-    });
-
-    const result = await service.submitMyProfile(userId);
-
-    expect(result.status).toBe(DriverStatus.PENDING_REVIEW);
-
-    expect(result.submittedAt).toBeInstanceOf(Date);
-  });
-
   it('debe impedir editar una solicitud pendiente', async () => {
     repository.findOne.mockResolvedValue({
       ...profile,

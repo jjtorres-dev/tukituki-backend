@@ -12,6 +12,7 @@ import { DriversService } from './drivers.service';
 import { DriverDocument } from './entities/driver-document.entity';
 import { DriverProfile } from './entities/driver-profile.entity';
 import { DriverVehicle } from './entities/driver-vehicle.entity';
+import { DriverApplicationSubmissionService } from './driver-application-submission.service';
 
 @Module({
   imports: [
@@ -24,7 +25,17 @@ import { DriverVehicle } from './entities/driver-vehicle.entity';
     DriverVehiclesController,
     DriverDocumentsController,
   ],
-  providers: [DriversService, DriverVehiclesService, DriverDocumentsService],
-  exports: [DriversService, DriverVehiclesService, DriverDocumentsService],
+  providers: [
+    DriversService,
+    DriverVehiclesService,
+    DriverDocumentsService,
+    DriverApplicationSubmissionService,
+  ],
+  exports: [
+    DriversService,
+    DriverVehiclesService,
+    DriverDocumentsService,
+    DriverApplicationSubmissionService,
+  ],
 })
 export class DriversModule {}
