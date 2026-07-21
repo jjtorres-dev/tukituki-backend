@@ -8,6 +8,7 @@ import { AuthSession } from '../modules/auth-sessions/entities/auth-session.enti
 import { PassengerProfile } from '../modules/passengers/entities/passenger-profile.entity';
 import { DriverProfile } from '../modules/drivers/entities/driver-profile.entity';
 import { DriverVehicle } from '../modules/drivers/entities/driver-vehicle.entity';
+import { DriverDocument } from '../modules/drivers/entities/driver-document.entity';
 
 function getRequiredEnvironmentVariable(name: string): string {
   const value = process.env[name];
@@ -42,7 +43,14 @@ const AppDataSource = new DataSource({
         }
       : false,
 
-  entities: [User, AuthSession, PassengerProfile, DriverProfile, DriverVehicle],
+  entities: [
+    User,
+    AuthSession,
+    PassengerProfile,
+    DriverProfile,
+    DriverVehicle,
+    DriverDocument,
+  ],
 
   migrations: [join(__dirname, 'migrations', '*.js')],
 
