@@ -4,9 +4,20 @@ import { PublicUserDto } from './register-response.dto';
 
 export class LoginResponseDto {
   @ApiProperty({
-    description: 'JWT para autorizar solicitudes',
+    description: 'JWT de corta duración para autorizar solicitudes',
   })
   accessToken!: string;
+
+  @ApiProperty({
+    description: 'Token utilizado para renovar la sesión',
+  })
+  refreshToken!: string;
+
+  @ApiProperty({
+    format: 'uuid',
+    description: 'Identificador de la sesión creada',
+  })
+  sessionId!: string;
 
   @ApiProperty({
     example: 'Bearer',
@@ -15,9 +26,15 @@ export class LoginResponseDto {
 
   @ApiProperty({
     example: 900,
-    description: 'Duración del token en segundos',
+    description: 'Duración del access token en segundos',
   })
   expiresIn!: number;
+
+  @ApiProperty({
+    example: 2592000,
+    description: 'Duración del refresh token en segundos',
+  })
+  refreshExpiresIn!: number;
 
   @ApiProperty({
     type: PublicUserDto,

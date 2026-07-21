@@ -5,6 +5,7 @@ import {
   HttpCode,
   HttpStatus,
   Post,
+  Req,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -34,6 +35,8 @@ import { VerifyPhoneOtpDto } from './dto/verify-phone-otp.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import type { AuthenticatedUser } from './interfaces/authenticated-user.interface';
 import { OtpService } from './otp.service';
+import { RefreshTokenDto } from './dto/refresh-token.dto';
+import type { Request } from 'express';
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -118,10 +121,19 @@ export class AuthController {
   @ApiForbiddenResponse({
     description: 'La cuenta no está verificada o habilitada',
   })
-  login(@Body() dto: LoginDto): Promise<LoginResponseDto> {
-    return this.authService.login(dto);
-  }
+  login(
+    @Body() dto: LoginDto,
+    @Req() request: Request,
+  ): Promise<LoginResponseDto> {
+    const ipAddress = request.ip ?? request.socket.remoteAddress ?? null;
 
+    const userAgent = request.get('user-agent') ?? null;
+
+    return this.authService.login(dto, {
+      ipAddress,
+      userAgent,
+    });
+  }
   @Get('me')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
@@ -136,5 +148,21 @@ export class AuthController {
   })
   me(@CurrentUser() user: AuthenticatedUser): AuthenticatedUser {
     return user;
+  }
+
+  @Post('refresh')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Renovar los tokens de una sesión',
+  })
+  @ApiOkResponse({
+    description: 'Tokens renovados correctamente',
+    type: LoginResponseDto,
+  })
+  @ApiUnauthorizedResponse({
+    description: 'Refresh token inválido, revocado o vencido',
+  })
+  refresh(@Body() dto: RefreshTokenDto): Promise<LoginResponseDto> {
+    return this.authService.refresh(dto.refreshToken);
   }
 }

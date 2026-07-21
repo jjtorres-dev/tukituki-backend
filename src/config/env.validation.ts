@@ -48,4 +48,10 @@ export const envValidationSchema = Joi.object({
     .min(300)
     .max(3600)
     .default(900),
+
+  REFRESH_TOKEN_TTL_SECONDS: Joi.number()
+    .integer()
+    .min(86400)
+    .max(7776000)
+    .default(2592000),
 });

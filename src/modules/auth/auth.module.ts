@@ -9,10 +9,12 @@ import { AuthService } from './auth.service';
 import { OtpService } from './otp.service';
 import { PasswordService } from './password.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
+import { AuthSessionsModule } from '../auth-sessions/auth-sessions.module';
 
 @Module({
   imports: [
     UsersModule,
+    AuthSessionsModule,
 
     PassportModule.register({
       defaultStrategy: 'jwt',
