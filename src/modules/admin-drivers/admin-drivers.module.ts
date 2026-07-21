@@ -9,6 +9,7 @@ import { DriverVehicle } from '../drivers/entities/driver-vehicle.entity';
 import { User } from '../users/entities/user.entity';
 import { AdminDriversController } from './admin-drivers.controller';
 import { AdminDriversService } from './admin-drivers.service';
+import { AdminDriverReviewService } from './admin-driver-review.service';
 
 @Module({
   imports: [
@@ -22,7 +23,7 @@ import { AdminDriversService } from './admin-drivers.service';
     AuthorizationModule,
   ],
   controllers: [AdminDriversController],
-  providers: [AdminDriversService],
-  exports: [AdminDriversService],
+  providers: [AdminDriversService, AdminDriverReviewService],
+  exports: [AdminDriversService, AdminDriverReviewService],
 })
 export class AdminDriversModule {}

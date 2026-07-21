@@ -77,6 +77,25 @@ export class DriverProfileResponseDto {
   })
   approvedByUserId!: string | null;
 
+  @ApiPropertyOptional({
+    nullable: true,
+    maxLength: 500,
+  })
+  suspensionReason!: string | null;
+
+  @ApiPropertyOptional({
+    type: String,
+    format: 'date-time',
+    nullable: true,
+  })
+  suspendedAt!: Date | null;
+
+  @ApiPropertyOptional({
+    format: 'uuid',
+    nullable: true,
+  })
+  suspendedByUserId!: string | null;
+
   @ApiProperty({
     type: String,
     format: 'date-time',

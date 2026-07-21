@@ -210,6 +210,11 @@ export class AdminDriversService {
       submittedAt: profile.submittedAt,
       approvedAt: profile.approvedAt,
       approvedByUserId: profile.approvedByUserId,
+      suspensionReason: profile.suspensionReason,
+
+      suspendedAt: profile.suspendedAt,
+
+      suspendedByUserId: profile.suspendedByUserId,
       createdAt: profile.createdAt,
       updatedAt: profile.updatedAt,
     };

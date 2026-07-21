@@ -26,6 +26,7 @@ import { IdentityDocumentType } from '../enums/identity-document-type.enum';
 })
 @Index('IDX_driver_profiles_approved_by_user_id', ['approvedByUserId'])
 @Index('IDX_driver_profiles_status', ['status'])
+@Index('IDX_driver_profiles_suspended_by_user_id', ['suspendedByUserId'])
 export class DriverProfile {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
@@ -143,6 +144,37 @@ export class DriverProfile {
     name: 'approved_by_user_id',
   })
   approvedBy!: Relation<User> | null;
+
+  @Column({
+    name: 'suspension_reason',
+    type: 'varchar',
+    length: 500,
+    nullable: true,
+  })
+  suspensionReason!: string | null;
+
+  @Column({
+    name: 'suspended_at',
+    type: 'timestamptz',
+    nullable: true,
+  })
+  suspendedAt!: Date | null;
+
+  @Column({
+    name: 'suspended_by_user_id',
+    type: 'uuid',
+    nullable: true,
+  })
+  suspendedByUserId!: string | null;
+
+  @ManyToOne(() => User, {
+    nullable: true,
+    onDelete: 'SET NULL',
+  })
+  @JoinColumn({
+    name: 'suspended_by_user_id',
+  })
+  suspendedBy!: Relation<User> | null;
 
   @CreateDateColumn({
     name: 'created_at',
