@@ -3,14 +3,16 @@ import 'dotenv/config';
 import { join } from 'node:path';
 import { DataSource } from 'typeorm';
 
-import { User } from '../modules/users/entities/user.entity';
 import { AuthSession } from '../modules/auth-sessions/entities/auth-session.entity';
-import { PassengerProfile } from '../modules/passengers/entities/passenger-profile.entity';
-import { DriverProfile } from '../modules/drivers/entities/driver-profile.entity';
-import { DriverVehicle } from '../modules/drivers/entities/driver-vehicle.entity';
-import { DriverDocument } from '../modules/drivers/entities/driver-document.entity';
 import { DriverLocation } from '../modules/driver-operations/entities/driver-location.entity';
 import { DriverOperationalState } from '../modules/driver-operations/entities/driver-operational-state.entity';
+import { DriverDocument } from '../modules/drivers/entities/driver-document.entity';
+import { DriverProfile } from '../modules/drivers/entities/driver-profile.entity';
+import { DriverVehicle } from '../modules/drivers/entities/driver-vehicle.entity';
+import { FareRule } from '../modules/fares/entities/fare-rule.entity';
+import { PassengerProfile } from '../modules/passengers/entities/passenger-profile.entity';
+import { ServiceZone } from '../modules/service-zones/entities/service-zone.entity';
+import { User } from '../modules/users/entities/user.entity';
 
 function getRequiredEnvironmentVariable(name: string): string {
   const value = process.env[name];
@@ -54,6 +56,8 @@ const AppDataSource = new DataSource({
     DriverDocument,
     DriverOperationalState,
     DriverLocation,
+    ServiceZone,
+    FareRule,
   ],
 
   migrations: [join(__dirname, 'migrations', '*.js')],

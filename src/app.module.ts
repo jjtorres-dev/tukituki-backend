@@ -3,15 +3,17 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { envValidationSchema } from './config/env.validation';
-import { HealthModule } from './modules/health/health.module';
-import { UsersModule } from './modules/users/users.module';
-import { AuthModule } from './modules/auth/auth.module';
 import { RedisModule } from './infrastructure/redis/redis.module';
-import { AuthSessionsModule } from './modules/auth-sessions/auth-sessions.module';
-import { PassengersModule } from './modules/passengers/passengers.module';
-import { DriversModule } from './modules/drivers/drivers.module';
 import { AdminDriversModule } from './modules/admin-drivers/admin-drivers.module';
+import { AuthSessionsModule } from './modules/auth-sessions/auth-sessions.module';
+import { AuthModule } from './modules/auth/auth.module';
 import { DriverOperationsModule } from './modules/driver-operations/driver-operations.module';
+import { DriversModule } from './modules/drivers/drivers.module';
+import { FaresModule } from './modules/fares/fares.module';
+import { HealthModule } from './modules/health/health.module';
+import { PassengersModule } from './modules/passengers/passengers.module';
+import { ServiceZonesModule } from './modules/service-zones/service-zones.module';
+import { UsersModule } from './modules/users/users.module';
 
 @Module({
   imports: [
@@ -50,22 +52,16 @@ import { DriverOperationsModule } from './modules/driver-operations/driver-opera
     }),
 
     HealthModule,
-
     UsersModule,
-
     AuthModule,
-
     RedisModule,
-
     AuthSessionsModule,
-
     PassengersModule,
-
     DriversModule,
-
     AdminDriversModule,
-
     DriverOperationsModule,
+    ServiceZonesModule,
+    FaresModule,
   ],
 })
 export class AppModule {}
