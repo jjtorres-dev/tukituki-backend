@@ -9,6 +9,7 @@ import { PassengerProfile } from '../modules/passengers/entities/passenger-profi
 import { DriverProfile } from '../modules/drivers/entities/driver-profile.entity';
 import { DriverVehicle } from '../modules/drivers/entities/driver-vehicle.entity';
 import { DriverDocument } from '../modules/drivers/entities/driver-document.entity';
+import { DriverLocation } from '../modules/driver-operations/entities/driver-location.entity';
 import { DriverOperationalState } from '../modules/driver-operations/entities/driver-operational-state.entity';
 
 function getRequiredEnvironmentVariable(name: string): string {
@@ -52,6 +53,7 @@ const AppDataSource = new DataSource({
     DriverVehicle,
     DriverDocument,
     DriverOperationalState,
+    DriverLocation,
   ],
 
   migrations: [join(__dirname, 'migrations', '*.js')],

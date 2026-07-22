@@ -2,11 +2,13 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import type { EntityManager, Repository } from 'typeorm';
 
+import { DriverAvailabilityRedisService } from '../../infrastructure/redis/driver-availability-redis.service';
 import { DriverDocument } from '../drivers/entities/driver-document.entity';
 import { DriverProfile } from '../drivers/entities/driver-profile.entity';
 import { DriverVehicle } from '../drivers/entities/driver-vehicle.entity';
@@ -24,7 +26,12 @@ const REQUIRED_OPERATIONAL_DOCUMENTS: readonly DriverDocumentType[] = [
 
 @Injectable()
 export class DriverOperationsService {
-  constructor(private readonly dataSource: DataSource) {}
+  private readonly logger = new Logger(DriverOperationsService.name);
+
+  constructor(
+    private readonly dataSource: DataSource,
+    private readonly availabilityRedisService: DriverAvailabilityRedisService,
+  ) {}
 
   getMyStatus(userId: string): Promise<DriverOperationalState> {
     return this.dataSource.transaction(async (manager) => {
@@ -36,8 +43,8 @@ export class DriverOperationsService {
     });
   }
 
-  goOnline(userId: string): Promise<DriverOperationalState> {
-    return this.dataSource.transaction(async (manager) => {
+  async goOnline(userId: string): Promise<DriverOperationalState> {
+    const state = await this.dataSource.transaction(async (manager) => {
       const profile = await this.lockApprovedProfile(manager, userId);
 
       const vehicle = await this.lockVehicle(manager, profile.id);
@@ -51,9 +58,12 @@ export class DriverOperationsService {
 
       const stateRepository = manager.getRepository(DriverOperationalState);
 
-      const state = await this.getOrCreateState(stateRepository, profile.id);
+      const currentState = await this.getOrCreateState(
+        stateRepository,
+        profile.id,
+      );
 
-      if (state.status === DriverOperationalStatus.BUSY) {
+      if (currentState.status === DriverOperationalStatus.BUSY) {
         throw new BadRequestException(
           'No puedes cambiar a disponible mientras tienes un viaje activo',
         );
@@ -61,69 +71,94 @@ export class DriverOperationsService {
 
       const now = new Date();
 
-      if (state.status === DriverOperationalStatus.OFFLINE) {
-        state.connectedAt = now;
+      if (currentState.status === DriverOperationalStatus.OFFLINE) {
+        currentState.connectedAt = now;
       }
 
-      state.status = DriverOperationalStatus.AVAILABLE;
+      currentState.status = DriverOperationalStatus.AVAILABLE;
 
-      state.lastSeenAt = now;
-      state.disconnectedAt = null;
+      currentState.lastSeenAt = now;
+      currentState.disconnectedAt = null;
 
-      return stateRepository.save(state);
+      return stateRepository.save(currentState);
     });
+
+    /*
+     * Al conectarse no publicamos una posición antigua.
+     * El siguiente PUT /drivers/me/location agregará al
+     * conductor a Redis GEO con coordenadas actuales.
+     */
+    await this.safeRemoveDriverAvailability(state.driverProfileId);
+
+    return state;
   }
 
-  goOffline(userId: string): Promise<DriverOperationalState> {
-    return this.dataSource.transaction(async (manager) => {
+  async goOffline(userId: string): Promise<DriverOperationalState> {
+    const state = await this.dataSource.transaction(async (manager) => {
       const profile = await this.lockApprovedProfile(manager, userId);
 
       const stateRepository = manager.getRepository(DriverOperationalState);
 
-      const state = await this.getOrCreateState(stateRepository, profile.id);
+      const currentState = await this.getOrCreateState(
+        stateRepository,
+        profile.id,
+      );
 
-      if (state.status === DriverOperationalStatus.BUSY) {
+      if (currentState.status === DriverOperationalStatus.BUSY) {
         throw new BadRequestException(
           'No puedes desconectarte mientras tienes un viaje activo',
         );
       }
 
-      if (state.status === DriverOperationalStatus.OFFLINE) {
-        if (!state.disconnectedAt) {
-          state.disconnectedAt = new Date();
+      if (currentState.status === DriverOperationalStatus.OFFLINE) {
+        if (!currentState.disconnectedAt) {
+          currentState.disconnectedAt = new Date();
 
-          return stateRepository.save(state);
+          return stateRepository.save(currentState);
         }
 
-        return state;
+        return currentState;
       }
 
-      state.status = DriverOperationalStatus.OFFLINE;
+      currentState.status = DriverOperationalStatus.OFFLINE;
 
-      state.disconnectedAt = new Date();
+      currentState.disconnectedAt = new Date();
 
-      return stateRepository.save(state);
+      return stateRepository.save(currentState);
     });
+
+    await this.safeRemoveDriverAvailability(state.driverProfileId);
+
+    return state;
   }
 
-  heartbeat(userId: string): Promise<DriverOperationalState> {
-    return this.dataSource.transaction(async (manager) => {
+  async heartbeat(userId: string): Promise<DriverOperationalState> {
+    const state = await this.dataSource.transaction(async (manager) => {
       const profile = await this.lockApprovedProfile(manager, userId);
 
       const stateRepository = manager.getRepository(DriverOperationalState);
 
-      const state = await this.lockState(stateRepository, profile.id);
+      const currentState = await this.lockState(stateRepository, profile.id);
 
-      if (!state || state.status === DriverOperationalStatus.OFFLINE) {
+      if (
+        !currentState ||
+        currentState.status === DriverOperationalStatus.OFFLINE
+      ) {
         throw new BadRequestException(
           'El conductor debe estar conectado para enviar heartbeat',
         );
       }
 
-      state.lastSeenAt = new Date();
+      currentState.lastSeenAt = new Date();
 
-      return stateRepository.save(state);
+      return stateRepository.save(currentState);
     });
+
+    if (state.status === DriverOperationalStatus.AVAILABLE) {
+      await this.safeRenewPresence(state.driverProfileId);
+    }
+
+    return state;
   }
 
   private async lockApprovedProfile(
@@ -261,6 +296,34 @@ export class DriverOperationsService {
       })
       .setLock('pessimistic_write')
       .getOne();
+  }
+
+  private async safeRemoveDriverAvailability(
+    driverProfileId: string,
+  ): Promise<void> {
+    try {
+      await this.availabilityRedisService.removeDriverAvailability(
+        driverProfileId,
+      );
+    } catch (error: unknown) {
+      this.logger.error(
+        `No se pudo limpiar la disponibilidad Redis del conductor ${driverProfileId}`,
+        error,
+      );
+    }
+  }
+
+  private async safeRenewPresence(driverProfileId: string): Promise<void> {
+    try {
+      await this.availabilityRedisService.renewPresenceIfExists(
+        driverProfileId,
+      );
+    } catch (error: unknown) {
+      this.logger.error(
+        `No se pudo renovar la presencia Redis del conductor ${driverProfileId}`,
+        error,
+      );
+    }
   }
 
   private getTodayIsoDate(): string {

@@ -1,10 +1,12 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { DataSource, EntityManager, Repository } from 'typeorm';
 
+import { DriverAvailabilityRedisService } from '../../infrastructure/redis/driver-availability-redis.service';
 import { DriverOperationalState } from '../driver-operations/entities/driver-operational-state.entity';
 import { DriverOperationalStatus } from '../driver-operations/enums/driver-operational-status.enum';
 import { DriverDocument } from '../drivers/entities/driver-document.entity';
@@ -30,30 +32,39 @@ const REQUIRED_DOCUMENT_TYPES: readonly DriverDocumentType[] = [
 
 @Injectable()
 export class AdminDriverReviewService {
-  constructor(private readonly dataSource: DataSource) {}
+  private readonly logger = new Logger(AdminDriverReviewService.name);
 
-  approve(driverProfileId: string, adminUserId: string): Promise<void> {
-    return this.dataSource.transaction((manager) =>
+  constructor(
+    private readonly dataSource: DataSource,
+    private readonly availabilityRedisService: DriverAvailabilityRedisService,
+  ) {}
+
+  async approve(driverProfileId: string, adminUserId: string): Promise<void> {
+    await this.dataSource.transaction((manager) =>
       this.approveWithinTransaction(manager, driverProfileId, adminUserId),
     );
+
+    await this.safeRemoveDriverAvailability(driverProfileId);
   }
 
-  reject(
+  async reject(
     driverProfileId: string,
     adminUserId: string,
     dto: RejectDriverApplicationDto,
   ): Promise<void> {
-    return this.dataSource.transaction((manager) =>
+    await this.dataSource.transaction((manager) =>
       this.rejectWithinTransaction(manager, driverProfileId, adminUserId, dto),
     );
+
+    await this.safeRemoveDriverAvailability(driverProfileId);
   }
 
-  suspend(
+  async suspend(
     driverProfileId: string,
     adminUserId: string,
     reason: string,
   ): Promise<void> {
-    return this.dataSource.transaction((manager) =>
+    await this.dataSource.transaction((manager) =>
       this.suspendWithinTransaction(
         manager,
         driverProfileId,
@@ -61,6 +72,8 @@ export class AdminDriverReviewService {
         reason,
       ),
     );
+
+    await this.safeRemoveDriverAvailability(driverProfileId);
   }
 
   private async approveWithinTransaction(
@@ -443,6 +456,21 @@ export class AdminDriverReviewService {
     }
 
     return reasons;
+  }
+
+  private async safeRemoveDriverAvailability(
+    driverProfileId: string,
+  ): Promise<void> {
+    try {
+      await this.availabilityRedisService.removeDriverAvailability(
+        driverProfileId,
+      );
+    } catch (error: unknown) {
+      this.logger.error(
+        `No se pudo limpiar la disponibilidad Redis del conductor ${driverProfileId}`,
+        error,
+      );
+    }
   }
 
   private getTodayIsoDate(): string {

@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 import type { EntityManager } from 'typeorm';
 import { DataSource } from 'typeorm';
 
+import { DriverAvailabilityRedisService } from '../../infrastructure/redis/driver-availability-redis.service';
 import { DriverOperationalState } from '../driver-operations/entities/driver-operational-state.entity';
 import { DriverOperationalStatus } from '../driver-operations/enums/driver-operational-status.enum';
 import { DriverDocument } from '../drivers/entities/driver-document.entity';
@@ -80,6 +81,10 @@ describe('AdminDriverReviewService', () => {
   let savedDocuments: DriverDocument[] | undefined;
   let savedUser: User | undefined;
   let savedOperationalState: DriverOperationalState | undefined;
+
+  let availabilityRedisService: {
+    removeDriverAvailability: jest.Mock<Promise<void>, [string]>;
+  };
 
   const adminUserId = '97e761e2-ce3d-49cc-b0ed-c0ff3c313444';
 
@@ -193,6 +198,12 @@ describe('AdminDriverReviewService', () => {
     savedUser = undefined;
     savedOperationalState = undefined;
 
+    availabilityRedisService = {
+      removeDriverAvailability: jest.fn<Promise<void>, [string]>(() =>
+        Promise.resolve(),
+      ),
+    };
+
     profileQueryBuilder = createQueryBuilderMock<DriverProfile>();
     vehicleQueryBuilder = createQueryBuilderMock<DriverVehicle>();
     documentQueryBuilder = createQueryBuilderMock<DriverDocument>();
@@ -305,6 +316,10 @@ describe('AdminDriverReviewService', () => {
           provide: DataSource,
           useValue: dataSourceMock,
         },
+        {
+          provide: DriverAvailabilityRedisService,
+          useValue: availabilityRedisService,
+        },
       ],
     }).compile();
 
@@ -366,6 +381,10 @@ describe('AdminDriverReviewService', () => {
     expect(savedOperationalState?.connectedAt).toBeNull();
     expect(savedOperationalState?.disconnectedAt).toBeNull();
     expect(savedOperationalState?.lastSeenAt).toBeNull();
+
+    expect(
+      availabilityRedisService.removeDriverAvailability,
+    ).toHaveBeenCalledWith(profile.id);
   });
 
   it('debe impedir aprobar dos veces', async () => {
@@ -486,5 +505,9 @@ describe('AdminDriverReviewService', () => {
     expect(savedUser?.roles).toContain(UserRole.PASSENGER);
     expect(savedOperationalState?.status).toBe(DriverOperationalStatus.OFFLINE);
     expect(savedOperationalState?.disconnectedAt).toBeInstanceOf(Date);
+
+    expect(
+      availabilityRedisService.removeDriverAvailability,
+    ).toHaveBeenCalledWith(profile.id);
   });
 });

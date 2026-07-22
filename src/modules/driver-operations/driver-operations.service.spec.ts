@@ -3,6 +3,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { DataSource } from 'typeorm';
 import type { EntityManager } from 'typeorm';
 
+import { DriverAvailabilityRedisService } from '../../infrastructure/redis/driver-availability-redis.service';
 import { DriverDocument } from '../drivers/entities/driver-document.entity';
 import { DriverProfile } from '../drivers/entities/driver-profile.entity';
 import { DriverVehicle } from '../drivers/entities/driver-vehicle.entity';
@@ -57,6 +58,11 @@ describe('DriverOperationsService', () => {
     createQueryBuilder: jest.Mock;
     create: jest.Mock;
     save: jest.Mock;
+  };
+
+  let availabilityRedisService: {
+    removeDriverAvailability: jest.Mock<Promise<void>, [string]>;
+    renewPresenceIfExists: jest.Mock<Promise<boolean>, [string]>;
   };
 
   const userId = 'f544d52a-39e0-4da3-8861-6010355c5dba';
@@ -169,6 +175,15 @@ describe('DriverOperationsService', () => {
       ),
     };
 
+    availabilityRedisService = {
+      removeDriverAvailability: jest.fn<Promise<void>, [string]>(() =>
+        Promise.resolve(),
+      ),
+      renewPresenceIfExists: jest.fn<Promise<boolean>, [string]>(() =>
+        Promise.resolve(true),
+      ),
+    };
+
     const managerMock = {
       getRepository: jest.fn((entity: unknown): unknown => {
         if (entity === DriverProfile) {
@@ -204,6 +219,10 @@ describe('DriverOperationsService', () => {
         {
           provide: DataSource,
           useValue: dataSourceMock,
+        },
+        {
+          provide: DriverAvailabilityRedisService,
+          useValue: availabilityRedisService,
         },
       ],
     }).compile();
@@ -256,6 +275,10 @@ describe('DriverOperationsService', () => {
     expect(result.lastSeenAt).toBeInstanceOf(Date);
 
     expect(result.disconnectedAt).toBeNull();
+
+    expect(
+      availabilityRedisService.removeDriverAvailability,
+    ).toHaveBeenCalledWith(profile.id);
   });
 
   it('debe impedir conexión sin perfil aprobado', async () => {
@@ -300,6 +323,10 @@ describe('DriverOperationsService', () => {
     expect(result.status).toBe(DriverOperationalStatus.OFFLINE);
 
     expect(result.disconnectedAt).toBeInstanceOf(Date);
+
+    expect(
+      availabilityRedisService.removeDriverAvailability,
+    ).toHaveBeenCalledWith(profile.id);
   });
 
   it('debe impedir desconexión mientras está BUSY', async () => {
@@ -324,6 +351,10 @@ describe('DriverOperationsService', () => {
     expect(result.lastSeenAt).toBeInstanceOf(Date);
 
     expect(stateRepository.save).toHaveBeenCalledTimes(1);
+
+    expect(availabilityRedisService.renewPresenceIfExists).toHaveBeenCalledWith(
+      profile.id,
+    );
   });
 
   it('debe rechazar heartbeat cuando está OFFLINE', async () => {
