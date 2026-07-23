@@ -5,6 +5,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import {
   DataSource,
@@ -25,6 +26,8 @@ import { ServiceZoneStatus } from '../service-zones/enums/service-zone-status.en
 import { User } from '../users/entities/user.entity';
 import { UserRole } from '../users/enums/user-role.enum';
 import { UserStatus } from '../users/enums/user-status.enum';
+import { OutboxEventType } from '../outbox/enums/outbox-event-type.enum';
+import { OutboxService } from '../outbox/outbox.service';
 import { CancelPassengerRideDto } from './dto/cancel-passenger-ride.dto';
 import { CreatePassengerRideDto } from './dto/create-passenger-ride.dto';
 import { PassengerRideResponseDto } from './dto/passenger-ride-response.dto';
@@ -61,6 +64,7 @@ export class PassengerRidesService {
     private readonly rideDispatchService: RideDispatchService,
     private readonly transitionsService: RideTransitionsService,
     private readonly rideViewService: RideViewService,
+    @Optional() private readonly outboxService?: OutboxService,
   ) {}
 
   async createRide(
@@ -200,6 +204,20 @@ export class PassengerRidesService {
               occurredAt: now,
             });
           await manager.getRepository(RideStatusHistory).save(initialHistory);
+
+          if (this.outboxService) {
+            await this.outboxService.enqueueWithinTransaction(manager, {
+              aggregateType: 'RIDE',
+              aggregateId: savedRide.id,
+              eventType: OutboxEventType.RIDE_REQUESTED,
+              payload: {
+                passengerUserId,
+                status: RideStatus.SEARCHING_DRIVER,
+                stateVersion: savedRide.stateVersion,
+                requestedAt: now.toISOString(),
+              },
+            });
+          }
 
           quote.status = FareQuoteStatus.USED;
           quote.usedAt = now;

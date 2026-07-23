@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { DataSource, In, LessThanOrEqual, MoreThan } from 'typeorm';
 import type { EntityManager, Repository } from 'typeorm';
 
@@ -13,6 +13,8 @@ import { DriverDocumentStatus } from '../drivers/enums/driver-document-status.en
 import { DriverDocumentType } from '../drivers/enums/driver-document-type.enum';
 import { DriverStatus } from '../drivers/enums/driver-status.enum';
 import { VehicleStatus } from '../drivers/enums/vehicle-status.enum';
+import { OutboxEventType } from '../outbox/enums/outbox-event-type.enum';
+import { OutboxService } from '../outbox/outbox.service';
 import { RideOffer } from './entities/ride-offer.entity';
 import { Ride } from './entities/ride.entity';
 import { RideOfferStatus } from './enums/ride-offer-status.enum';
@@ -55,6 +57,7 @@ export class RideDispatchService {
     private readonly dataSource: DataSource,
     private readonly driverLocationsService: DriverLocationsService,
     private readonly transitionsService: RideTransitionsService,
+    @Optional() private readonly outboxService?: OutboxService,
   ) {}
 
   async dispatchRide(rideId: string): Promise<RideOffer[]> {
@@ -290,7 +293,25 @@ export class RideDispatchService {
         }),
       );
 
-      return offerRepository.save(offers);
+      const savedOffers = await offerRepository.save(offers);
+
+      if (this.outboxService) {
+        for (const offer of savedOffers) {
+          await this.outboxService.enqueueWithinTransaction(manager, {
+            aggregateType: 'RIDE_OFFER',
+            aggregateId: offer.id,
+            eventType: OutboxEventType.RIDE_OFFER_CREATED,
+            payload: {
+              rideId: ride.id,
+              driverProfileId: offer.driverProfileId,
+              dispatchRound: offer.dispatchRound,
+              expiresAt: offer.expiresAt.toISOString(),
+            },
+          });
+        }
+      }
+
+      return savedOffers;
     });
   }
 

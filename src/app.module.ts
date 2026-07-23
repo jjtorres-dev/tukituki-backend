@@ -12,6 +12,8 @@ import { DriversModule } from './modules/drivers/drivers.module';
 import { FaresModule } from './modules/fares/fares.module';
 import { HealthModule } from './modules/health/health.module';
 import { PassengersModule } from './modules/passengers/passengers.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
+import { OutboxModule } from './modules/outbox/outbox.module';
 import { RidesModule } from './modules/rides/rides.module';
 import { ServiceZonesModule } from './modules/service-zones/service-zones.module';
 import { UsersModule } from './modules/users/users.module';
@@ -58,6 +60,8 @@ import { UsersModule } from './modules/users/users.module';
     RedisModule,
     AuthSessionsModule,
     PassengersModule,
+    NotificationsModule,
+    OutboxModule,
     DriversModule,
     AdminDriversModule,
     DriverOperationsModule,

@@ -12,6 +12,9 @@ import { DriverVehicle } from '../modules/drivers/entities/driver-vehicle.entity
 import { FareQuote } from '../modules/fares/entities/fare-quote.entity';
 import { FareRule } from '../modules/fares/entities/fare-rule.entity';
 import { PassengerProfile } from '../modules/passengers/entities/passenger-profile.entity';
+import { UserDevice } from '../modules/notifications/entities/user-device.entity';
+import { UserNotification } from '../modules/notifications/entities/user-notification.entity';
+import { OutboxEvent } from '../modules/outbox/entities/outbox-event.entity';
 import { RideFinalFare } from '../modules/rides/entities/ride-final-fare.entity';
 import { RideLocationSample } from '../modules/rides/entities/ride-location-sample.entity';
 import { RideOffer } from '../modules/rides/entities/ride-offer.entity';
@@ -60,6 +63,9 @@ const AppDataSource = new DataSource({
     User,
     AuthSession,
     PassengerProfile,
+    UserDevice,
+    UserNotification,
+    OutboxEvent,
     DriverProfile,
     DriverVehicle,
     DriverDocument,

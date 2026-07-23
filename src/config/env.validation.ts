@@ -66,4 +66,46 @@ export const envValidationSchema = Joi.object({
     .min(1)
     .max(10)
     .default(3),
+
+  RIDE_FINAL_FARE_MAX_INCREASE_PERCENT: Joi.number()
+    .integer()
+    .min(0)
+    .max(100)
+    .default(20),
+
+  WORKERS_ENABLED: Joi.boolean().default(true),
+
+  RIDE_DISPATCH_POLL_INTERVAL_MS: Joi.number()
+    .integer()
+    .min(500)
+    .max(60000)
+    .default(2000),
+
+  RIDE_DISPATCH_BATCH_SIZE: Joi.number().integer().min(1).max(100).default(25),
+
+  OUTBOX_POLL_INTERVAL_MS: Joi.number()
+    .integer()
+    .min(250)
+    .max(60000)
+    .default(1000),
+
+  OUTBOX_BATCH_SIZE: Joi.number().integer().min(1).max(100).default(20),
+
+  OUTBOX_MAX_ATTEMPTS: Joi.number().integer().min(1).max(50).default(8),
+
+  OUTBOX_LOCK_TIMEOUT_SECONDS: Joi.number()
+    .integer()
+    .min(10)
+    .max(3600)
+    .default(60),
+
+  FCM_ENABLED: Joi.boolean().default(false),
+
+  FIREBASE_PROJECT_ID: Joi.string().max(200).optional(),
+
+  FIREBASE_SERVICE_ACCOUNT_BASE64: Joi.when('FCM_ENABLED', {
+    is: true,
+    then: Joi.string().min(100).required(),
+    otherwise: Joi.string().optional(),
+  }),
 });

@@ -5,6 +5,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import type { EntityManager } from 'typeorm';
@@ -23,6 +24,8 @@ import { VehicleStatus } from '../drivers/enums/vehicle-status.enum';
 import { User } from '../users/entities/user.entity';
 import { UserRole } from '../users/enums/user-role.enum';
 import { UserStatus } from '../users/enums/user-status.enum';
+import { OutboxEventType } from '../outbox/enums/outbox-event-type.enum';
+import { OutboxService } from '../outbox/outbox.service';
 import { RideTransitionResponseDto } from './dto/ride-transition-response.dto';
 import { RideOffer } from './entities/ride-offer.entity';
 import { RideStatusHistory } from './entities/ride-status-history.entity';
@@ -83,6 +86,7 @@ export class RideTransitionsService {
     private readonly availabilityRedisService: DriverAvailabilityRedisService,
     private readonly realtimeService: RideRealtimeService,
     private readonly rideStartCodesService: RideStartCodesService,
+    @Optional() private readonly outboxService?: OutboxService,
   ) {}
 
   async startArrival(
@@ -430,6 +434,44 @@ export class RideTransitionsService {
     });
 
     await manager.getRepository(RideStatusHistory).save(history);
+
+    const eventType = this.outboxEventType(newStatus);
+    if (eventType && this.outboxService) {
+      await this.outboxService.enqueueWithinTransaction(manager, {
+        aggregateType: 'RIDE',
+        aggregateId: ride.id,
+        eventType,
+        payload: {
+          previousStatus,
+          status: newStatus,
+          stateVersion: ride.stateVersion,
+          actorType: context.actorType,
+          actorUserId: context.actorUserId,
+          occurredAt: context.occurredAt.toISOString(),
+        },
+      });
+    }
+  }
+
+  private outboxEventType(status: RideStatus): OutboxEventType | null {
+    switch (status) {
+      case RideStatus.DRIVER_ASSIGNED:
+        return OutboxEventType.RIDE_ASSIGNED;
+      case RideStatus.DRIVER_ARRIVING:
+        return OutboxEventType.DRIVER_ARRIVING;
+      case RideStatus.DRIVER_ARRIVED:
+        return OutboxEventType.DRIVER_ARRIVED;
+      case RideStatus.IN_PROGRESS:
+        return OutboxEventType.RIDE_STARTED;
+      case RideStatus.COMPLETED:
+        return OutboxEventType.RIDE_COMPLETED;
+      case RideStatus.CANCELLED:
+        return OutboxEventType.RIDE_CANCELLED;
+      case RideStatus.EXPIRED:
+        return OutboxEventType.RIDE_EXPIRED;
+      case RideStatus.SEARCHING_DRIVER:
+        return OutboxEventType.RIDE_REQUESTED;
+    }
   }
 
   private assertTransitionAllowed(
