@@ -12,10 +12,7 @@ import { DriverVehicle } from '../modules/drivers/entities/driver-vehicle.entity
 import { FareQuote } from '../modules/fares/entities/fare-quote.entity';
 import { FareRule } from '../modules/fares/entities/fare-rule.entity';
 import { PassengerProfile } from '../modules/passengers/entities/passenger-profile.entity';
-import { RideFinalFare } from '../modules/rides/entities/ride-final-fare.entity';
-import { RideLocationSample } from '../modules/rides/entities/ride-location-sample.entity';
 import { RideOffer } from '../modules/rides/entities/ride-offer.entity';
-import { RideProgressMetrics } from '../modules/rides/entities/ride-progress-metrics.entity';
 import { RideStartCode } from '../modules/rides/entities/ride-start-code.entity';
 import { RideStatusHistory } from '../modules/rides/entities/ride-status-history.entity';
 import { Ride } from '../modules/rides/entities/ride.entity';
@@ -71,9 +68,6 @@ const AppDataSource = new DataSource({
     RideOffer,
     RideStartCode,
     RideStatusHistory,
-    RideLocationSample,
-    RideProgressMetrics,
-    RideFinalFare,
   ],
 
   migrations: [join(__dirname, 'migrations', '*.js')],

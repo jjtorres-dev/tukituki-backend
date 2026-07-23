@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsDateString, IsNumber, IsOptional, Max, Min } from 'class-validator';
+import { IsNumber, IsOptional, Max, Min } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class UpdateDriverLocationDto {
@@ -28,16 +28,6 @@ export class UpdateDriverLocationDto {
   @Min(-180)
   @Max(180)
   longitude!: number;
-
-  @ApiPropertyOptional({
-    type: String,
-    format: 'date-time',
-    description:
-      'Momento capturado por el dispositivo. Si se omite, se usa la hora del servidor',
-  })
-  @IsOptional()
-  @IsDateString()
-  recordedAt?: string;
 
   @ApiPropertyOptional({
     example: 90,

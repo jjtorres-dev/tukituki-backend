@@ -14,7 +14,6 @@ import type { EntityManager } from 'typeorm';
 import { DriverLocation } from '../driver-operations/entities/driver-location.entity';
 import { DriverOperationalState } from '../driver-operations/entities/driver-operational-state.entity';
 import { DriverOperationalStatus } from '../driver-operations/enums/driver-operational-status.enum';
-import { RideProgressTrackingService } from '../driver-operations/ride-progress-tracking.service';
 import { DriverProfile } from '../drivers/entities/driver-profile.entity';
 import { DriverStatus } from '../drivers/enums/driver-status.enum';
 import { RideStartResponseDto } from './dto/ride-start-response.dto';
@@ -68,7 +67,6 @@ export class RideStartService {
     private readonly dataSource: DataSource,
     private readonly startCodesService: RideStartCodesService,
     private readonly transitionsService: RideTransitionsService,
-    private readonly progressTrackingService: RideProgressTrackingService,
     private readonly realtimeService: RideRealtimeService,
   ) {}
 
@@ -203,15 +201,6 @@ export class RideStartService {
               locationRecordedAt: usableLocation.recordedAt.toISOString(),
               locationAccuracyMeters: usableLocation.accuracy,
             },
-          },
-        );
-        await this.progressTrackingService.initializeWithinTransaction(
-          manager,
-          ride,
-          now,
-          {
-            driverProfileId: profile.id,
-            location: usableLocation,
           },
         );
 

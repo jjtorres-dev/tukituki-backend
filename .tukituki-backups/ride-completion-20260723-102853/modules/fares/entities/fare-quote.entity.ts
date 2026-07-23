@@ -174,41 +174,6 @@ export class FareQuote {
   bookingFee!: string;
 
   @Column({
-    name: 'pricing_minimum_fare',
-    type: 'numeric',
-    precision: 10,
-    scale: 2,
-    nullable: true,
-  })
-  pricingMinimumFare!: string | null;
-
-  @Column({
-    name: 'pricing_price_per_km',
-    type: 'numeric',
-    precision: 10,
-    scale: 4,
-    nullable: true,
-  })
-  pricingPricePerKm!: string | null;
-
-  @Column({
-    name: 'pricing_price_per_minute',
-    type: 'numeric',
-    precision: 10,
-    scale: 4,
-    nullable: true,
-  })
-  pricingPricePerMinute!: string | null;
-
-  @Column({
-    name: 'pricing_calculation_version',
-    type: 'varchar',
-    length: 30,
-    nullable: true,
-  })
-  pricingCalculationVersion!: string | null;
-
-  @Column({
     type: 'numeric',
     precision: 10,
     scale: 2,

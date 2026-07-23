@@ -28,16 +28,11 @@ import type { AuthenticatedUser } from '../auth/interfaces/authenticated-user.in
 import { Roles } from '../authorization/decorators/roles.decorator';
 import { RolesGuard } from '../authorization/guards/roles.guard';
 import { UserRole } from '../users/enums/user-role.enum';
-import { CompleteRideDto } from './dto/complete-ride.dto';
 import { DriverActiveRideResponseDto } from './dto/driver-active-ride-response.dto';
-import { RideCompletionResponseDto } from './dto/ride-completion-response.dto';
-import { RideReceiptResponseDto } from './dto/ride-receipt-response.dto';
 import { RideTransitionResponseDto } from './dto/ride-transition-response.dto';
 import { RideStartResponseDto } from './dto/ride-start-response.dto';
 import { StartRideDto } from './dto/start-ride.dto';
 import { DriverRidesService } from './driver-rides.service';
-import { RideCompletionService } from './ride-completion.service';
-import { RideReceiptsService } from './ride-receipts.service';
 import { RideStartService } from './ride-start.service';
 import { RideTransitionsService } from './ride-transitions.service';
 
@@ -53,8 +48,6 @@ export class DriverRidesController {
     private readonly driverRidesService: DriverRidesService,
     private readonly transitionsService: RideTransitionsService,
     private readonly rideStartService: RideStartService,
-    private readonly rideCompletionService: RideCompletionService,
-    private readonly rideReceiptsService: RideReceiptsService,
   ) {}
 
   @Get('active')
@@ -117,39 +110,6 @@ export class DriverRidesController {
     @Param('rideId', ParseUUIDPipe) rideId: string,
   ): Promise<RideTransitionResponseDto> {
     return this.transitionsService.markArrived(user.id, rideId);
-  }
-
-  @Post(':rideId/complete')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({
-    summary: 'Finalizar el viaje cerca del destino y calcular la tarifa final',
-  })
-  @ApiOkResponse({ type: RideCompletionResponseDto })
-  @ApiBadRequestResponse({
-    description:
-      'GPS ausente, vencido, impreciso o conductor lejos del destino',
-  })
-  @ApiConflictResponse({
-    description: 'El viaje o el conductor no están en un estado compatible',
-  })
-  @ApiNotFoundResponse()
-  completeRide(
-    @CurrentUser() user: AuthenticatedUser,
-    @Param('rideId', ParseUUIDPipe) rideId: string,
-    @Body() dto: CompleteRideDto,
-  ): Promise<RideCompletionResponseDto> {
-    return this.rideCompletionService.completeRide(user.id, rideId, dto);
-  }
-
-  @Get(':rideId/receipt')
-  @ApiOperation({ summary: 'Consultar el comprobante de un viaje finalizado' })
-  @ApiOkResponse({ type: RideReceiptResponseDto })
-  @ApiNotFoundResponse()
-  getReceipt(
-    @CurrentUser() user: AuthenticatedUser,
-    @Param('rideId', ParseUUIDPipe) rideId: string,
-  ): Promise<RideReceiptResponseDto> {
-    return this.rideReceiptsService.getDriverReceipt(user.id, rideId);
   }
 
   @Post(':rideId/start')

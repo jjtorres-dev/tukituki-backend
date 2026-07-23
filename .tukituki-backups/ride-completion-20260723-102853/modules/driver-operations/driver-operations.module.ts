@@ -6,15 +6,11 @@ import { AuthorizationModule } from '../authorization/authorization.module';
 import { DriverDocument } from '../drivers/entities/driver-document.entity';
 import { DriverProfile } from '../drivers/entities/driver-profile.entity';
 import { DriverVehicle } from '../drivers/entities/driver-vehicle.entity';
-import { RideLocationSample } from '../rides/entities/ride-location-sample.entity';
-import { RideProgressMetrics } from '../rides/entities/ride-progress-metrics.entity';
-import { Ride } from '../rides/entities/ride.entity';
 import { RideRealtimeModule } from '../rides/realtime/ride-realtime.module';
 import { DriverLocationsController } from './driver-locations.controller';
 import { DriverLocationsService } from './driver-locations.service';
 import { DriverOperationsController } from './driver-operations.controller';
 import { DriverOperationsService } from './driver-operations.service';
-import { RideProgressTrackingService } from './ride-progress-tracking.service';
 import { DriverLocation } from './entities/driver-location.entity';
 import { DriverOperationalState } from './entities/driver-operational-state.entity';
 
@@ -26,24 +22,13 @@ import { DriverOperationalState } from './entities/driver-operational-state.enti
       DriverDocument,
       DriverOperationalState,
       DriverLocation,
-      Ride,
-      RideLocationSample,
-      RideProgressMetrics,
     ]),
     AuthModule,
     AuthorizationModule,
     RideRealtimeModule,
   ],
   controllers: [DriverOperationsController, DriverLocationsController],
-  providers: [
-    DriverOperationsService,
-    DriverLocationsService,
-    RideProgressTrackingService,
-  ],
-  exports: [
-    DriverOperationsService,
-    DriverLocationsService,
-    RideProgressTrackingService,
-  ],
+  providers: [DriverOperationsService, DriverLocationsService],
+  exports: [DriverOperationsService, DriverLocationsService],
 })
 export class DriverOperationsModule {}

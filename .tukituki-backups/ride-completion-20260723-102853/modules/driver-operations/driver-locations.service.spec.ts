@@ -10,7 +10,6 @@ import { DriverProfile } from '../drivers/entities/driver-profile.entity';
 import { DriverStatus } from '../drivers/enums/driver-status.enum';
 import { IdentityDocumentType } from '../drivers/enums/identity-document-type.enum';
 import { DriverLocationsService } from './driver-locations.service';
-import { RideProgressTrackingService } from './ride-progress-tracking.service';
 import { DriverLocation } from './entities/driver-location.entity';
 import { DriverOperationalState } from './entities/driver-operational-state.entity';
 import { DriverOperationalStatus } from './enums/driver-operational-status.enum';
@@ -257,13 +256,6 @@ describe('DriverLocationsService', () => {
           provide: RideRealtimeService,
           useValue: {
             emitDriverLocation: jest.fn(() => Promise.resolve()),
-            emitProgress: jest.fn(),
-          },
-        },
-        {
-          provide: RideProgressTrackingService,
-          useValue: {
-            recordWithinTransaction: jest.fn(() => Promise.resolve(null)),
           },
         },
       ],

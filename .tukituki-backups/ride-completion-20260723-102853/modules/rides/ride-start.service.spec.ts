@@ -6,7 +6,6 @@ import type { EntityManager } from 'typeorm';
 import { DriverLocation } from '../driver-operations/entities/driver-location.entity';
 import { DriverOperationalState } from '../driver-operations/entities/driver-operational-state.entity';
 import { DriverOperationalStatus } from '../driver-operations/enums/driver-operational-status.enum';
-import { RideProgressTrackingService } from '../driver-operations/ride-progress-tracking.service';
 import { DriverProfile } from '../drivers/entities/driver-profile.entity';
 import { DriverStatus } from '../drivers/enums/driver-status.enum';
 import { RideStartCode } from './entities/ride-start-code.entity';
@@ -41,9 +40,6 @@ describe('RideStartService', () => {
   let codeService: RideStartCodesService;
   let transitionsService: {
     transitionWithinTransaction: jest.Mock;
-  };
-  let progressTrackingService: {
-    initializeWithinTransaction: jest.Mock;
   };
   let realtimeService: {
     emitStatusChanged: jest.Mock;
@@ -154,9 +150,6 @@ describe('RideStartService', () => {
         },
       ),
     };
-    progressTrackingService = {
-      initializeWithinTransaction: jest.fn(() => Promise.resolve()),
-    };
     realtimeService = {
       emitStatusChanged: jest.fn(),
       emitStarted: jest.fn(),
@@ -165,7 +158,6 @@ describe('RideStartService', () => {
       dataSourceMock as unknown as DataSource,
       codeService,
       transitionsService as unknown as RideTransitionsService,
-      progressTrackingService as unknown as RideProgressTrackingService,
       realtimeService as unknown as RideRealtimeService,
     );
   });
@@ -182,9 +174,6 @@ describe('RideStartService', () => {
     expect(startCode.usedAt).toBeInstanceOf(Date);
     expect(
       transitionsService.transitionWithinTransaction,
-    ).toHaveBeenCalledTimes(1);
-    expect(
-      progressTrackingService.initializeWithinTransaction,
     ).toHaveBeenCalledTimes(1);
     expect(realtimeService.emitStarted).toHaveBeenCalledTimes(1);
   });

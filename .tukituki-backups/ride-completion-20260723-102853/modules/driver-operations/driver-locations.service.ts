@@ -25,13 +25,10 @@ import type { DriverLocationPoint } from './entities/driver-location.entity';
 import { DriverOperationalState } from './entities/driver-operational-state.entity';
 import { DriverOperationalStatus } from './enums/driver-operational-status.enum';
 import type { NearbyAvailableDriver } from './interfaces/nearby-available-driver.interface';
-import { RideProgressTrackingService } from './ride-progress-tracking.service';
-import type { RideProgressUpdate } from './ride-progress-tracking.service';
 
 interface SavedLocationResult {
   location: DriverLocation;
   operationalStatus: DriverOperationalStatus;
-  progress: RideProgressUpdate | null;
 }
 
 @Injectable()
@@ -42,7 +39,6 @@ export class DriverLocationsService {
     private readonly dataSource: DataSource,
     private readonly availabilityRedisService: DriverAvailabilityRedisService,
     private readonly realtimeService: RideRealtimeService,
-    private readonly progressTrackingService: RideProgressTrackingService,
   ) {}
 
   async updateMyLocation(
@@ -82,19 +78,6 @@ export class DriverLocationsService {
           }`,
         );
       });
-
-    if (result.progress) {
-      try {
-        this.realtimeService.emitProgress(result.progress);
-      } catch (error: unknown) {
-        this.logger.warn(
-          `La métrica del viaje ${result.progress.rideId} se guardó, pero no ` +
-            `pudo emitirse: ${
-              error instanceof Error ? error.message : 'error desconocido'
-            }`,
-        );
-      }
-    }
 
     return this.mapLocation(result.location);
   }
@@ -279,20 +262,9 @@ export class DriverLocationsService {
 
     const savedLocation = await locationRepository.save(location);
 
-    const progress =
-      state.status === DriverOperationalStatus.BUSY
-        ? await this.progressTrackingService.recordWithinTransaction(
-            manager,
-            profile.id,
-            dto,
-            now,
-          )
-        : null;
-
     return {
       location: savedLocation,
       operationalStatus: state.status,
-      progress,
     };
   }
 

@@ -17,19 +17,14 @@ import { DriverRideOffersController } from './driver-ride-offers.controller';
 import { DriverRideOffersService } from './driver-ride-offers.service';
 import { DriverRidesController } from './driver-rides.controller';
 import { DriverRidesService } from './driver-rides.service';
-import { RideFinalFare } from './entities/ride-final-fare.entity';
-import { RideLocationSample } from './entities/ride-location-sample.entity';
 import { RideOffer } from './entities/ride-offer.entity';
-import { RideProgressMetrics } from './entities/ride-progress-metrics.entity';
 import { RideStartCode } from './entities/ride-start-code.entity';
 import { RideStatusHistory } from './entities/ride-status-history.entity';
 import { Ride } from './entities/ride.entity';
 import { PassengerRidesController } from './passenger-rides.controller';
 import { PassengerRidesService } from './passenger-rides.service';
 import { RideRealtimeModule } from './realtime/ride-realtime.module';
-import { RideCompletionService } from './ride-completion.service';
 import { RideDispatchService } from './ride-dispatch.service';
-import { RideReceiptsService } from './ride-receipts.service';
 import { RideStartCodesService } from './ride-start-codes.service';
 import { RideStartService } from './ride-start.service';
 import { RideTransitionsService } from './ride-transitions.service';
@@ -42,9 +37,6 @@ import { RideViewService } from './ride-view.service';
       RideOffer,
       RideStatusHistory,
       RideStartCode,
-      RideLocationSample,
-      RideProgressMetrics,
-      RideFinalFare,
       FareQuote,
       FareRule,
       ServiceZone,
@@ -74,8 +66,6 @@ import { RideViewService } from './ride-view.service';
     RideViewService,
     RideStartCodesService,
     RideStartService,
-    RideCompletionService,
-    RideReceiptsService,
   ],
   exports: [
     PassengerRidesService,
@@ -86,8 +76,6 @@ import { RideViewService } from './ride-view.service';
     RideViewService,
     RideStartCodesService,
     RideStartService,
-    RideCompletionService,
-    RideReceiptsService,
   ],
 })
 export class RidesModule {}

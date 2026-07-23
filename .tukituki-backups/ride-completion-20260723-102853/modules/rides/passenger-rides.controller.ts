@@ -33,10 +33,8 @@ import { UserRole } from '../users/enums/user-role.enum';
 import { CancelPassengerRideDto } from './dto/cancel-passenger-ride.dto';
 import { CreatePassengerRideDto } from './dto/create-passenger-ride.dto';
 import { PassengerRideResponseDto } from './dto/passenger-ride-response.dto';
-import { RideReceiptResponseDto } from './dto/ride-receipt-response.dto';
 import { PassengerRideStartCodeResponseDto } from './dto/passenger-ride-start-code-response.dto';
 import { PassengerRidesService } from './passenger-rides.service';
-import { RideReceiptsService } from './ride-receipts.service';
 import { RideStartCodesService } from './ride-start-codes.service';
 
 const HTTP_STATUS_LOCKED = 423;
@@ -50,7 +48,6 @@ export class PassengerRidesController {
   constructor(
     private readonly passengerRidesService: PassengerRidesService,
     private readonly rideStartCodesService: RideStartCodesService,
-    private readonly rideReceiptsService: RideReceiptsService,
   ) {}
 
   @Post()
@@ -145,19 +142,6 @@ export class PassengerRidesController {
       user.id,
       rideId,
     );
-  }
-
-  @Get(':rideId/receipt')
-  @ApiOperation({ summary: 'Consultar el comprobante del viaje finalizado' })
-  @ApiOkResponse({ type: RideReceiptResponseDto })
-  @ApiNotFoundResponse({
-    description: 'El comprobante no existe o el viaje todavía no finalizó',
-  })
-  getReceipt(
-    @CurrentUser() user: AuthenticatedUser,
-    @Param('rideId', ParseUUIDPipe) rideId: string,
-  ): Promise<RideReceiptResponseDto> {
-    return this.rideReceiptsService.getPassengerReceipt(user.id, rideId);
   }
 
   @Get(':rideId')

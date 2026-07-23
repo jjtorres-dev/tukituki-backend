@@ -2,9 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { DataSource, In } from 'typeorm';
 
 import { DriverLocation } from '../../driver-operations/entities/driver-location.entity';
-import { RideFinalFare } from '../entities/ride-final-fare.entity';
 import { Ride } from '../entities/ride.entity';
-import type { RideProgressUpdate } from '../../driver-operations/ride-progress-tracking.service';
 import { RideStatus } from '../enums/ride-status.enum';
 import { RidesGateway } from './rides.gateway';
 
@@ -59,40 +57,6 @@ export class RideRealtimeService {
       status: ride.status,
       stateVersion: ride.stateVersion,
       startedAt: ride.startedAt,
-    });
-  }
-
-  emitProgress(progress: RideProgressUpdate): void {
-    this.gateway.emitToRide(progress.rideId, 'ride.progress.updated', {
-      rideId: progress.rideId,
-      stateVersion: progress.stateVersion,
-      trackedDistanceMeters: progress.trackedDistanceMeters,
-      durationSeconds: progress.durationSeconds,
-      acceptedForMetrics: progress.acceptedForMetrics,
-      rejectionReason: progress.rejectionReason,
-      driverLocation: {
-        latitude: progress.latitude,
-        longitude: progress.longitude,
-        heading: progress.heading,
-        speed: progress.speed,
-        accuracy: progress.accuracy,
-        recordedAt: progress.recordedAt,
-      },
-    });
-  }
-
-  emitCompleted(ride: Ride, fare: RideFinalFare): void {
-    this.gateway.emitToRide(ride.id, 'ride.completed', {
-      rideId: ride.id,
-      status: ride.status,
-      stateVersion: ride.stateVersion,
-      completedAt: ride.completedAt,
-      actualDistanceMeters: ride.actualDistanceMeters,
-      actualDurationSeconds: ride.actualDurationSeconds,
-      estimatedFare: ride.estimatedFare,
-      finalFare: fare.finalFare,
-      currency: fare.currency,
-      fareWasCapped: fare.fareWasCapped,
     });
   }
 

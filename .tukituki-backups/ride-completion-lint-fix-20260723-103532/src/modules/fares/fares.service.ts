@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { DataSource } from 'typeorm';
-import type { EntityManager } from 'typeorm';
+import type { EntityManager, Repository } from 'typeorm';
 
 import { ServiceZone } from '../service-zones/entities/service-zone.entity';
 import { ServiceZoneStatus } from '../service-zones/enums/service-zone-status.enum';

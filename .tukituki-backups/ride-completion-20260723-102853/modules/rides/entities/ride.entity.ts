@@ -185,76 +185,6 @@ export class Ride {
   finalFare!: string | null;
 
   @Column({
-    name: 'pricing_base_fare',
-    type: 'numeric',
-    precision: 10,
-    scale: 2,
-    nullable: true,
-  })
-  pricingBaseFare!: string | null;
-
-  @Column({
-    name: 'pricing_minimum_fare',
-    type: 'numeric',
-    precision: 10,
-    scale: 2,
-    nullable: true,
-  })
-  pricingMinimumFare!: string | null;
-
-  @Column({
-    name: 'pricing_price_per_km',
-    type: 'numeric',
-    precision: 10,
-    scale: 4,
-    nullable: true,
-  })
-  pricingPricePerKm!: string | null;
-
-  @Column({
-    name: 'pricing_price_per_minute',
-    type: 'numeric',
-    precision: 10,
-    scale: 4,
-    nullable: true,
-  })
-  pricingPricePerMinute!: string | null;
-
-  @Column({
-    name: 'pricing_booking_fee',
-    type: 'numeric',
-    precision: 10,
-    scale: 2,
-    nullable: true,
-  })
-  pricingBookingFee!: string | null;
-
-  @Column({
-    name: 'pricing_adjustment_multiplier',
-    type: 'numeric',
-    precision: 6,
-    scale: 3,
-    nullable: true,
-  })
-  pricingAdjustmentMultiplier!: string | null;
-
-  @Column({
-    name: 'pricing_currency',
-    type: 'char',
-    length: 3,
-    nullable: true,
-  })
-  pricingCurrency!: string | null;
-
-  @Column({
-    name: 'pricing_calculation_version',
-    type: 'varchar',
-    length: 30,
-    nullable: true,
-  })
-  pricingCalculationVersion!: string | null;
-
-  @Column({
     type: 'char',
     length: 3,
   })
@@ -352,53 +282,6 @@ export class Ride {
     nullable: true,
   })
   completedAt!: Date | null;
-
-  @Column({
-    name: 'actual_distance_meters',
-    type: 'integer',
-    nullable: true,
-  })
-  actualDistanceMeters!: number | null;
-
-  @Column({
-    name: 'actual_duration_seconds',
-    type: 'integer',
-    nullable: true,
-  })
-  actualDurationSeconds!: number | null;
-
-  @Column({
-    name: 'destination_arrival_distance_meters',
-    type: 'numeric',
-    precision: 10,
-    scale: 2,
-    nullable: true,
-  })
-  destinationArrivalDistanceMeters!: string | null;
-
-  @Column({
-    name: 'calculated_final_fare',
-    type: 'numeric',
-    precision: 10,
-    scale: 2,
-    nullable: true,
-  })
-  calculatedFinalFare!: string | null;
-
-  @Column({
-    name: 'fare_was_capped',
-    type: 'boolean',
-    nullable: true,
-  })
-  fareWasCapped!: boolean | null;
-
-  @Column({
-    name: 'completion_notes',
-    type: 'varchar',
-    length: 500,
-    nullable: true,
-  })
-  completionNotes!: string | null;
 
   @Column({
     name: 'cancelled_at',
