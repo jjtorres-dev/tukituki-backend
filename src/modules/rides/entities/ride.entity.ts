@@ -31,6 +31,13 @@ import { RideStatus } from '../enums/ride-status.enum';
     `'SEARCHING_DRIVER', 'DRIVER_ASSIGNED', ` +
     `'DRIVER_ARRIVING', 'DRIVER_ARRIVED', 'IN_PROGRESS')`,
 })
+@Index('UQ_rides_active_driver', ['driverProfileId'], {
+  unique: true,
+  where:
+    `"driver_profile_id" IS NOT NULL AND "status" IN (` +
+    `'DRIVER_ASSIGNED', 'DRIVER_ARRIVING', ` +
+    `'DRIVER_ARRIVED', 'IN_PROGRESS')`,
+})
 export class Ride {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
@@ -210,6 +217,20 @@ export class Ride {
     type: 'timestamptz',
   })
   searchExpiresAt!: Date;
+
+  @Column({
+    name: 'dispatch_round',
+    type: 'smallint',
+    default: 0,
+  })
+  dispatchRound!: number;
+
+  @Column({
+    name: 'last_dispatch_at',
+    type: 'timestamptz',
+    nullable: true,
+  })
+  lastDispatchAt!: Date | null;
 
   @Column({
     name: 'driver_assigned_at',

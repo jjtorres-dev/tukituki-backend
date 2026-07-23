@@ -87,6 +87,13 @@ export class PassengerRideResponseDto {
     format: 'date-time',
     nullable: true,
   })
+  driverAssignedAt!: Date | null;
+
+  @ApiPropertyOptional({
+    type: String,
+    format: 'date-time',
+    nullable: true,
+  })
   cancelledAt!: Date | null;
 
   @ApiPropertyOptional({

@@ -3,6 +3,7 @@ import {
   ConflictException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import {
@@ -27,9 +28,12 @@ import { UserStatus } from '../users/enums/user-status.enum';
 import { CancelPassengerRideDto } from './dto/cancel-passenger-ride.dto';
 import { CreatePassengerRideDto } from './dto/create-passenger-ride.dto';
 import { PassengerRideResponseDto } from './dto/passenger-ride-response.dto';
+import { RideOffer } from './entities/ride-offer.entity';
 import { Ride } from './entities/ride.entity';
 import { RideCancellationActor } from './enums/ride-cancellation-actor.enum';
+import { RideOfferStatus } from './enums/ride-offer-status.enum';
 import { RideStatus } from './enums/ride-status.enum';
+import { RideDispatchService } from './ride-dispatch.service';
 
 const RIDE_SEARCH_TTL_MS = 2 * 60 * 1000;
 
@@ -47,7 +51,12 @@ interface ExpiredQuoteOutcome {
 
 @Injectable()
 export class PassengerRidesService {
-  constructor(private readonly dataSource: DataSource) {}
+  private readonly logger = new Logger(PassengerRidesService.name);
+
+  constructor(
+    private readonly dataSource: DataSource,
+    private readonly rideDispatchService: RideDispatchService,
+  ) {}
 
   async createRide(
     passengerUserId: string,
@@ -106,6 +115,16 @@ export class PassengerRidesService {
             if (isExpiredSearch) {
               activeRide.status = RideStatus.EXPIRED;
               await rideRepository.save(activeRide);
+              await manager.getRepository(RideOffer).update(
+                {
+                  rideId: activeRide.id,
+                  status: RideOfferStatus.OFFERED,
+                },
+                {
+                  status: RideOfferStatus.EXPIRED,
+                  respondedAt: now,
+                },
+              );
             } else {
               throw new ConflictException(
                 'El pasajero ya tiene un viaje activo',
@@ -132,6 +151,8 @@ export class PassengerRidesService {
             passengerNotes: dto.passengerNotes?.trim() || null,
             requestedAt: now,
             searchExpiresAt: new Date(now.getTime() + RIDE_SEARCH_TTL_MS),
+            dispatchRound: 0,
+            lastDispatchAt: null,
             driverAssignedAt: null,
             driverArrivedAt: null,
             startedAt: null,
@@ -155,6 +176,14 @@ export class PassengerRidesService {
           'La cotización ha vencido; genera una nueva cotización',
         );
       }
+
+      await this.rideDispatchService
+        .dispatchRide(outcome.id)
+        .catch((error: unknown) => {
+          this.logger.warn(
+            `No pudo iniciarse el matching del viaje ${outcome.id}: ${this.errorMessage(error)}`,
+          );
+        });
 
       return this.mapRide(outcome);
     } catch (error: unknown) {
@@ -192,6 +221,17 @@ export class PassengerRidesService {
       await this.expireSearchingRide(ride.id);
 
       throw new NotFoundException('El pasajero no tiene un viaje activo');
+    }
+
+    if (ride.status === RideStatus.SEARCHING_DRIVER) {
+      await this.rideDispatchService
+        .dispatchRide(ride.id)
+        .catch((error: unknown) => {
+          this.logger.warn(
+            `No pudo continuarse el matching del viaje ${ride.id}: ` +
+              this.errorMessage(error),
+          );
+        });
     }
 
     return this.mapRide(ride);
@@ -252,6 +292,18 @@ export class PassengerRidesService {
 
       const savedRide = await rideRepository.save(ride);
 
+      await manager.getRepository(RideOffer).update(
+        {
+          rideId: ride.id,
+          status: RideOfferStatus.OFFERED,
+        },
+        {
+          status: RideOfferStatus.CANCELLED,
+          respondedAt: cancelledAt,
+          cancelledAt,
+        },
+      );
+
       return this.mapRide(savedRide);
     });
   }
@@ -276,8 +328,20 @@ export class PassengerRidesService {
         return false;
       }
 
+      const expiredAt = new Date();
       ride.status = RideStatus.EXPIRED;
       await rideRepository.save(ride);
+
+      await manager.getRepository(RideOffer).update(
+        {
+          rideId: ride.id,
+          status: RideOfferStatus.OFFERED,
+        },
+        {
+          status: RideOfferStatus.EXPIRED,
+          respondedAt: expiredAt,
+        },
+      );
 
       return true;
     });
@@ -426,12 +490,17 @@ export class PassengerRidesService {
       passengerNotes: ride.passengerNotes,
       requestedAt: ride.requestedAt,
       searchExpiresAt: ride.searchExpiresAt,
+      driverAssignedAt: ride.driverAssignedAt,
       cancelledAt: ride.cancelledAt,
       cancellationReason: ride.cancellationReason,
       cancelledBy: ride.cancelledBy,
       createdAt: ride.createdAt,
       updatedAt: ride.updatedAt,
     };
+  }
+
+  private errorMessage(error: unknown): string {
+    return error instanceof Error ? error.message : 'error desconocido';
   }
 
   private isUniqueViolation(error: unknown): boolean {

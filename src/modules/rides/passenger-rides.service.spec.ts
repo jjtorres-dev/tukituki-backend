@@ -16,15 +16,21 @@ import { ServiceZoneStatus } from '../service-zones/enums/service-zone-status.en
 import { User } from '../users/entities/user.entity';
 import { UserRole } from '../users/enums/user-role.enum';
 import { UserStatus } from '../users/enums/user-status.enum';
+import { RideOffer } from './entities/ride-offer.entity';
 import { Ride } from './entities/ride.entity';
 import { RideCancellationActor } from './enums/ride-cancellation-actor.enum';
 import { RideStatus } from './enums/ride-status.enum';
+import { RideDispatchService } from './ride-dispatch.service';
 import { PassengerRidesService } from './passenger-rides.service';
 
 type RepositoryMock<T> = {
   findOne: jest.Mock<Promise<T | null>, [FindOneOptions<T>]>;
   create: jest.Mock<T, [Partial<T>]>;
   save: jest.Mock<Promise<T>, [T]>;
+  update: jest.Mock<
+    Promise<{ affected: number }>,
+    [Record<string, unknown>, Record<string, unknown>]
+  >;
 };
 
 describe('PassengerRidesService', () => {
@@ -34,6 +40,10 @@ describe('PassengerRidesService', () => {
   let zoneRepository: RepositoryMock<ServiceZone>;
   let fareRuleRepository: RepositoryMock<FareRule>;
   let rideRepository: RepositoryMock<Ride>;
+  let offerRepository: RepositoryMock<RideOffer>;
+  let rideDispatchService: {
+    dispatchRide: jest.Mock<Promise<RideOffer[]>, [string]>;
+  };
   let savedQuote: FareQuote | undefined;
   let savedRide: Ride | undefined;
 
@@ -124,6 +134,8 @@ describe('PassengerRidesService', () => {
     passengerNotes: null,
     requestedAt: new Date(),
     searchExpiresAt: new Date(Date.now() + 120000),
+    dispatchRound: 0,
+    lastDispatchAt: null,
     driverAssignedAt: null,
     driverArrivedAt: null,
     startedAt: null,
@@ -144,6 +156,10 @@ describe('PassengerRidesService', () => {
       save: jest.fn<Promise<T>, [T]>((entity: T): Promise<T> =>
         Promise.resolve(entity),
       ),
+      update: jest.fn<
+        Promise<{ affected: number }>,
+        [Record<string, unknown>, Record<string, unknown>]
+      >(() => Promise.resolve({ affected: 1 })),
     };
   }
 
@@ -155,6 +171,12 @@ describe('PassengerRidesService', () => {
     zoneRepository = createRepositoryMock<ServiceZone>();
     fareRuleRepository = createRepositoryMock<FareRule>();
     rideRepository = createRepositoryMock<Ride>();
+    offerRepository = createRepositoryMock<RideOffer>();
+    rideDispatchService = {
+      dispatchRide: jest.fn<Promise<RideOffer[]>, [string]>(() =>
+        Promise.resolve([]),
+      ),
+    };
 
     userRepository.findOne.mockResolvedValue({
       ...passenger,
@@ -206,6 +228,10 @@ describe('PassengerRidesService', () => {
           return rideRepository;
         }
 
+        if (entity === RideOffer) {
+          return offerRepository;
+        }
+
         throw new Error('Repositorio inesperado');
       }),
     };
@@ -220,6 +246,10 @@ describe('PassengerRidesService', () => {
           return rideRepository;
         }
 
+        if (entity === RideOffer) {
+          return offerRepository;
+        }
+
         throw new Error('Repositorio inesperado');
       }),
     };
@@ -230,6 +260,10 @@ describe('PassengerRidesService', () => {
         {
           provide: DataSource,
           useValue: dataSourceMock,
+        },
+        {
+          provide: RideDispatchService,
+          useValue: rideDispatchService,
         },
       ],
     }).compile();
@@ -253,6 +287,7 @@ describe('PassengerRidesService', () => {
     expect(savedQuote?.status).toBe(FareQuoteStatus.USED);
     expect(savedQuote?.usedAt).toBeInstanceOf(Date);
     expect(result.id).toBe(rideId);
+    expect(rideDispatchService.dispatchRide).toHaveBeenCalledWith(rideId);
   });
 
   it('debe marcar una cotización vencida como EXPIRED', async () => {
@@ -366,6 +401,7 @@ describe('PassengerRidesService', () => {
     expect(savedRide?.cancelledBy).toBe(RideCancellationActor.PASSENGER);
     expect(savedRide?.cancelledAt).toBeInstanceOf(Date);
     expect(result.status).toBe(RideStatus.CANCELLED);
+    expect(offerRepository.update).toHaveBeenCalledTimes(1);
   });
 
   it('debe impedir cancelar un viaje en progreso', async () => {
@@ -391,5 +427,6 @@ describe('PassengerRidesService', () => {
 
     expect(result).toBe(true);
     expect(savedRide?.status).toBe(RideStatus.EXPIRED);
+    expect(offerRepository.update).toHaveBeenCalledTimes(1);
   });
 });

@@ -1,0 +1,7 @@
+export enum RideOfferStatus {
+  OFFERED = 'OFFERED',
+  ACCEPTED = 'ACCEPTED',
+  REJECTED = 'REJECTED',
+  EXPIRED = 'EXPIRED',
+  CANCELLED = 'CANCELLED',
+}
