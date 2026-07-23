@@ -16,6 +16,7 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
 import { OutboxModule } from './modules/outbox/outbox.module';
 import { RidesModule } from './modules/rides/rides.module';
 import { ServiceZonesModule } from './modules/service-zones/service-zones.module';
+import { SafetyModule } from './modules/safety/safety.module';
 import { UsersModule } from './modules/users/users.module';
 
 @Module({
@@ -68,6 +69,7 @@ import { UsersModule } from './modules/users/users.module';
     ServiceZonesModule,
     FaresModule,
     RidesModule,
+    SafetyModule,
   ],
 })
 export class AppModule {}

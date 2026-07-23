@@ -7,6 +7,11 @@ import type { CreateNotificationInput } from '../notifications/interfaces/create
 import { RideOffer } from '../rides/entities/ride-offer.entity';
 import { Ride } from '../rides/entities/ride.entity';
 import { RideOfferStatus } from '../rides/enums/ride-offer-status.enum';
+import { EmergencyContactAlert } from '../safety/entities/emergency-contact-alert.entity';
+import { EmergencyContact } from '../safety/entities/emergency-contact.entity';
+import { RideSafetyIncident } from '../safety/entities/ride-safety-incident.entity';
+import { EmergencyContactAlertStatus } from '../safety/enums/emergency-contact-alert-status.enum';
+import { User } from '../users/entities/user.entity';
 import { OutboxEvent } from './entities/outbox-event.entity';
 import { OutboxEventType } from './enums/outbox-event-type.enum';
 
@@ -134,6 +139,42 @@ export class NotificationEventHandler {
           'Reiniciamos la búsqueda porque el conductor anterior no mostró progreso.',
         );
         return;
+      case OutboxEventType.SAFETY_INCIDENT_CREATED:
+        await this.handleSafetyIncidentCreated(event);
+        return;
+      case OutboxEventType.EMERGENCY_CONTACT_NOTIFICATION_REQUESTED:
+        await this.handleEmergencyContactNotifications(event);
+        return;
+      case OutboxEventType.SAFETY_INCIDENT_ACKNOWLEDGED:
+        await this.handleSafetyIncidentStatus(
+          event,
+          NotificationType.SAFETY_INCIDENT_ACKNOWLEDGED,
+          'Incidente reconocido',
+          'El equipo de soporte reconoció el incidente y está revisándolo.',
+        );
+        return;
+      case OutboxEventType.SAFETY_INCIDENT_RESOLVED:
+        await this.handleSafetyIncidentStatus(
+          event,
+          NotificationType.SAFETY_INCIDENT_RESOLVED,
+          'Incidente actualizado',
+          'El equipo de soporte cerró el incidente de seguridad.',
+        );
+        return;
+      case OutboxEventType.RIDE_SHARE_LINK_CREATED:
+        await this.handleRideShareLink(
+          event,
+          'Enlace de viaje creado',
+          'El enlace para compartir tu viaje fue creado correctamente.',
+        );
+        return;
+      case OutboxEventType.RIDE_SHARE_LINK_REVOKED:
+        await this.handleRideShareLink(
+          event,
+          'Enlace de viaje revocado',
+          'El enlace compartido dejó de estar disponible.',
+        );
+        return;
     }
   }
 
@@ -259,6 +300,171 @@ export class NotificationEventHandler {
         ? 'Confirmamos la falta de progreso y reiniciamos la búsqueda.'
         : 'Confirmamos la falta de progreso y cancelamos el viaje sin tarifa.',
     );
+  }
+
+  private async handleSafetyIncidentCreated(event: OutboxEvent): Promise<void> {
+    const incident = await this.loadSafetyIncident(event.aggregateId);
+    const participantIds = this.participantUserIds(incident.ride);
+    const adminIds = await this.adminUserIds();
+    const userIds = [...new Set([...participantIds, ...adminIds])];
+
+    for (const userId of userIds) {
+      await this.notificationsService.createAndDeliver({
+        userId,
+        type: NotificationType.SAFETY_INCIDENT,
+        title:
+          userId === incident.reporterUserId
+            ? 'SOS activado'
+            : 'Alerta de seguridad',
+        body:
+          userId === incident.reporterUserId
+            ? 'Registramos tu alerta y notificamos al equipo de soporte.'
+            : `Se registró un incidente ${incident.severity} durante un viaje.`,
+        data: {
+          route: 'safety-incident',
+          incidentId: incident.id,
+          rideId: incident.rideId,
+          severity: incident.severity,
+        },
+        dedupeKey: `${event.id}:${userId}:safety-incident`,
+      });
+    }
+  }
+
+  private async handleEmergencyContactNotifications(
+    event: OutboxEvent,
+  ): Promise<void> {
+    const incident = await this.loadSafetyIncident(event.aggregateId);
+    const contacts = await this.dataSource
+      .getRepository(EmergencyContact)
+      .find({
+        where: { userId: incident.reporterUserId },
+        order: { isPrimary: 'DESC', createdAt: 'ASC' },
+      });
+    const alertRepository = this.dataSource.getRepository(
+      EmergencyContactAlert,
+    );
+    const userRepository = this.dataSource.getRepository(User);
+
+    for (const contact of contacts) {
+      let alert = await alertRepository.findOne({
+        where: { incidentId: incident.id, contactId: contact.id },
+      });
+      if (!alert) {
+        const matchedUser = await userRepository.findOne({
+          where: { phoneE164: contact.phoneE164 },
+        });
+        alert = await alertRepository.save(
+          alertRepository.create({
+            incidentId: incident.id,
+            contactId: contact.id,
+            contactName: contact.name,
+            contactPhoneE164: contact.phoneE164,
+            matchedUserId:
+              matchedUser && matchedUser.id !== incident.reporterUserId
+                ? matchedUser.id
+                : null,
+            status: EmergencyContactAlertStatus.PENDING_EXTERNAL_PROVIDER,
+            deliveryAttempts: 0,
+            deliveredAt: null,
+            lastError: null,
+          }),
+        );
+      }
+
+      if (
+        alert.matchedUserId &&
+        alert.status !== EmergencyContactAlertStatus.IN_APP_DELIVERED
+      ) {
+        await this.notificationsService.createAndDeliver({
+          userId: alert.matchedUserId,
+          type: NotificationType.EMERGENCY_CONTACT_ALERT,
+          title: 'Alerta de un contacto de emergencia',
+          body: `${contact.name} fue registrado como contacto de emergencia y se activó una alerta durante un viaje.`,
+          data: {
+            route: 'emergency-contact-alert',
+            incidentId: incident.id,
+            rideId: incident.rideId,
+          },
+          dedupeKey: `${event.id}:${alert.matchedUserId}:emergency-contact`,
+        });
+        alert.status = EmergencyContactAlertStatus.IN_APP_DELIVERED;
+        alert.deliveryAttempts += 1;
+        alert.deliveredAt = new Date();
+        alert.lastError = null;
+        await alertRepository.save(alert);
+      }
+    }
+  }
+
+  private async handleRideShareLink(
+    event: OutboxEvent,
+    title: string,
+    body: string,
+  ): Promise<void> {
+    const userId = this.payloadString(event.payload, 'createdByUserId');
+    const rideId = this.payloadString(event.payload, 'rideId');
+    if (!userId || !rideId) return;
+    await this.notificationsService.createAndDeliver({
+      userId,
+      type: NotificationType.RIDE_SHARE_LINK,
+      title,
+      body,
+      data: {
+        route: 'ride-share-links',
+        rideId,
+        shareLinkId: event.aggregateId,
+      },
+      dedupeKey: `${event.id}:${userId}:ride-share-link`,
+    });
+  }
+
+  private async handleSafetyIncidentStatus(
+    event: OutboxEvent,
+    type: NotificationType,
+    title: string,
+    body: string,
+  ): Promise<void> {
+    const incident = await this.loadSafetyIncident(event.aggregateId);
+    for (const userId of this.participantUserIds(incident.ride)) {
+      await this.notificationsService.createAndDeliver({
+        userId,
+        type,
+        title,
+        body,
+        data: {
+          route: 'safety-incident',
+          incidentId: incident.id,
+          rideId: incident.rideId,
+          status: incident.status,
+        },
+        dedupeKey: `${event.id}:${userId}:${type}`,
+      });
+    }
+  }
+
+  private async loadSafetyIncident(
+    incidentId: string,
+  ): Promise<RideSafetyIncident> {
+    const incident = await this.dataSource
+      .getRepository(RideSafetyIncident)
+      .findOne({
+        where: { id: incidentId },
+        relations: { ride: { driverProfile: true } },
+      });
+    if (!incident) {
+      throw new NotFoundException('El incidente del evento no existe');
+    }
+    return incident;
+  }
+
+  private async adminUserIds(): Promise<string[]> {
+    const raw: unknown = await this.dataSource.query(
+      `SELECT id FROM users
+       WHERE deleted_at IS NULL
+         AND roles && ARRAY['ADMIN', 'SUPER_ADMIN']::user_role_enum[]`,
+    );
+    return (raw as Array<{ id: string }>).map((row) => row.id);
   }
 
   private async notifyPassenger(

@@ -1,0 +1,7 @@
+export enum SafetyIncidentStatus {
+  OPEN = 'OPEN',
+  ACKNOWLEDGED = 'ACKNOWLEDGED',
+  IN_REVIEW = 'IN_REVIEW',
+  RESOLVED = 'RESOLVED',
+  FALSE_ALARM = 'FALSE_ALARM',
+}

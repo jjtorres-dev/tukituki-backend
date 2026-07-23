@@ -1,11 +1,13 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { DataSource, In } from 'typeorm';
 
 import { DriverLocation } from '../../driver-operations/entities/driver-location.entity';
-import { RideFinalFare } from '../entities/ride-final-fare.entity';
-import { Ride } from '../entities/ride.entity';
-import { RideWaiting } from '../entities/ride-waiting.entity';
 import type { RideProgressUpdate } from '../../driver-operations/ride-progress-tracking.service';
+import { RideSafetyIncident } from '../../safety/entities/ride-safety-incident.entity';
+import { SharedRideRealtimeService } from '../../safety/realtime/shared-ride-realtime.service';
+import { RideFinalFare } from '../entities/ride-final-fare.entity';
+import { RideWaiting } from '../entities/ride-waiting.entity';
+import { Ride } from '../entities/ride.entity';
 import { RideStatus } from '../enums/ride-status.enum';
 import { RidesGateway } from './rides.gateway';
 
@@ -18,9 +20,13 @@ const LOCATION_VISIBLE_STATUSES: readonly RideStatus[] = [
 
 @Injectable()
 export class RideRealtimeService {
+  private readonly logger = new Logger(RideRealtimeService.name);
+
   constructor(
     private readonly dataSource: DataSource,
     private readonly gateway: RidesGateway,
+    @Optional()
+    private readonly sharedRideRealtimeService?: SharedRideRealtimeService,
   ) {}
 
   emitAssigned(ride: Ride): void {
@@ -41,6 +47,7 @@ export class RideRealtimeService {
       stateVersion: ride.stateVersion,
       occurredAt: ride.updatedAt ?? new Date(),
     });
+    this.emitSharedRideStatus(ride);
   }
 
   emitCancelled(ride: Ride): void {
@@ -52,6 +59,7 @@ export class RideRealtimeService {
       cancelledBy: ride.cancelledBy,
       cancellationReason: ride.cancellationReason,
     });
+    this.emitSharedRideStatus(ride);
   }
 
   emitWaitingStarted(waiting: RideWaiting): void {
@@ -70,6 +78,29 @@ export class RideRealtimeService {
       stateVersion: ride.stateVersion,
       previousDriverProfileId,
       searchExpiresAt: ride.searchExpiresAt,
+    });
+  }
+
+  emitSafetyIncidentCreated(incident: RideSafetyIncident): void {
+    this.gateway.emitToRide(incident.rideId, 'ride.sos.created', {
+      incidentId: incident.id,
+      rideId: incident.rideId,
+      reporterRole: incident.reporterRole,
+      incidentType: incident.incidentType,
+      severity: incident.severity,
+      status: incident.status,
+      createdAt: incident.createdAt,
+    });
+  }
+
+  emitSafetyStatusChanged(incident: RideSafetyIncident): void {
+    this.gateway.emitToRide(incident.rideId, 'ride.safety-status.changed', {
+      incidentId: incident.id,
+      rideId: incident.rideId,
+      status: incident.status,
+      acknowledgedAt: incident.acknowledgedAt,
+      resolvedAt: incident.resolvedAt,
+      updatedAt: incident.updatedAt,
     });
   }
 
@@ -114,6 +145,18 @@ export class RideRealtimeService {
       currency: fare.currency,
       fareWasCapped: fare.fareWasCapped,
     });
+    this.emitSharedRideStatus(ride);
+  }
+
+  private emitSharedRideStatus(ride: Ride): void {
+    const pending = this.sharedRideRealtimeService?.emitRideStatus(ride);
+    if (!pending) return;
+    void pending.catch((error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.warn(
+        `No se pudo publicar el estado compartido del viaje ${ride.id}: ${message}`,
+      );
+    });
   }
 
   async emitDriverLocation(
@@ -141,5 +184,6 @@ export class RideRealtimeService {
       accuracy: location.accuracy,
       recordedAt: location.recordedAt,
     });
+    await this.sharedRideRealtimeService?.emitDriverLocation(ride, location);
   }
 }

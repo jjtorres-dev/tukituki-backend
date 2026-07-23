@@ -143,6 +143,44 @@ export const envValidationSchema = Joi.object({
     .pattern(/^(0|[1-9]\d*)\.\d{2}$/)
     .default('1.50'),
 
+  PUBLIC_APP_ORIGIN: Joi.string().uri().default('http://localhost:3000'),
+
+  RIDE_SHARE_DEFAULT_TTL_MINUTES: Joi.number()
+    .integer()
+    .min(15)
+    .max(1440)
+    .default(120),
+
+  RIDE_SHARE_MAX_TTL_MINUTES: Joi.number()
+    .integer()
+    .min(15)
+    .max(10080)
+    .default(1440),
+
+  RIDE_SHARE_RATE_LIMIT_MAX: Joi.number()
+    .integer()
+    .min(5)
+    .max(1000)
+    .default(60),
+
+  RIDE_SHARE_RATE_LIMIT_WINDOW_SECONDS: Joi.number()
+    .integer()
+    .min(60)
+    .max(3600)
+    .default(600),
+
+  SAFETY_INCIDENT_RECENT_RIDE_GRACE_SECONDS: Joi.number()
+    .integer()
+    .min(0)
+    .max(86400)
+    .default(3600),
+
+  SAFETY_LOCATION_MAX_DISTANCE_METERS: Joi.number()
+    .integer()
+    .min(1000)
+    .max(100000)
+    .default(20000),
+
   FCM_ENABLED: Joi.boolean().default(false),
 
   FIREBASE_PROJECT_ID: Joi.string().max(200).optional(),

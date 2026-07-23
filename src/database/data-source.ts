@@ -27,6 +27,11 @@ import { RideRating } from '../modules/rides/entities/ride-rating.entity';
 import { RideStartCode } from '../modules/rides/entities/ride-start-code.entity';
 import { RideStatusHistory } from '../modules/rides/entities/ride-status-history.entity';
 import { Ride } from '../modules/rides/entities/ride.entity';
+import { EmergencyContactAlert } from '../modules/safety/entities/emergency-contact-alert.entity';
+import { EmergencyContact } from '../modules/safety/entities/emergency-contact.entity';
+import { RideSafetyIncident } from '../modules/safety/entities/ride-safety-incident.entity';
+import { RideShareAccessLog } from '../modules/safety/entities/ride-share-access-log.entity';
+import { RideShareLink } from '../modules/safety/entities/ride-share-link.entity';
 import { ServiceZone } from '../modules/service-zones/entities/service-zone.entity';
 import { User } from '../modules/users/entities/user.entity';
 
@@ -90,6 +95,11 @@ const AppDataSource = new DataSource({
     RideProgressMetrics,
     RideFinalFare,
     RideRating,
+    EmergencyContact,
+    RideSafetyIncident,
+    RideShareLink,
+    RideShareAccessLog,
+    EmergencyContactAlert,
   ],
 
   migrations: [join(__dirname, 'migrations', '*.js')],
