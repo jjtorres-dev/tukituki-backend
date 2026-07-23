@@ -51,15 +51,6 @@ export class RideRealtimeService {
     });
   }
 
-  emitStarted(ride: Ride): void {
-    this.gateway.emitToRide(ride.id, 'ride.started', {
-      rideId: ride.id,
-      status: ride.status,
-      stateVersion: ride.stateVersion,
-      startedAt: ride.startedAt,
-    });
-  }
-
   async emitDriverLocation(
     driverProfileId: string,
     location: DriverLocation,

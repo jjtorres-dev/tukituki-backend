@@ -13,7 +13,6 @@ import { FareQuote } from '../modules/fares/entities/fare-quote.entity';
 import { FareRule } from '../modules/fares/entities/fare-rule.entity';
 import { PassengerProfile } from '../modules/passengers/entities/passenger-profile.entity';
 import { RideOffer } from '../modules/rides/entities/ride-offer.entity';
-import { RideStartCode } from '../modules/rides/entities/ride-start-code.entity';
 import { RideStatusHistory } from '../modules/rides/entities/ride-status-history.entity';
 import { Ride } from '../modules/rides/entities/ride.entity';
 import { ServiceZone } from '../modules/service-zones/entities/service-zone.entity';
@@ -66,7 +65,6 @@ const AppDataSource = new DataSource({
     FareQuote,
     Ride,
     RideOffer,
-    RideStartCode,
     RideStatusHistory,
   ],
 

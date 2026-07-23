@@ -2,8 +2,6 @@ import {
   Body,
   Controller,
   Get,
-  HttpCode,
-  HttpStatus,
   Param,
   ParseUUIDPipe,
   Patch,
@@ -19,7 +17,6 @@ import {
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
-  ApiResponse,
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
@@ -33,11 +30,7 @@ import { UserRole } from '../users/enums/user-role.enum';
 import { CancelPassengerRideDto } from './dto/cancel-passenger-ride.dto';
 import { CreatePassengerRideDto } from './dto/create-passenger-ride.dto';
 import { PassengerRideResponseDto } from './dto/passenger-ride-response.dto';
-import { PassengerRideStartCodeResponseDto } from './dto/passenger-ride-start-code-response.dto';
 import { PassengerRidesService } from './passenger-rides.service';
-import { RideStartCodesService } from './ride-start-codes.service';
-
-const HTTP_STATUS_LOCKED = 423;
 
 @ApiTags('Passenger rides')
 @ApiBearerAuth()
@@ -45,10 +38,7 @@ const HTTP_STATUS_LOCKED = 423;
 @Roles(UserRole.PASSENGER)
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class PassengerRidesController {
-  constructor(
-    private readonly passengerRidesService: PassengerRidesService,
-    private readonly rideStartCodesService: RideStartCodesService,
-  ) {}
+  constructor(private readonly passengerRidesService: PassengerRidesService) {}
 
   @Post()
   @ApiOperation({
@@ -90,58 +80,6 @@ export class PassengerRidesController {
     user: AuthenticatedUser,
   ): Promise<PassengerRideResponseDto> {
     return this.passengerRidesService.getActiveRide(user.id);
-  }
-
-  @Get(':rideId/start-code')
-  @ApiOperation({
-    summary: 'Consultar el código seguro para iniciar el viaje',
-  })
-  @ApiOkResponse({ type: PassengerRideStartCodeResponseDto })
-  @ApiConflictResponse({
-    description: 'El conductor todavía no llegó o el código no está disponible',
-  })
-  @ApiNotFoundResponse({
-    description: 'El viaje no existe o no pertenece al pasajero',
-  })
-  @ApiResponse({
-    status: HttpStatus.GONE,
-    description: 'El código venció y debe regenerarse',
-  })
-  @ApiResponse({
-    status: HTTP_STATUS_LOCKED,
-    description: 'El código está bloqueado por intentos fallidos',
-  })
-  getStartCode(
-    @CurrentUser() user: AuthenticatedUser,
-    @Param('rideId', ParseUUIDPipe) rideId: string,
-  ): Promise<PassengerRideStartCodeResponseDto> {
-    return this.rideStartCodesService.getPassengerStartCode(user.id, rideId);
-  }
-
-  @Post(':rideId/start-code/regenerate')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({
-    summary: 'Regenerar e invalidar el código anterior de inicio',
-  })
-  @ApiOkResponse({ type: PassengerRideStartCodeResponseDto })
-  @ApiConflictResponse({
-    description: 'El viaje o el código ya no permiten regeneración',
-  })
-  @ApiNotFoundResponse({
-    description: 'El viaje no existe o no pertenece al pasajero',
-  })
-  @ApiResponse({
-    status: HttpStatus.TOO_MANY_REQUESTS,
-    description: 'Se alcanzó el límite de regeneraciones',
-  })
-  regenerateStartCode(
-    @CurrentUser() user: AuthenticatedUser,
-    @Param('rideId', ParseUUIDPipe) rideId: string,
-  ): Promise<PassengerRideStartCodeResponseDto> {
-    return this.rideStartCodesService.regeneratePassengerStartCode(
-      user.id,
-      rideId,
-    );
   }
 
   @Get(':rideId')

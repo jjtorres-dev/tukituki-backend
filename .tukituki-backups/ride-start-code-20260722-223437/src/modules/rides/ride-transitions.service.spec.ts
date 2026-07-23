@@ -16,7 +16,6 @@ import { RideStatusHistory } from './entities/ride-status-history.entity';
 import { Ride } from './entities/ride.entity';
 import { RideStatus } from './enums/ride-status.enum';
 import { RideRealtimeService } from './realtime/ride-realtime.service';
-import { RideStartCodesService } from './ride-start-codes.service';
 import { RideTransitionsService } from './ride-transitions.service';
 
 function queryBuilderReturning<T>(value: T) {
@@ -45,10 +44,6 @@ describe('RideTransitionsService', () => {
   let realtimeService: {
     emitStatusChanged: jest.Mock;
     emitCancelled: jest.Mock;
-  };
-  let rideStartCodesService: {
-    createForArrivedRideWithinTransaction: jest.Mock;
-    cancelForRideWithinTransaction: jest.Mock;
   };
   let availabilityRedisService: {
     publishAvailableDriver: jest.Mock;
@@ -158,10 +153,6 @@ describe('RideTransitionsService', () => {
       emitStatusChanged: jest.fn(),
       emitCancelled: jest.fn(),
     };
-    rideStartCodesService = {
-      createForArrivedRideWithinTransaction: jest.fn(() => Promise.resolve({})),
-      cancelForRideWithinTransaction: jest.fn(() => Promise.resolve()),
-    };
     availabilityRedisService = {
       publishAvailableDriver: jest.fn(() => Promise.resolve()),
       removeDriverAvailability: jest.fn(() => Promise.resolve()),
@@ -171,7 +162,6 @@ describe('RideTransitionsService', () => {
       dataSourceMock as unknown as DataSource,
       availabilityRedisService as unknown as DriverAvailabilityRedisService,
       realtimeService as unknown as RideRealtimeService,
-      rideStartCodesService as unknown as RideStartCodesService,
     );
   });
 
@@ -194,9 +184,6 @@ describe('RideTransitionsService', () => {
     expect(result.status).toBe(RideStatus.DRIVER_ARRIVED);
     expect(result.arrivalDistanceMeters).toBe('80.00');
     expect(ride.driverArrivedAt).toBeInstanceOf(Date);
-    expect(
-      rideStartCodesService.createForArrivedRideWithinTransaction,
-    ).toHaveBeenCalledTimes(1);
   });
 
   it('debe rechazar la llegada cuando el conductor está lejos', async () => {
@@ -227,8 +214,5 @@ describe('RideTransitionsService', () => {
     expect(result.status).toBe(RideStatus.CANCELLED);
     expect(state.status).toBe(DriverOperationalStatus.AVAILABLE);
     expect(realtimeService.emitCancelled).toHaveBeenCalledTimes(1);
-    expect(
-      rideStartCodesService.cancelForRideWithinTransaction,
-    ).toHaveBeenCalledTimes(1);
   });
 });

@@ -37,7 +37,6 @@ import {
   DRIVER_LOCATION_MAX_AGE_MS,
 } from './ride-lifecycle.constants';
 import { RideRealtimeService } from './realtime/ride-realtime.service';
-import { RideStartCodesService } from './ride-start-codes.service';
 
 const ALLOWED_TRANSITIONS: Readonly<Record<RideStatus, readonly RideStatus[]>> =
   {
@@ -82,7 +81,6 @@ export class RideTransitionsService {
     private readonly dataSource: DataSource,
     private readonly availabilityRedisService: DriverAvailabilityRedisService,
     private readonly realtimeService: RideRealtimeService,
-    private readonly rideStartCodesService: RideStartCodesService,
   ) {}
 
   async startArrival(
@@ -198,12 +196,6 @@ export class RideTransitionsService {
         },
       );
 
-      await this.rideStartCodesService.createForArrivedRideWithinTransaction(
-        manager,
-        ride,
-        now,
-      );
-
       return { ride, previousStatus };
     });
 
@@ -306,12 +298,6 @@ export class RideTransitionsService {
             respondedAt: now,
             cancelledAt: now,
           },
-        );
-
-        await this.rideStartCodesService.cancelForRideWithinTransaction(
-          manager,
-          ride.id,
-          now,
         );
 
         return {

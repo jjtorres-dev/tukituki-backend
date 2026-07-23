@@ -1,5 +1,4 @@
 import {
-  Body,
   Controller,
   Get,
   HttpCode,
@@ -17,7 +16,6 @@ import {
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
-  ApiResponse,
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
@@ -30,13 +28,8 @@ import { RolesGuard } from '../authorization/guards/roles.guard';
 import { UserRole } from '../users/enums/user-role.enum';
 import { DriverActiveRideResponseDto } from './dto/driver-active-ride-response.dto';
 import { RideTransitionResponseDto } from './dto/ride-transition-response.dto';
-import { RideStartResponseDto } from './dto/ride-start-response.dto';
-import { StartRideDto } from './dto/start-ride.dto';
 import { DriverRidesService } from './driver-rides.service';
-import { RideStartService } from './ride-start.service';
 import { RideTransitionsService } from './ride-transitions.service';
-
-const HTTP_STATUS_LOCKED = 423;
 
 @ApiTags('Driver rides')
 @ApiBearerAuth()
@@ -47,7 +40,6 @@ export class DriverRidesController {
   constructor(
     private readonly driverRidesService: DriverRidesService,
     private readonly transitionsService: RideTransitionsService,
-    private readonly rideStartService: RideStartService,
   ) {}
 
   @Get('active')
@@ -110,35 +102,5 @@ export class DriverRidesController {
     @Param('rideId', ParseUUIDPipe) rideId: string,
   ): Promise<RideTransitionResponseDto> {
     return this.transitionsService.markArrived(user.id, rideId);
-  }
-
-  @Post(':rideId/start')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({
-    summary: 'Iniciar el viaje mediante el código entregado por el pasajero',
-  })
-  @ApiOkResponse({ type: RideStartResponseDto })
-  @ApiBadRequestResponse({
-    description:
-      'Código incorrecto, GPS ausente, vencido, impreciso o conductor lejos del origen',
-  })
-  @ApiConflictResponse({
-    description: 'Estado del viaje, código o conductor incompatible',
-  })
-  @ApiNotFoundResponse()
-  @ApiResponse({
-    status: HttpStatus.GONE,
-    description: 'El código de inicio venció',
-  })
-  @ApiResponse({
-    status: HTTP_STATUS_LOCKED,
-    description: 'El código fue bloqueado por demasiados intentos',
-  })
-  startRide(
-    @CurrentUser() user: AuthenticatedUser,
-    @Param('rideId', ParseUUIDPipe) rideId: string,
-    @Body() dto: StartRideDto,
-  ): Promise<RideStartResponseDto> {
-    return this.rideStartService.startRide(user.id, rideId, dto.code);
   }
 }

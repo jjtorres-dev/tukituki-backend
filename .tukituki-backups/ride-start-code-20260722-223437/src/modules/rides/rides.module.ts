@@ -18,15 +18,12 @@ import { DriverRideOffersService } from './driver-ride-offers.service';
 import { DriverRidesController } from './driver-rides.controller';
 import { DriverRidesService } from './driver-rides.service';
 import { RideOffer } from './entities/ride-offer.entity';
-import { RideStartCode } from './entities/ride-start-code.entity';
 import { RideStatusHistory } from './entities/ride-status-history.entity';
 import { Ride } from './entities/ride.entity';
 import { PassengerRidesController } from './passenger-rides.controller';
 import { PassengerRidesService } from './passenger-rides.service';
 import { RideRealtimeModule } from './realtime/ride-realtime.module';
 import { RideDispatchService } from './ride-dispatch.service';
-import { RideStartCodesService } from './ride-start-codes.service';
-import { RideStartService } from './ride-start.service';
 import { RideTransitionsService } from './ride-transitions.service';
 import { RideViewService } from './ride-view.service';
 
@@ -36,7 +33,6 @@ import { RideViewService } from './ride-view.service';
       Ride,
       RideOffer,
       RideStatusHistory,
-      RideStartCode,
       FareQuote,
       FareRule,
       ServiceZone,
@@ -64,8 +60,6 @@ import { RideViewService } from './ride-view.service';
     DriverRidesService,
     RideTransitionsService,
     RideViewService,
-    RideStartCodesService,
-    RideStartService,
   ],
   exports: [
     PassengerRidesService,
@@ -74,8 +68,6 @@ import { RideViewService } from './ride-view.service';
     DriverRidesService,
     RideTransitionsService,
     RideViewService,
-    RideStartCodesService,
-    RideStartService,
   ],
 })
 export class RidesModule {}

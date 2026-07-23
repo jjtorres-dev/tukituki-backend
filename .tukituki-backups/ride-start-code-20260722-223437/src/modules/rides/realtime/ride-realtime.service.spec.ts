@@ -46,32 +46,4 @@ describe('RideRealtimeService', () => {
       }),
     );
   });
-
-  it('debe emitir ride.started sin incluir el código de inicio', () => {
-    const ride = {
-      id: '3dbb6cbc-aee8-43f0-8247-e13d8e197b71',
-      status: RideStatus.IN_PROGRESS,
-      stateVersion: 4,
-      startedAt: new Date(),
-    } as Ride;
-    const dataSourceMock = {
-      getRepository: jest.fn(),
-    };
-    const gateway = {
-      emitToRide: jest.fn(),
-    };
-    const service = new RideRealtimeService(
-      dataSourceMock as unknown as DataSource,
-      gateway as unknown as RidesGateway,
-    );
-
-    service.emitStarted(ride);
-
-    expect(gateway.emitToRide).toHaveBeenCalledWith(ride.id, 'ride.started', {
-      rideId: ride.id,
-      status: RideStatus.IN_PROGRESS,
-      stateVersion: 4,
-      startedAt: ride.startedAt,
-    });
-  });
 });

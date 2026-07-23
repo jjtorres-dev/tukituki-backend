@@ -54,16 +54,4 @@ export const envValidationSchema = Joi.object({
     .min(86400)
     .max(7776000)
     .default(2592000),
-  RIDE_START_CODE_SECRET: Joi.string().min(32).required(),
-  RIDE_START_CODE_TTL_SECONDS: Joi.number().integer().min(60).default(900),
-  RIDE_START_CODE_MAX_ATTEMPTS: Joi.number()
-    .integer()
-    .min(1)
-    .max(10)
-    .default(5),
-  RIDE_START_CODE_MAX_REGENERATIONS: Joi.number()
-    .integer()
-    .min(1)
-    .max(10)
-    .default(3),
 });
