@@ -36,6 +36,12 @@ export class PassengerProfileResponseDto {
   })
   emergencyContactPhoneE164!: string | null;
 
+  @ApiProperty({ example: '4.85' })
+  ratingAverage!: string;
+
+  @ApiProperty()
+  ratingCount!: number;
+
   @ApiProperty({
     type: String,
     format: 'date-time',

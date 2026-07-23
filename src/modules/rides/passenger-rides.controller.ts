@@ -5,6 +5,7 @@ import {
   HttpCode,
   HttpStatus,
   Param,
+  Query,
   ParseUUIDPipe,
   Patch,
   Post,
@@ -32,11 +33,17 @@ import { RolesGuard } from '../authorization/guards/roles.guard';
 import { UserRole } from '../users/enums/user-role.enum';
 import { CancelPassengerRideDto } from './dto/cancel-passenger-ride.dto';
 import { CreatePassengerRideDto } from './dto/create-passenger-ride.dto';
+import { PassengerRideHistoryResponseDto } from './dto/passenger-ride-history-response.dto';
+import { RideHistoryQueryDto } from './dto/ride-history-query.dto';
+import { RideRatingResponseDto } from './dto/ride-rating-response.dto';
+import { SubmitRideRatingDto } from './dto/submit-ride-rating.dto';
 import { PassengerRideResponseDto } from './dto/passenger-ride-response.dto';
 import { RideReceiptResponseDto } from './dto/ride-receipt-response.dto';
 import { PassengerRideStartCodeResponseDto } from './dto/passenger-ride-start-code-response.dto';
 import { PassengerRidesService } from './passenger-rides.service';
 import { RideReceiptsService } from './ride-receipts.service';
+import { RideHistoryService } from './ride-history.service';
+import { RideRatingsService } from './ride-ratings.service';
 import { RideStartCodesService } from './ride-start-codes.service';
 
 const HTTP_STATUS_LOCKED = 423;
@@ -51,6 +58,8 @@ export class PassengerRidesController {
     private readonly passengerRidesService: PassengerRidesService,
     private readonly rideStartCodesService: RideStartCodesService,
     private readonly rideReceiptsService: RideReceiptsService,
+    private readonly rideHistoryService: RideHistoryService,
+    private readonly rideRatingsService: RideRatingsService,
   ) {}
 
   @Post()
@@ -93,6 +102,16 @@ export class PassengerRidesController {
     user: AuthenticatedUser,
   ): Promise<PassengerRideResponseDto> {
     return this.passengerRidesService.getActiveRide(user.id);
+  }
+
+  @Get('history')
+  @ApiOperation({ summary: 'Consultar el historial paginado del pasajero' })
+  @ApiOkResponse({ type: PassengerRideHistoryResponseDto })
+  getHistory(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() query: RideHistoryQueryDto,
+  ): Promise<PassengerRideHistoryResponseDto> {
+    return this.rideHistoryService.getPassengerHistory(user.id, query);
   }
 
   @Get(':rideId/start-code')
@@ -145,6 +164,25 @@ export class PassengerRidesController {
       user.id,
       rideId,
     );
+  }
+
+  @Post(':rideId/rating')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Calificar al conductor de un viaje completado' })
+  @ApiCreatedResponse({ type: RideRatingResponseDto })
+  @ApiBadRequestResponse({ description: 'Puntuación o etiquetas inválidas' })
+  @ApiConflictResponse({
+    description: 'El viaje no está completado o ya fue calificado',
+  })
+  @ApiNotFoundResponse({
+    description: 'El viaje no existe o no pertenece al pasajero',
+  })
+  rateDriver(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('rideId', ParseUUIDPipe) rideId: string,
+    @Body() dto: SubmitRideRatingDto,
+  ): Promise<RideRatingResponseDto> {
+    return this.rideRatingsService.rateDriver(user.id, rideId, dto);
   }
 
   @Get(':rideId/receipt')

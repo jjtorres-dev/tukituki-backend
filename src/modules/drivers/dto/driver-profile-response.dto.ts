@@ -47,6 +47,12 @@ export class DriverProfileResponseDto {
   })
   photoUrl!: string | null;
 
+  @ApiProperty({ example: '4.85' })
+  ratingAverage!: string;
+
+  @ApiProperty()
+  ratingCount!: number;
+
   @ApiProperty({
     enum: DriverStatus,
   })

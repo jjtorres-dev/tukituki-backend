@@ -205,6 +205,8 @@ export class AdminDriversService {
       birthDate: profile.birthDate,
       address: profile.address,
       photoUrl: profile.photoUrl,
+      ratingAverage: profile.ratingAverage,
+      ratingCount: profile.ratingCount,
       status: profile.status,
       rejectionReason: profile.rejectionReason,
       submittedAt: profile.submittedAt,

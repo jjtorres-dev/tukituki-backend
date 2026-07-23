@@ -100,6 +100,22 @@ export class DriverProfile {
   photoUrl!: string | null;
 
   @Column({
+    name: 'rating_average',
+    type: 'numeric',
+    precision: 3,
+    scale: 2,
+    default: '0.00',
+  })
+  ratingAverage!: string;
+
+  @Column({
+    name: 'rating_count',
+    type: 'integer',
+    default: 0,
+  })
+  ratingCount!: number;
+
+  @Column({
     type: 'enum',
     enum: DriverStatus,
     enumName: 'driver_status_enum',

@@ -7,12 +7,14 @@ import {
   Param,
   ParseUUIDPipe,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
   ApiBearerAuth,
   ApiConflictResponse,
+  ApiCreatedResponse,
   ApiForbiddenResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
@@ -29,6 +31,10 @@ import { Roles } from '../authorization/decorators/roles.decorator';
 import { RolesGuard } from '../authorization/guards/roles.guard';
 import { UserRole } from '../users/enums/user-role.enum';
 import { CompleteRideDto } from './dto/complete-ride.dto';
+import { DriverRideHistoryResponseDto } from './dto/driver-ride-history-response.dto';
+import { RideHistoryQueryDto } from './dto/ride-history-query.dto';
+import { RideRatingResponseDto } from './dto/ride-rating-response.dto';
+import { SubmitRideRatingDto } from './dto/submit-ride-rating.dto';
 import { DriverActiveRideResponseDto } from './dto/driver-active-ride-response.dto';
 import { RideCompletionResponseDto } from './dto/ride-completion-response.dto';
 import { RideReceiptResponseDto } from './dto/ride-receipt-response.dto';
@@ -38,6 +44,8 @@ import { StartRideDto } from './dto/start-ride.dto';
 import { DriverRidesService } from './driver-rides.service';
 import { RideCompletionService } from './ride-completion.service';
 import { RideReceiptsService } from './ride-receipts.service';
+import { RideHistoryService } from './ride-history.service';
+import { RideRatingsService } from './ride-ratings.service';
 import { RideStartService } from './ride-start.service';
 import { RideTransitionsService } from './ride-transitions.service';
 
@@ -55,6 +63,8 @@ export class DriverRidesController {
     private readonly rideStartService: RideStartService,
     private readonly rideCompletionService: RideCompletionService,
     private readonly rideReceiptsService: RideReceiptsService,
+    private readonly rideHistoryService: RideHistoryService,
+    private readonly rideRatingsService: RideRatingsService,
   ) {}
 
   @Get('active')
@@ -69,6 +79,16 @@ export class DriverRidesController {
     @CurrentUser() user: AuthenticatedUser,
   ): Promise<DriverActiveRideResponseDto> {
     return this.driverRidesService.getActiveRide(user.id);
+  }
+
+  @Get('history')
+  @ApiOperation({ summary: 'Consultar el historial paginado del conductor' })
+  @ApiOkResponse({ type: DriverRideHistoryResponseDto })
+  getHistory(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() query: RideHistoryQueryDto,
+  ): Promise<DriverRideHistoryResponseDto> {
+    return this.rideHistoryService.getDriverHistory(user.id, query);
   }
 
   @Get(':rideId')
@@ -139,6 +159,25 @@ export class DriverRidesController {
     @Body() dto: CompleteRideDto,
   ): Promise<RideCompletionResponseDto> {
     return this.rideCompletionService.completeRide(user.id, rideId, dto);
+  }
+
+  @Post(':rideId/rating')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Calificar al pasajero de un viaje completado' })
+  @ApiCreatedResponse({ type: RideRatingResponseDto })
+  @ApiBadRequestResponse({ description: 'Puntuación o etiquetas inválidas' })
+  @ApiConflictResponse({
+    description: 'El viaje no está completado o ya fue calificado',
+  })
+  @ApiNotFoundResponse({
+    description: 'El viaje no existe o no pertenece al conductor',
+  })
+  ratePassenger(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('rideId', ParseUUIDPipe) rideId: string,
+    @Body() dto: SubmitRideRatingDto,
+  ): Promise<RideRatingResponseDto> {
+    return this.rideRatingsService.ratePassenger(user.id, rideId, dto);
   }
 
   @Get(':rideId/receipt')
