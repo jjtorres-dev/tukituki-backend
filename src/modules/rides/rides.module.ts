@@ -15,17 +15,24 @@ import { ServiceZone } from '../service-zones/entities/service-zone.entity';
 import { User } from '../users/entities/user.entity';
 import { DriverRideOffersController } from './driver-ride-offers.controller';
 import { DriverRideOffersService } from './driver-ride-offers.service';
+import { DriverRidesController } from './driver-rides.controller';
+import { DriverRidesService } from './driver-rides.service';
 import { RideOffer } from './entities/ride-offer.entity';
+import { RideStatusHistory } from './entities/ride-status-history.entity';
 import { Ride } from './entities/ride.entity';
 import { PassengerRidesController } from './passenger-rides.controller';
 import { PassengerRidesService } from './passenger-rides.service';
+import { RideRealtimeModule } from './realtime/ride-realtime.module';
 import { RideDispatchService } from './ride-dispatch.service';
+import { RideTransitionsService } from './ride-transitions.service';
+import { RideViewService } from './ride-view.service';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([
       Ride,
       RideOffer,
+      RideStatusHistory,
       FareQuote,
       FareRule,
       ServiceZone,
@@ -38,18 +45,29 @@ import { RideDispatchService } from './ride-dispatch.service';
     ]),
     AuthModule,
     AuthorizationModule,
+    RideRealtimeModule,
     DriverOperationsModule,
   ],
-  controllers: [PassengerRidesController, DriverRideOffersController],
+  controllers: [
+    PassengerRidesController,
+    DriverRideOffersController,
+    DriverRidesController,
+  ],
   providers: [
     PassengerRidesService,
     RideDispatchService,
     DriverRideOffersService,
+    DriverRidesService,
+    RideTransitionsService,
+    RideViewService,
   ],
   exports: [
     PassengerRidesService,
     RideDispatchService,
     DriverRideOffersService,
+    DriverRidesService,
+    RideTransitionsService,
+    RideViewService,
   ],
 })
 export class RidesModule {}

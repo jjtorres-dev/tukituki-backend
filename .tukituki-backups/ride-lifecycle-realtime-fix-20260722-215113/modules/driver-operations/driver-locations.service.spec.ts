@@ -7,8 +7,10 @@ import { DriverAvailabilityRedisService } from '../../infrastructure/redis/drive
 import type { RedisGeoSearchResult } from '../../infrastructure/redis/redis.service';
 import { RideRealtimeService } from '../rides/realtime/ride-realtime.service';
 import { DriverProfile } from '../drivers/entities/driver-profile.entity';
+import { DriverVehicle } from '../drivers/entities/driver-vehicle.entity';
 import { DriverStatus } from '../drivers/enums/driver-status.enum';
 import { IdentityDocumentType } from '../drivers/enums/identity-document-type.enum';
+import { VehicleStatus } from '../drivers/enums/vehicle-status.enum';
 import { DriverLocationsService } from './driver-locations.service';
 import { DriverLocation } from './entities/driver-location.entity';
 import { DriverOperationalState } from './entities/driver-operational-state.entity';
@@ -151,10 +153,7 @@ describe('DriverLocationsService', () => {
 
     profileRepository = {
       createQueryBuilder: jest.fn(() => profileQueryBuilder),
-      findOne: jest.fn<
-        Promise<DriverProfile | null>,
-        [FindOneOptions<DriverProfile>]
-      >(() => Promise.resolve(null)),
+      findOne: jest.fn(),
     };
 
     stateRepository = {
@@ -167,10 +166,7 @@ describe('DriverLocationsService', () => {
 
     locationRepository = {
       createQueryBuilder: jest.fn(() => locationQueryBuilder),
-      findOne: jest.fn<
-        Promise<DriverLocation | null>,
-        [FindOneOptions<DriverLocation>]
-      >(() => Promise.resolve(null)),
+      findOne: jest.fn(),
       create: jest.fn(
         (input: Partial<DriverLocation>): DriverLocation =>
           input as DriverLocation,

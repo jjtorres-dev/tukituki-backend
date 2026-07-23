@@ -12,6 +12,7 @@ import { Ride } from './entities/ride.entity';
 import { RideOfferStatus } from './enums/ride-offer-status.enum';
 import { RideStatus } from './enums/ride-status.enum';
 import { RideDispatchService } from './ride-dispatch.service';
+import { RideTransitionsService } from './ride-transitions.service';
 
 function createQueryBuilderMock<T>(rows: T[]) {
   const queryBuilder = {
@@ -149,6 +150,17 @@ describe('RideDispatchService', () => {
         {
           provide: DriverLocationsService,
           useValue: driverLocationsService,
+        },
+        {
+          provide: RideTransitionsService,
+          useValue: {
+            expireWithinTransaction: jest.fn(
+              (_manager: EntityManager, entity: Ride) => {
+                entity.status = RideStatus.EXPIRED;
+                return Promise.resolve();
+              },
+            ),
+          },
         },
       ],
     }).compile();

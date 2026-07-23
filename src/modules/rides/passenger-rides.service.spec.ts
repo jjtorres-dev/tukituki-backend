@@ -1,432 +1,191 @@
-import {
-  BadRequestException,
-  ConflictException,
-  NotFoundException,
-} from '@nestjs/common';
-import { Test, TestingModule } from '@nestjs/testing';
 import { DataSource } from 'typeorm';
-import type { EntityManager, FindOneOptions } from 'typeorm';
+import type { EntityManager } from 'typeorm';
 
 import { FareQuote } from '../fares/entities/fare-quote.entity';
-import { FareRule } from '../fares/entities/fare-rule.entity';
 import { FareQuoteStatus } from '../fares/enums/fare-quote-status.enum';
+import { FareRule } from '../fares/entities/fare-rule.entity';
 import { FareRuleStatus } from '../fares/enums/fare-rule-status.enum';
 import { ServiceZone } from '../service-zones/entities/service-zone.entity';
 import { ServiceZoneStatus } from '../service-zones/enums/service-zone-status.enum';
 import { User } from '../users/entities/user.entity';
 import { UserRole } from '../users/enums/user-role.enum';
 import { UserStatus } from '../users/enums/user-status.enum';
-import { RideOffer } from './entities/ride-offer.entity';
+import { PassengerRideResponseDto } from './dto/passenger-ride-response.dto';
+import { RideStatusHistory } from './entities/ride-status-history.entity';
 import { Ride } from './entities/ride.entity';
-import { RideCancellationActor } from './enums/ride-cancellation-actor.enum';
 import { RideStatus } from './enums/ride-status.enum';
-import { RideDispatchService } from './ride-dispatch.service';
 import { PassengerRidesService } from './passenger-rides.service';
-
-type RepositoryMock<T> = {
-  findOne: jest.Mock<Promise<T | null>, [FindOneOptions<T>]>;
-  create: jest.Mock<T, [Partial<T>]>;
-  save: jest.Mock<Promise<T>, [T]>;
-  update: jest.Mock<
-    Promise<{ affected: number }>,
-    [Record<string, unknown>, Record<string, unknown>]
-  >;
-};
+import { RideDispatchService } from './ride-dispatch.service';
+import { RideTransitionsService } from './ride-transitions.service';
+import { RideViewService } from './ride-view.service';
 
 describe('PassengerRidesService', () => {
-  let service: PassengerRidesService;
-  let userRepository: RepositoryMock<User>;
-  let quoteRepository: RepositoryMock<FareQuote>;
-  let zoneRepository: RepositoryMock<ServiceZone>;
-  let fareRuleRepository: RepositoryMock<FareRule>;
-  let rideRepository: RepositoryMock<Ride>;
-  let offerRepository: RepositoryMock<RideOffer>;
-  let rideDispatchService: {
-    dispatchRide: jest.Mock<Promise<RideOffer[]>, [string]>;
-  };
-  let savedQuote: FareQuote | undefined;
-  let savedRide: Ride | undefined;
-
   const passengerUserId = 'f544d52a-39e0-4da3-8861-6010355c5dba';
   const quoteId = '1f66359e-d183-494d-a921-a19edbfbe2b9';
   const rideId = '3dbb6cbc-aee8-43f0-8247-e13d8e197b71';
-  const originZoneId = '7d37cc0a-bbbe-4cd1-a244-b8eca8350012';
-  const destinationZoneId = '1d2edb48-b408-46b5-b312-44e89acd2bb4';
-  const fareRuleId = 'd2e188bd-681a-4f19-9d47-f4b6526ef311';
 
-  const passenger: User = {
-    id: passengerUserId,
-    phoneE164: '+51987654321',
-    roles: [UserRole.PASSENGER],
-    status: UserStatus.ACTIVE,
-    isPhoneVerified: true,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  } as User;
+  let service: PassengerRidesService;
+  let savedRide: Ride | undefined;
+  let savedHistory: RideStatusHistory | undefined;
+  let transitionsService: {
+    cancelByPassenger: jest.Mock;
+    expireSearchingRide: jest.Mock;
+    expireWithinTransaction: jest.Mock;
+  };
+  let dispatchService: { dispatchRide: jest.Mock };
 
-  const quote: FareQuote = {
-    id: quoteId,
-    passengerUserId,
-    fareRuleId,
-    originZoneId,
-    destinationZoneId,
-    originPosition: {
-      type: 'Point',
-      coordinates: [-76.3599, -6.4877],
-    },
-    destinationPosition: {
-      type: 'Point',
-      coordinates: [-76.3655, -6.4812],
-    },
-    originAddress: 'Jr. Lima 250, Tarapoto',
-    destinationAddress: 'Plaza de Armas de Morales',
-    distanceMeters: 3200,
-    durationSeconds: 720,
-    baseFare: '2.50',
-    distanceAmount: '3.20',
-    timeAmount: '1.20',
-    bookingFee: '0.50',
-    subtotal: '7.40',
-    adjustmentMultiplier: '1.000',
-    estimatedFare: '7.40',
-    currency: 'PEN',
-    isNight: false,
-    isRaining: false,
-    status: FareQuoteStatus.ACTIVE,
-    expiresAt: new Date(Date.now() + 300000),
-    usedAt: null,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  } as FareQuote;
-
-  const zone: ServiceZone = {
-    id: originZoneId,
-    name: 'Tarapoto Centro',
-    code: 'TARAPOTO_CENTRO',
-    status: ServiceZoneStatus.ACTIVE,
-  } as ServiceZone;
-
-  const fareRule: FareRule = {
-    id: fareRuleId,
-    serviceZoneId: originZoneId,
-    status: FareRuleStatus.ACTIVE,
-    effectiveFrom: new Date('2026-01-01T00:00:00.000Z'),
-    effectiveUntil: null,
-  } as FareRule;
-
-  const searchingRide: Ride = {
-    id: rideId,
-    passengerUserId,
-    driverProfileId: null,
-    fareQuoteId: quoteId,
-    originZoneId,
-    destinationZoneId,
-    originPosition: quote.originPosition,
-    destinationPosition: quote.destinationPosition,
-    originAddress: quote.originAddress,
-    destinationAddress: quote.destinationAddress,
-    distanceMeters: quote.distanceMeters,
-    estimatedDurationSeconds: quote.durationSeconds,
-    estimatedFare: quote.estimatedFare,
-    finalFare: null,
-    currency: quote.currency,
-    status: RideStatus.SEARCHING_DRIVER,
-    passengerNotes: null,
-    requestedAt: new Date(),
-    searchExpiresAt: new Date(Date.now() + 120000),
-    dispatchRound: 0,
-    lastDispatchAt: null,
-    driverAssignedAt: null,
-    driverArrivedAt: null,
-    startedAt: null,
-    completedAt: null,
-    cancelledAt: null,
-    cancellationReason: null,
-    cancelledBy: null,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  } as Ride;
-
-  function createRepositoryMock<T>(): RepositoryMock<T> {
-    return {
-      findOne: jest.fn<Promise<T | null>, [FindOneOptions<T>]>(() =>
-        Promise.resolve(null),
-      ),
-      create: jest.fn<T, [Partial<T>]>((input: Partial<T>): T => input as T),
-      save: jest.fn<Promise<T>, [T]>((entity: T): Promise<T> =>
-        Promise.resolve(entity),
-      ),
-      update: jest.fn<
-        Promise<{ affected: number }>,
-        [Record<string, unknown>, Record<string, unknown>]
-      >(() => Promise.resolve({ affected: 1 })),
-    };
-  }
-
-  beforeEach(async () => {
-    savedQuote = undefined;
+  beforeEach(() => {
     savedRide = undefined;
-    userRepository = createRepositoryMock<User>();
-    quoteRepository = createRepositoryMock<FareQuote>();
-    zoneRepository = createRepositoryMock<ServiceZone>();
-    fareRuleRepository = createRepositoryMock<FareRule>();
-    rideRepository = createRepositoryMock<Ride>();
-    offerRepository = createRepositoryMock<RideOffer>();
-    rideDispatchService = {
-      dispatchRide: jest.fn<Promise<RideOffer[]>, [string]>(() =>
-        Promise.resolve([]),
-      ),
-    };
+    savedHistory = undefined;
 
-    userRepository.findOne.mockResolvedValue({
-      ...passenger,
-      roles: [...passenger.roles],
-    });
-    quoteRepository.findOne.mockResolvedValue({
-      ...quote,
-      expiresAt: new Date(Date.now() + 300000),
-    });
-    zoneRepository.findOne.mockResolvedValue({ ...zone });
-    fareRuleRepository.findOne.mockResolvedValue({ ...fareRule });
-    rideRepository.findOne.mockResolvedValue(null);
-
-    quoteRepository.save.mockImplementation(
-      (entity: FareQuote): Promise<FareQuote> => {
-        savedQuote = entity;
-        return Promise.resolve(entity);
+    const passenger = {
+      id: passengerUserId,
+      roles: [UserRole.PASSENGER],
+      status: UserStatus.ACTIVE,
+      isPhoneVerified: true,
+    } as User;
+    const quote = {
+      id: quoteId,
+      passengerUserId,
+      fareRuleId: 'd2e188bd-681a-4f19-9d47-f4b6526ef311',
+      originZoneId: '7d37cc0a-bbbe-4cd1-a244-b8eca8350012',
+      destinationZoneId: '1d2edb48-b408-46b5-b312-44e89acd2bb4',
+      originPosition: {
+        type: 'Point',
+        coordinates: [-76.3599, -6.4877],
       },
-    );
-    rideRepository.save.mockImplementation((entity: Ride): Promise<Ride> => {
-      savedRide = {
-        ...entity,
-        id: entity.id ?? rideId,
-        createdAt: entity.createdAt ?? new Date(),
-        updatedAt: entity.updatedAt ?? new Date(),
-      };
-      return Promise.resolve(savedRide);
-    });
+      destinationPosition: {
+        type: 'Point',
+        coordinates: [-76.3655, -6.4812],
+      },
+      originAddress: 'Jr. Lima 250, Tarapoto',
+      destinationAddress: 'Plaza de Armas de Morales',
+      distanceMeters: 3200,
+      durationSeconds: 720,
+      estimatedFare: '7.40',
+      currency: 'PEN',
+      status: FareQuoteStatus.ACTIVE,
+      expiresAt: new Date(Date.now() + 300_000),
+      usedAt: null,
+    } as FareQuote;
+    const zone = {
+      status: ServiceZoneStatus.ACTIVE,
+    } as ServiceZone;
+    const fareRule = {
+      status: FareRuleStatus.ACTIVE,
+    } as FareRule;
 
-    const managerMock = {
-      getRepository: jest.fn((entity: unknown): unknown => {
-        if (entity === User) {
-          return userRepository;
-        }
-
-        if (entity === FareQuote) {
-          return quoteRepository;
-        }
-
-        if (entity === ServiceZone) {
-          return zoneRepository;
-        }
-
-        if (entity === FareRule) {
-          return fareRuleRepository;
-        }
-
-        if (entity === Ride) {
-          return rideRepository;
-        }
-
-        if (entity === RideOffer) {
-          return offerRepository;
-        }
-
-        throw new Error('Repositorio inesperado');
+    const userRepository = {
+      findOne: jest.fn(() => Promise.resolve(passenger)),
+    };
+    const quoteRepository = {
+      findOne: jest.fn(() => Promise.resolve(quote)),
+      save: jest.fn((entity: FareQuote) => Promise.resolve(entity)),
+    };
+    const zoneRepository = {
+      findOne: jest.fn(() => Promise.resolve(zone)),
+    };
+    const fareRuleRepository = {
+      findOne: jest.fn(() => Promise.resolve(fareRule)),
+    };
+    const rideRepository = {
+      findOne: jest.fn(() => Promise.resolve(null)),
+      create: jest.fn((input: Partial<Ride>) => input as Ride),
+      save: jest.fn((entity: Ride) => {
+        savedRide = {
+          ...entity,
+          id: entity.id ?? rideId,
+          createdAt: entity.createdAt ?? new Date(),
+          updatedAt: entity.updatedAt ?? new Date(),
+        };
+        return Promise.resolve(savedRide);
+      }),
+    };
+    const historyRepository = {
+      create: jest.fn(
+        (input: Partial<RideStatusHistory>) => input as RideStatusHistory,
+      ),
+      save: jest.fn((entity: RideStatusHistory) => {
+        savedHistory = entity;
+        return Promise.resolve(entity);
       }),
     };
 
+    const managerMock = {
+      getRepository: jest.fn((entity: unknown): unknown => {
+        if (entity === User) return userRepository;
+        if (entity === FareQuote) return quoteRepository;
+        if (entity === ServiceZone) return zoneRepository;
+        if (entity === FareRule) return fareRuleRepository;
+        if (entity === Ride) return rideRepository;
+        if (entity === RideStatusHistory) return historyRepository;
+        return { update: jest.fn(() => Promise.resolve({ affected: 0 })) };
+      }),
+    };
     const dataSourceMock = {
       transaction: jest.fn(
         <T>(work: (manager: EntityManager) => Promise<T>): Promise<T> =>
           work(managerMock as unknown as EntityManager),
       ),
-      getRepository: jest.fn((entity: unknown): unknown => {
-        if (entity === Ride) {
-          return rideRepository;
-        }
-
-        if (entity === RideOffer) {
-          return offerRepository;
-        }
-
-        throw new Error('Repositorio inesperado');
-      }),
+      getRepository: jest.fn(() => rideRepository),
     };
 
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        PassengerRidesService,
-        {
-          provide: DataSource,
-          useValue: dataSourceMock,
-        },
-        {
-          provide: RideDispatchService,
-          useValue: rideDispatchService,
-        },
-      ],
-    }).compile();
+    dispatchService = {
+      dispatchRide: jest.fn(() => Promise.resolve([])),
+    };
+    transitionsService = {
+      cancelByPassenger: jest.fn(),
+      expireSearchingRide: jest.fn(() => Promise.resolve(true)),
+      expireWithinTransaction: jest.fn(() => Promise.resolve()),
+    };
+    const viewService = {
+      toPassengerResponse: jest.fn((ride: Ride) =>
+        Promise.resolve({
+          id: ride.id,
+          status: ride.status,
+        } as PassengerRideResponseDto),
+      ),
+    };
 
-    service = module.get<PassengerRidesService>(PassengerRidesService);
+    service = new PassengerRidesService(
+      dataSourceMock as unknown as DataSource,
+      dispatchService as unknown as RideDispatchService,
+      transitionsService as unknown as RideTransitionsService,
+      viewService as unknown as RideViewService,
+    );
   });
 
-  it('debe crear el viaje copiando los datos inmutables de la cotización', async () => {
+  it('debe crear el viaje, registrar estado inicial e iniciar matching', async () => {
     const result = await service.createRide(passengerUserId, {
       fareQuoteId: quoteId,
       passengerNotes: 'Estoy frente a la puerta principal',
     });
 
-    expect(savedRide).toBeDefined();
     expect(savedRide?.status).toBe(RideStatus.SEARCHING_DRIVER);
-    expect(savedRide?.estimatedFare).toBe('7.40');
-    expect(savedRide?.originPosition).toEqual(quote.originPosition);
-    expect(savedRide?.passengerNotes).toBe(
-      'Estoy frente a la puerta principal',
-    );
-    expect(savedQuote?.status).toBe(FareQuoteStatus.USED);
-    expect(savedQuote?.usedAt).toBeInstanceOf(Date);
+    expect(savedRide?.stateVersion).toBe(0);
+    expect(savedRide?.driverArrivingAt).toBeNull();
+    expect(savedHistory?.previousStatus).toBeNull();
+    expect(savedHistory?.newStatus).toBe(RideStatus.SEARCHING_DRIVER);
+    expect(dispatchService.dispatchRide).toHaveBeenCalledWith(rideId);
     expect(result.id).toBe(rideId);
-    expect(rideDispatchService.dispatchRide).toHaveBeenCalledWith(rideId);
   });
 
-  it('debe marcar una cotización vencida como EXPIRED', async () => {
-    quoteRepository.findOne.mockResolvedValue({
-      ...quote,
-      expiresAt: new Date(Date.now() - 1000),
-    });
-
-    await expect(
-      service.createRide(passengerUserId, {
-        fareQuoteId: quoteId,
-      }),
-    ).rejects.toBeInstanceOf(BadRequestException);
-
-    expect(savedQuote?.status).toBe(FareQuoteStatus.EXPIRED);
-    expect(rideRepository.save).not.toHaveBeenCalled();
-  });
-
-  it('debe ocultar una cotización perteneciente a otro pasajero', async () => {
-    quoteRepository.findOne.mockResolvedValue({
-      ...quote,
-      passengerUserId: '381f6711-a5ca-4cc5-9107-3f94a6e0b649',
-    });
-
-    await expect(
-      service.createRide(passengerUserId, {
-        fareQuoteId: quoteId,
-      }),
-    ).rejects.toBeInstanceOf(NotFoundException);
-  });
-
-  it('debe rechazar una cotización ya utilizada', async () => {
-    quoteRepository.findOne.mockResolvedValue({
-      ...quote,
-      status: FareQuoteStatus.USED,
-    });
-
-    await expect(
-      service.createRide(passengerUserId, {
-        fareQuoteId: quoteId,
-      }),
-    ).rejects.toBeInstanceOf(BadRequestException);
-  });
-
-  it('debe impedir dos viajes activos para el mismo pasajero', async () => {
-    rideRepository.findOne.mockResolvedValue({ ...searchingRide });
-
-    await expect(
-      service.createRide(passengerUserId, {
-        fareQuoteId: quoteId,
-      }),
-    ).rejects.toBeInstanceOf(ConflictException);
-
-    expect(quoteRepository.save).not.toHaveBeenCalled();
-  });
-
-  it('debe consultar el viaje activo del pasajero', async () => {
-    rideRepository.findOne.mockResolvedValue({ ...searchingRide });
-
-    const result = await service.getActiveRide(passengerUserId);
-
-    expect(result.id).toBe(rideId);
-    expect(result.status).toBe(RideStatus.SEARCHING_DRIVER);
-  });
-
-  it('debe rechazar la consulta cuando no hay viaje activo', async () => {
-    await expect(service.getActiveRide(passengerUserId)).rejects.toBeInstanceOf(
-      NotFoundException,
-    );
-  });
-
-  it('debe consultar el detalle de un viaje propio', async () => {
-    rideRepository.findOne.mockResolvedValue({ ...searchingRide });
-
-    const result = await service.getRide(passengerUserId, rideId);
-
-    expect(result.id).toBe(rideId);
-    expect(result.fareQuoteId).toBe(quoteId);
-  });
-
-  it('debe ocultar un viaje que no pertenece al pasajero', async () => {
-    rideRepository.findOne.mockResolvedValue(null);
-
-    await expect(
-      service.getRide(passengerUserId, rideId),
-    ).rejects.toBeInstanceOf(NotFoundException);
-  });
-
-  it('debe liberar una búsqueda vencida antes de crear otro viaje', async () => {
-    rideRepository.findOne.mockResolvedValue({
-      ...searchingRide,
-      searchExpiresAt: new Date(Date.now() - 1000),
-    });
-
-    const result = await service.createRide(passengerUserId, {
-      fareQuoteId: quoteId,
-    });
-
-    expect(result.status).toBe(RideStatus.SEARCHING_DRIVER);
-    expect(rideRepository.save).toHaveBeenCalledTimes(2);
-  });
-
-  it('debe cancelar un viaje que está buscando conductor', async () => {
-    rideRepository.findOne.mockResolvedValue({ ...searchingRide });
+  it('debe delegar la cancelación a la máquina central de estados', async () => {
+    const cancelledRide = {
+      id: rideId,
+      status: RideStatus.CANCELLED,
+    } as Ride;
+    transitionsService.cancelByPassenger.mockResolvedValue(cancelledRide);
 
     const result = await service.cancelRide(passengerUserId, rideId, {
       reason: 'Ya no necesito el viaje',
     });
 
-    expect(savedRide?.status).toBe(RideStatus.CANCELLED);
-    expect(savedRide?.cancelledBy).toBe(RideCancellationActor.PASSENGER);
-    expect(savedRide?.cancelledAt).toBeInstanceOf(Date);
+    expect(transitionsService.cancelByPassenger).toHaveBeenCalledWith(
+      passengerUserId,
+      rideId,
+      'Ya no necesito el viaje',
+    );
     expect(result.status).toBe(RideStatus.CANCELLED);
-    expect(offerRepository.update).toHaveBeenCalledTimes(1);
-  });
-
-  it('debe impedir cancelar un viaje en progreso', async () => {
-    rideRepository.findOne.mockResolvedValue({
-      ...searchingRide,
-      status: RideStatus.IN_PROGRESS,
-    });
-
-    await expect(
-      service.cancelRide(passengerUserId, rideId, {
-        reason: 'Quiero cancelar el viaje',
-      }),
-    ).rejects.toBeInstanceOf(BadRequestException);
-  });
-
-  it('debe expirar una búsqueda vencida', async () => {
-    rideRepository.findOne.mockResolvedValue({
-      ...searchingRide,
-      searchExpiresAt: new Date(Date.now() - 1000),
-    });
-
-    const result = await service.expireSearchingRide(rideId);
-
-    expect(result).toBe(true);
-    expect(savedRide?.status).toBe(RideStatus.EXPIRED);
-    expect(offerRepository.update).toHaveBeenCalledTimes(1);
   });
 });

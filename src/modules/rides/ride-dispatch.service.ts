@@ -26,6 +26,7 @@ import {
   RIDE_OFFER_TTL_MS,
   RIDE_SEARCH_RADII_METERS,
 } from './ride-matching.constants';
+import { RideTransitionsService } from './ride-transitions.service';
 
 interface DispatchPlan {
   rideId: string;
@@ -53,6 +54,7 @@ export class RideDispatchService {
   constructor(
     private readonly dataSource: DataSource,
     private readonly driverLocationsService: DriverLocationsService,
+    private readonly transitionsService: RideTransitionsService,
   ) {}
 
   async dispatchRide(rideId: string): Promise<RideOffer[]> {
@@ -92,8 +94,11 @@ export class RideDispatchService {
         ride.status === RideStatus.SEARCHING_DRIVER &&
         ride.searchExpiresAt.getTime() <= now.getTime()
       ) {
-        ride.status = RideStatus.EXPIRED;
-        await manager.getRepository(Ride).save(ride);
+        await this.transitionsService.expireWithinTransaction(
+          manager,
+          ride,
+          now,
+        );
         affected += await this.expireAllOfferedRows(
           manager.getRepository(RideOffer),
           ride.id,
@@ -120,8 +125,11 @@ export class RideDispatchService {
       }
 
       if (ride.searchExpiresAt.getTime() <= now.getTime()) {
-        ride.status = RideStatus.EXPIRED;
-        await manager.getRepository(Ride).save(ride);
+        await this.transitionsService.expireWithinTransaction(
+          manager,
+          ride,
+          now,
+        );
         await this.expireAllOfferedRows(offerRepository, ride.id, now);
 
         return {
@@ -189,8 +197,11 @@ export class RideDispatchService {
       }
 
       if (ride.searchExpiresAt.getTime() <= now.getTime()) {
-        ride.status = RideStatus.EXPIRED;
-        await rideRepository.save(ride);
+        await this.transitionsService.expireWithinTransaction(
+          manager,
+          ride,
+          now,
+        );
         await this.expireAllOfferedRows(offerRepository, ride.id, now);
 
         return [];

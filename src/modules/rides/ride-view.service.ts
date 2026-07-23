@@ -1,0 +1,137 @@
+import { Injectable } from '@nestjs/common';
+import { DataSource } from 'typeorm';
+
+import { DriverLocation } from '../driver-operations/entities/driver-location.entity';
+import { DriverProfile } from '../drivers/entities/driver-profile.entity';
+import { DriverVehicle } from '../drivers/entities/driver-vehicle.entity';
+import { DriverActiveRideResponseDto } from './dto/driver-active-ride-response.dto';
+import { PassengerRideResponseDto } from './dto/passenger-ride-response.dto';
+import { Ride } from './entities/ride.entity';
+
+@Injectable()
+export class RideViewService {
+  constructor(private readonly dataSource: DataSource) {}
+
+  async toPassengerResponse(ride: Ride): Promise<PassengerRideResponseDto> {
+    let driver: PassengerRideResponseDto['driver'] = null;
+    let driverLocation: PassengerRideResponseDto['driverLocation'] = null;
+
+    if (ride.driverProfileId) {
+      const [profile, vehicle, location] = await Promise.all([
+        this.dataSource.getRepository(DriverProfile).findOne({
+          where: { id: ride.driverProfileId },
+        }),
+        this.dataSource.getRepository(DriverVehicle).findOne({
+          where: { driverProfileId: ride.driverProfileId },
+        }),
+        this.dataSource.getRepository(DriverLocation).findOne({
+          where: { driverProfileId: ride.driverProfileId },
+        }),
+      ]);
+
+      if (profile && vehicle) {
+        driver = {
+          profileId: profile.id,
+          firstName: profile.firstName,
+          photoUrl: profile.photoUrl,
+          vehicle: {
+            plate: vehicle.plate,
+            brand: vehicle.brand,
+            model: vehicle.model,
+            color: vehicle.color,
+            vehicleType: vehicle.vehicleType,
+          },
+        };
+      }
+
+      if (location) {
+        driverLocation = {
+          latitude: location.latitude,
+          longitude: location.longitude,
+          heading: location.heading,
+          speed: location.speed,
+          accuracy: location.accuracy,
+          recordedAt: location.recordedAt,
+        };
+      }
+    }
+
+    return {
+      ...this.baseResponse(ride),
+      driver,
+      driverLocation,
+    };
+  }
+
+  toDriverResponse(
+    ride: Ride,
+    distanceToOriginMeters: number | null,
+  ): DriverActiveRideResponseDto {
+    return {
+      id: ride.id,
+      status: ride.status,
+      stateVersion: ride.stateVersion,
+      origin: this.location(ride.originPosition, ride.originAddress),
+      destination: this.location(
+        ride.destinationPosition,
+        ride.destinationAddress,
+      ),
+      distanceMeters: ride.distanceMeters,
+      estimatedDurationSeconds: ride.estimatedDurationSeconds,
+      estimatedFare: ride.estimatedFare,
+      currency: ride.currency,
+      passengerNotes: ride.passengerNotes,
+      requestedAt: ride.requestedAt,
+      driverAssignedAt: ride.driverAssignedAt,
+      driverArrivingAt: ride.driverArrivingAt,
+      driverArrivedAt: ride.driverArrivedAt,
+      arrivalDistanceMeters: ride.arrivalDistanceMeters,
+      distanceToOriginMeters,
+    };
+  }
+
+  private baseResponse(
+    ride: Ride,
+  ): Omit<PassengerRideResponseDto, 'driver' | 'driverLocation'> {
+    return {
+      id: ride.id,
+      fareQuoteId: ride.fareQuoteId,
+      driverProfileId: ride.driverProfileId,
+      status: ride.status,
+      stateVersion: ride.stateVersion,
+      origin: this.location(ride.originPosition, ride.originAddress),
+      destination: this.location(
+        ride.destinationPosition,
+        ride.destinationAddress,
+      ),
+      distanceMeters: ride.distanceMeters,
+      estimatedDurationSeconds: ride.estimatedDurationSeconds,
+      estimatedFare: ride.estimatedFare,
+      finalFare: ride.finalFare,
+      currency: ride.currency,
+      passengerNotes: ride.passengerNotes,
+      requestedAt: ride.requestedAt,
+      searchExpiresAt: ride.searchExpiresAt,
+      driverAssignedAt: ride.driverAssignedAt,
+      driverArrivingAt: ride.driverArrivingAt,
+      driverArrivedAt: ride.driverArrivedAt,
+      arrivalDistanceMeters: ride.arrivalDistanceMeters,
+      cancelledAt: ride.cancelledAt,
+      cancellationReason: ride.cancellationReason,
+      cancelledBy: ride.cancelledBy,
+      createdAt: ride.createdAt,
+      updatedAt: ride.updatedAt,
+    };
+  }
+
+  private location(
+    point: Ride['originPosition'],
+    address: string,
+  ): PassengerRideResponseDto['origin'] {
+    return {
+      latitude: point.coordinates[1],
+      longitude: point.coordinates[0],
+      address,
+    };
+  }
+}

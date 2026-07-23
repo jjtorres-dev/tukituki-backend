@@ -27,6 +27,8 @@ import { RideOfferStatus } from './enums/ride-offer-status.enum';
 import { RideStatus } from './enums/ride-status.enum';
 import { ACTIVE_DRIVER_RIDE_STATUSES } from './ride-matching.constants';
 import { RideDispatchService } from './ride-dispatch.service';
+import { RideTransitionsService } from './ride-transitions.service';
+import { RideRealtimeService } from './realtime/ride-realtime.service';
 
 interface AcceptedOutcome {
   kind: 'accepted';
@@ -60,6 +62,8 @@ export class DriverRideOffersService {
     private readonly dataSource: DataSource,
     private readonly rideDispatchService: RideDispatchService,
     private readonly availabilityRedisService: DriverAvailabilityRedisService,
+    private readonly transitionsService: RideTransitionsService,
+    private readonly realtimeService: RideRealtimeService,
   ) {}
 
   async getActiveOffers(userId: string): Promise<DriverRideOfferResponseDto[]> {
@@ -149,6 +153,19 @@ export class DriverRideOffersService {
               this.errorMessage(error),
           );
         });
+
+      try {
+        this.realtimeService.emitAssigned(outcome.offer.ride);
+        this.realtimeService.emitStatusChanged(
+          outcome.offer.ride,
+          RideStatus.SEARCHING_DRIVER,
+        );
+      } catch (error: unknown) {
+        this.logger.warn(
+          `El viaje ${outcome.offer.rideId} fue asignado, ` +
+            `pero no pudo emitirse por WebSocket: ${this.errorMessage(error)}`,
+        );
+      }
 
       return this.mapOffer(outcome.offer);
     } catch (error: unknown) {
@@ -256,8 +273,11 @@ export class DriverRideOffersService {
         ride.status === RideStatus.SEARCHING_DRIVER &&
         ride.searchExpiresAt.getTime() <= now.getTime()
       ) {
-        ride.status = RideStatus.EXPIRED;
-        await rideRepository.save(ride);
+        await this.transitionsService.expireWithinTransaction(
+          manager,
+          ride,
+          now,
+        );
 
         await offerRepository.update(
           {
@@ -320,15 +340,18 @@ export class DriverRideOffersService {
     offer.rejectedAt = null;
     offer.rejectionReason = null;
 
-    ride.driverProfileId = profile.id;
-    ride.status = RideStatus.DRIVER_ASSIGNED;
-    ride.driverAssignedAt = now;
-
     operationalState.status = DriverOperationalStatus.BUSY;
     operationalState.lastSeenAt = now;
 
     const savedOffer = await offerRepository.save(offer);
-    await rideRepository.save(ride);
+    await this.transitionsService.assignDriverWithinTransaction(
+      manager,
+      ride,
+      profile.id,
+      userId,
+      offer.id,
+      now,
+    );
     await manager.getRepository(DriverOperationalState).save(operationalState);
 
     await offerRepository.update(

@@ -240,11 +240,34 @@ export class Ride {
   driverAssignedAt!: Date | null;
 
   @Column({
+    name: 'driver_arriving_at',
+    type: 'timestamptz',
+    nullable: true,
+  })
+  driverArrivingAt!: Date | null;
+
+  @Column({
     name: 'driver_arrived_at',
     type: 'timestamptz',
     nullable: true,
   })
   driverArrivedAt!: Date | null;
+
+  @Column({
+    name: 'arrival_distance_meters',
+    type: 'numeric',
+    precision: 10,
+    scale: 2,
+    nullable: true,
+  })
+  arrivalDistanceMeters!: string | null;
+
+  @Column({
+    name: 'state_version',
+    type: 'integer',
+    default: 0,
+  })
+  stateVersion!: number;
 
   @Column({
     name: 'started_at',

@@ -126,12 +126,11 @@ describe('DriverRideOffersService', () => {
       registerBusyPresence: jest.fn(() => Promise.resolve()),
     };
     const transitionsService = {
-      assignDriverWithinTransaction: jest.fn((): Promise<void> => {
+      assignDriverWithinTransaction: jest.fn(async (): Promise<void> => {
         ride.driverProfileId = driverProfileId;
         ride.status = RideStatus.DRIVER_ASSIGNED;
         ride.stateVersion = 1;
         ride.driverAssignedAt = new Date();
-        return Promise.resolve();
       }),
       expireWithinTransaction: jest.fn(() => Promise.resolve()),
     };

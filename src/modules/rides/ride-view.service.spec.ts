@@ -1,0 +1,112 @@
+import { DataSource } from 'typeorm';
+
+import { DriverLocation } from '../driver-operations/entities/driver-location.entity';
+import { DriverProfile } from '../drivers/entities/driver-profile.entity';
+import { DriverVehicle } from '../drivers/entities/driver-vehicle.entity';
+import { VehicleType } from '../drivers/enums/vehicle-type.enum';
+import { Ride } from './entities/ride.entity';
+import { RideStatus } from './enums/ride-status.enum';
+import { RideViewService } from './ride-view.service';
+
+describe('RideViewService', () => {
+  const driverProfileId = '72b81eb5-c53f-4de2-bd9f-11f33d64da64';
+
+  const ride = {
+    id: '3dbb6cbc-aee8-43f0-8247-e13d8e197b71',
+    fareQuoteId: '1f66359e-d183-494d-a921-a19edbfbe2b9',
+    driverProfileId,
+    status: RideStatus.DRIVER_ASSIGNED,
+    stateVersion: 1,
+    originPosition: {
+      type: 'Point',
+      coordinates: [-76.3599, -6.4877],
+    },
+    destinationPosition: {
+      type: 'Point',
+      coordinates: [-76.3655, -6.4812],
+    },
+    originAddress: 'Jr. Lima 250, Tarapoto',
+    destinationAddress: 'Plaza de Armas de Morales',
+    distanceMeters: 3200,
+    estimatedDurationSeconds: 720,
+    estimatedFare: '7.40',
+    finalFare: null,
+    currency: 'PEN',
+    passengerNotes: null,
+    requestedAt: new Date(),
+    searchExpiresAt: new Date(),
+    driverAssignedAt: new Date(),
+    driverArrivingAt: null,
+    driverArrivedAt: null,
+    arrivalDistanceMeters: null,
+    cancelledAt: null,
+    cancellationReason: null,
+    cancelledBy: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  } as Ride;
+
+  it('debe incluir conductor, vehículo y última ubicación después de asignar', async () => {
+    const profile = {
+      id: driverProfileId,
+      firstName: 'Carlos',
+      photoUrl: 'https://cdn.tukituki.pe/carlos.jpg',
+    } as DriverProfile;
+    const vehicle = {
+      driverProfileId,
+      plate: '1234-AB',
+      brand: 'Bajaj',
+      model: 'RE 4S',
+      color: 'Rojo',
+      vehicleType: VehicleType.MOTOTAXI,
+    } as DriverVehicle;
+    const location = {
+      driverProfileId,
+      latitude: -6.4879,
+      longitude: -76.3601,
+      heading: 90,
+      speed: 7.5,
+      accuracy: 8,
+      recordedAt: new Date(),
+    } as DriverLocation;
+
+    const dataSourceMock = {
+      getRepository: jest.fn((entity: unknown): unknown => ({
+        findOne: jest.fn(() => {
+          if (entity === DriverProfile) return Promise.resolve(profile);
+          if (entity === DriverVehicle) return Promise.resolve(vehicle);
+          if (entity === DriverLocation) return Promise.resolve(location);
+          return Promise.resolve(null);
+        }),
+      })),
+    };
+    const service = new RideViewService(
+      dataSourceMock as unknown as DataSource,
+    );
+
+    const result = await service.toPassengerResponse(ride);
+
+    expect(result.driver?.firstName).toBe('Carlos');
+    expect(result.driver?.vehicle.plate).toBe('1234-AB');
+    expect(result.driverLocation?.latitude).toBe(-6.4879);
+  });
+
+  it('no debe exponer conductor antes de la asignación', async () => {
+    const dataSourceMock = {
+      getRepository: jest.fn(),
+    };
+    const service = new RideViewService(
+      dataSourceMock as unknown as DataSource,
+    );
+
+    const result = await service.toPassengerResponse({
+      ...ride,
+      driverProfileId: null,
+      status: RideStatus.SEARCHING_DRIVER,
+    });
+
+    expect(result.driver).toBeNull();
+    expect(result.driverLocation).toBeNull();
+    expect(dataSourceMock.getRepository).not.toHaveBeenCalled();
+  });
+});

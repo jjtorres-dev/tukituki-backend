@@ -104,7 +104,7 @@ export class PassengerRidesController {
 
   @Patch(':rideId/cancel')
   @ApiOperation({
-    summary: 'Cancelar una solicitud mientras busca conductor',
+    summary: 'Cancelar un viaje antes de iniciar el recorrido',
   })
   @ApiOkResponse({
     type: PassengerRideResponseDto,

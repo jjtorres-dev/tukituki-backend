@@ -30,10 +30,13 @@ import { CreatePassengerRideDto } from './dto/create-passenger-ride.dto';
 import { PassengerRideResponseDto } from './dto/passenger-ride-response.dto';
 import { RideOffer } from './entities/ride-offer.entity';
 import { Ride } from './entities/ride.entity';
-import { RideCancellationActor } from './enums/ride-cancellation-actor.enum';
 import { RideOfferStatus } from './enums/ride-offer-status.enum';
+import { RideStatusActor } from './enums/ride-status-actor.enum';
 import { RideStatus } from './enums/ride-status.enum';
+import { RideStatusHistory } from './entities/ride-status-history.entity';
 import { RideDispatchService } from './ride-dispatch.service';
+import { RideTransitionsService } from './ride-transitions.service';
+import { RideViewService } from './ride-view.service';
 
 const RIDE_SEARCH_TTL_MS = 2 * 60 * 1000;
 
@@ -56,6 +59,8 @@ export class PassengerRidesService {
   constructor(
     private readonly dataSource: DataSource,
     private readonly rideDispatchService: RideDispatchService,
+    private readonly transitionsService: RideTransitionsService,
+    private readonly rideViewService: RideViewService,
   ) {}
 
   async createRide(
@@ -113,8 +118,11 @@ export class PassengerRidesService {
               activeRide.searchExpiresAt.getTime() <= now.getTime();
 
             if (isExpiredSearch) {
-              activeRide.status = RideStatus.EXPIRED;
-              await rideRepository.save(activeRide);
+              await this.transitionsService.expireWithinTransaction(
+                manager,
+                activeRide,
+                now,
+              );
               await manager.getRepository(RideOffer).update(
                 {
                   rideId: activeRide.id,
@@ -154,7 +162,10 @@ export class PassengerRidesService {
             dispatchRound: 0,
             lastDispatchAt: null,
             driverAssignedAt: null,
+            driverArrivingAt: null,
             driverArrivedAt: null,
+            arrivalDistanceMeters: null,
+            stateVersion: 0,
             startedAt: null,
             completedAt: null,
             cancelledAt: null,
@@ -162,6 +173,19 @@ export class PassengerRidesService {
             cancelledBy: null,
           });
           const savedRide = await rideRepository.save(ride);
+
+          const initialHistory = manager
+            .getRepository(RideStatusHistory)
+            .create({
+              rideId: savedRide.id,
+              previousStatus: null,
+              newStatus: RideStatus.SEARCHING_DRIVER,
+              actorType: RideStatusActor.PASSENGER,
+              actorUserId: passengerUserId,
+              metadata: { fareQuoteId: quote.id },
+              occurredAt: now,
+            });
+          await manager.getRepository(RideStatusHistory).save(initialHistory);
 
           quote.status = FareQuoteStatus.USED;
           quote.usedAt = now;
@@ -185,7 +209,7 @@ export class PassengerRidesService {
           );
         });
 
-      return this.mapRide(outcome);
+      return this.rideViewService.toPassengerResponse(outcome);
     } catch (error: unknown) {
       if (this.isUniqueViolation(error)) {
         throw new ConflictException(
@@ -234,7 +258,7 @@ export class PassengerRidesService {
         });
     }
 
-    return this.mapRide(ride);
+    return this.rideViewService.toPassengerResponse(ride);
   }
 
   async getRide(
@@ -252,99 +276,25 @@ export class PassengerRidesService {
       throw new NotFoundException('El viaje no existe');
     }
 
-    return this.mapRide(ride);
+    return this.rideViewService.toPassengerResponse(ride);
   }
 
-  cancelRide(
+  async cancelRide(
     passengerUserId: string,
     rideId: string,
     dto: CancelPassengerRideDto,
   ): Promise<PassengerRideResponseDto> {
-    return this.dataSource.transaction(async (manager) => {
-      const passenger = await this.lockPassenger(manager, passengerUserId);
-      this.assertPassengerEnabled(passenger);
+    const ride = await this.transitionsService.cancelByPassenger(
+      passengerUserId,
+      rideId,
+      dto.reason,
+    );
 
-      const rideRepository = manager.getRepository(Ride);
-      const ride = await rideRepository.findOne({
-        where: {
-          id: rideId,
-        },
-        lock: {
-          mode: 'pessimistic_write',
-        },
-      });
-
-      if (!ride || ride.passengerUserId !== passengerUserId) {
-        throw new NotFoundException('El viaje no existe');
-      }
-
-      if (ride.status !== RideStatus.SEARCHING_DRIVER) {
-        throw new BadRequestException(
-          'Solo puede cancelarse un viaje que está buscando conductor',
-        );
-      }
-
-      const cancelledAt = new Date();
-      ride.status = RideStatus.CANCELLED;
-      ride.cancelledAt = cancelledAt;
-      ride.cancelledBy = RideCancellationActor.PASSENGER;
-      ride.cancellationReason = dto.reason.trim();
-
-      const savedRide = await rideRepository.save(ride);
-
-      await manager.getRepository(RideOffer).update(
-        {
-          rideId: ride.id,
-          status: RideOfferStatus.OFFERED,
-        },
-        {
-          status: RideOfferStatus.CANCELLED,
-          respondedAt: cancelledAt,
-          cancelledAt,
-        },
-      );
-
-      return this.mapRide(savedRide);
-    });
+    return this.rideViewService.toPassengerResponse(ride);
   }
 
   expireSearchingRide(rideId: string): Promise<boolean> {
-    return this.dataSource.transaction(async (manager) => {
-      const rideRepository = manager.getRepository(Ride);
-      const ride = await rideRepository.findOne({
-        where: {
-          id: rideId,
-        },
-        lock: {
-          mode: 'pessimistic_write',
-        },
-      });
-
-      if (
-        !ride ||
-        ride.status !== RideStatus.SEARCHING_DRIVER ||
-        ride.searchExpiresAt.getTime() > Date.now()
-      ) {
-        return false;
-      }
-
-      const expiredAt = new Date();
-      ride.status = RideStatus.EXPIRED;
-      await rideRepository.save(ride);
-
-      await manager.getRepository(RideOffer).update(
-        {
-          rideId: ride.id,
-          status: RideOfferStatus.OFFERED,
-        },
-        {
-          status: RideOfferStatus.EXPIRED,
-          respondedAt: expiredAt,
-        },
-      );
-
-      return true;
-    });
+    return this.transitionsService.expireSearchingRide(rideId);
   }
 
   private async lockPassenger(
@@ -464,39 +414,6 @@ export class PassengerRidesService {
         'La regla tarifaria de la cotización ya no está disponible',
       );
     }
-  }
-
-  private mapRide(ride: Ride): PassengerRideResponseDto {
-    return {
-      id: ride.id,
-      fareQuoteId: ride.fareQuoteId,
-      driverProfileId: ride.driverProfileId,
-      status: ride.status,
-      origin: {
-        latitude: ride.originPosition.coordinates[1],
-        longitude: ride.originPosition.coordinates[0],
-        address: ride.originAddress,
-      },
-      destination: {
-        latitude: ride.destinationPosition.coordinates[1],
-        longitude: ride.destinationPosition.coordinates[0],
-        address: ride.destinationAddress,
-      },
-      distanceMeters: ride.distanceMeters,
-      estimatedDurationSeconds: ride.estimatedDurationSeconds,
-      estimatedFare: ride.estimatedFare,
-      finalFare: ride.finalFare,
-      currency: ride.currency,
-      passengerNotes: ride.passengerNotes,
-      requestedAt: ride.requestedAt,
-      searchExpiresAt: ride.searchExpiresAt,
-      driverAssignedAt: ride.driverAssignedAt,
-      cancelledAt: ride.cancelledAt,
-      cancellationReason: ride.cancellationReason,
-      cancelledBy: ride.cancelledBy,
-      createdAt: ride.createdAt,
-      updatedAt: ride.updatedAt,
-    };
   }
 
   private errorMessage(error: unknown): string {

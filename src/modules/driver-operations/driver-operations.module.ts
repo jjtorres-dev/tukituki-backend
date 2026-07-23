@@ -6,6 +6,7 @@ import { AuthorizationModule } from '../authorization/authorization.module';
 import { DriverDocument } from '../drivers/entities/driver-document.entity';
 import { DriverProfile } from '../drivers/entities/driver-profile.entity';
 import { DriverVehicle } from '../drivers/entities/driver-vehicle.entity';
+import { RideRealtimeModule } from '../rides/realtime/ride-realtime.module';
 import { DriverLocationsController } from './driver-locations.controller';
 import { DriverLocationsService } from './driver-locations.service';
 import { DriverOperationsController } from './driver-operations.controller';
@@ -24,6 +25,7 @@ import { DriverOperationalState } from './entities/driver-operational-state.enti
     ]),
     AuthModule,
     AuthorizationModule,
+    RideRealtimeModule,
   ],
   controllers: [DriverOperationsController, DriverLocationsController],
   providers: [DriverOperationsService, DriverLocationsService],

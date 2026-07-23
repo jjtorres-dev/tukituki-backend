@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
+import { VehicleType } from '../../drivers/enums/vehicle-type.enum';
 import { RideCancellationActor } from '../enums/ride-cancellation-actor.enum';
 import { RideStatus } from '../enums/ride-status.enum';
 
@@ -14,36 +15,77 @@ export class RideLocationResponseDto {
   address!: string;
 }
 
+export class AssignedDriverVehicleResponseDto {
+  @ApiProperty()
+  plate!: string;
+
+  @ApiProperty()
+  brand!: string;
+
+  @ApiProperty()
+  model!: string;
+
+  @ApiProperty()
+  color!: string;
+
+  @ApiProperty({ enum: VehicleType })
+  vehicleType!: VehicleType;
+}
+
+export class AssignedDriverResponseDto {
+  @ApiProperty({ format: 'uuid' })
+  profileId!: string;
+
+  @ApiProperty()
+  firstName!: string;
+
+  @ApiPropertyOptional({ nullable: true })
+  photoUrl!: string | null;
+
+  @ApiProperty({ type: AssignedDriverVehicleResponseDto })
+  vehicle!: AssignedDriverVehicleResponseDto;
+}
+
+export class AssignedDriverLocationResponseDto {
+  @ApiProperty()
+  latitude!: number;
+
+  @ApiProperty()
+  longitude!: number;
+
+  @ApiPropertyOptional({ nullable: true })
+  heading!: number | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  speed!: number | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  accuracy!: number | null;
+
+  @ApiProperty({ type: String, format: 'date-time' })
+  recordedAt!: Date;
+}
+
 export class PassengerRideResponseDto {
-  @ApiProperty({
-    format: 'uuid',
-  })
+  @ApiProperty({ format: 'uuid' })
   id!: string;
 
-  @ApiProperty({
-    format: 'uuid',
-  })
+  @ApiProperty({ format: 'uuid' })
   fareQuoteId!: string;
 
-  @ApiPropertyOptional({
-    format: 'uuid',
-    nullable: true,
-  })
+  @ApiPropertyOptional({ format: 'uuid', nullable: true })
   driverProfileId!: string | null;
 
-  @ApiProperty({
-    enum: RideStatus,
-  })
+  @ApiProperty({ enum: RideStatus })
   status!: RideStatus;
 
-  @ApiProperty({
-    type: RideLocationResponseDto,
-  })
+  @ApiProperty()
+  stateVersion!: number;
+
+  @ApiProperty({ type: RideLocationResponseDto })
   origin!: RideLocationResponseDto;
 
-  @ApiProperty({
-    type: RideLocationResponseDto,
-  })
+  @ApiProperty({ type: RideLocationResponseDto })
   destination!: RideLocationResponseDto;
 
   @ApiProperty()
@@ -55,31 +97,31 @@ export class PassengerRideResponseDto {
   @ApiProperty()
   estimatedFare!: string;
 
-  @ApiPropertyOptional({
-    nullable: true,
-  })
+  @ApiPropertyOptional({ nullable: true })
   finalFare!: string | null;
 
-  @ApiProperty({
-    example: 'PEN',
-  })
+  @ApiProperty({ example: 'PEN' })
   currency!: string;
 
-  @ApiPropertyOptional({
-    nullable: true,
-  })
+  @ApiPropertyOptional({ nullable: true })
   passengerNotes!: string | null;
 
-  @ApiProperty({
-    type: String,
-    format: 'date-time',
+  @ApiPropertyOptional({
+    type: AssignedDriverResponseDto,
+    nullable: true,
   })
+  driver!: AssignedDriverResponseDto | null;
+
+  @ApiPropertyOptional({
+    type: AssignedDriverLocationResponseDto,
+    nullable: true,
+  })
+  driverLocation!: AssignedDriverLocationResponseDto | null;
+
+  @ApiProperty({ type: String, format: 'date-time' })
   requestedAt!: Date;
 
-  @ApiProperty({
-    type: String,
-    format: 'date-time',
-  })
+  @ApiProperty({ type: String, format: 'date-time' })
   searchExpiresAt!: Date;
 
   @ApiPropertyOptional({
@@ -94,11 +136,26 @@ export class PassengerRideResponseDto {
     format: 'date-time',
     nullable: true,
   })
-  cancelledAt!: Date | null;
+  driverArrivingAt!: Date | null;
 
   @ApiPropertyOptional({
+    type: String,
+    format: 'date-time',
     nullable: true,
   })
+  driverArrivedAt!: Date | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  arrivalDistanceMeters!: string | null;
+
+  @ApiPropertyOptional({
+    type: String,
+    format: 'date-time',
+    nullable: true,
+  })
+  cancelledAt!: Date | null;
+
+  @ApiPropertyOptional({ nullable: true })
   cancellationReason!: string | null;
 
   @ApiPropertyOptional({
@@ -107,15 +164,9 @@ export class PassengerRideResponseDto {
   })
   cancelledBy!: RideCancellationActor | null;
 
-  @ApiProperty({
-    type: String,
-    format: 'date-time',
-  })
+  @ApiProperty({ type: String, format: 'date-time' })
   createdAt!: Date;
 
-  @ApiProperty({
-    type: String,
-    format: 'date-time',
-  })
+  @ApiProperty({ type: String, format: 'date-time' })
   updatedAt!: Date;
 }

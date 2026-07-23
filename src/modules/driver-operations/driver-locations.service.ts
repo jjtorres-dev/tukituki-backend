@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
   ServiceUnavailableException,
 } from '@nestjs/common';
@@ -16,6 +17,7 @@ import { DriverDocumentStatus } from '../drivers/enums/driver-document-status.en
 import { DriverDocumentType } from '../drivers/enums/driver-document-type.enum';
 import { DriverStatus } from '../drivers/enums/driver-status.enum';
 import { VehicleStatus } from '../drivers/enums/vehicle-status.enum';
+import { RideRealtimeService } from '../rides/realtime/ride-realtime.service';
 import { DriverLocationResponseDto } from './dto/driver-location-response.dto';
 import { UpdateDriverLocationDto } from './dto/update-driver-location.dto';
 import { DriverLocation } from './entities/driver-location.entity';
@@ -31,9 +33,12 @@ interface SavedLocationResult {
 
 @Injectable()
 export class DriverLocationsService {
+  private readonly logger = new Logger(DriverLocationsService.name);
+
   constructor(
     private readonly dataSource: DataSource,
     private readonly availabilityRedisService: DriverAvailabilityRedisService,
+    private readonly realtimeService: RideRealtimeService,
   ) {}
 
   async updateMyLocation(
@@ -63,6 +68,16 @@ export class DriverLocationsService {
         'La ubicación fue guardada, pero no pudo publicarse para disponibilidad. Intenta nuevamente',
       );
     }
+
+    await this.realtimeService
+      .emitDriverLocation(result.location.driverProfileId, result.location)
+      .catch((error: unknown) => {
+        this.logger.warn(
+          `La ubicación se guardó, pero no pudo emitirse al viaje activo: ${
+            error instanceof Error ? error.message : 'error desconocido'
+          }`,
+        );
+      });
 
     return this.mapLocation(result.location);
   }
