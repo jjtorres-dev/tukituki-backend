@@ -9,8 +9,10 @@ import { DriverOperationalState } from '../modules/driver-operations/entities/dr
 import { DriverDocument } from '../modules/drivers/entities/driver-document.entity';
 import { DriverProfile } from '../modules/drivers/entities/driver-profile.entity';
 import { DriverVehicle } from '../modules/drivers/entities/driver-vehicle.entity';
+import { FareQuote } from '../modules/fares/entities/fare-quote.entity';
 import { FareRule } from '../modules/fares/entities/fare-rule.entity';
 import { PassengerProfile } from '../modules/passengers/entities/passenger-profile.entity';
+import { Ride } from '../modules/rides/entities/ride.entity';
 import { ServiceZone } from '../modules/service-zones/entities/service-zone.entity';
 import { User } from '../modules/users/entities/user.entity';
 
@@ -58,6 +60,8 @@ const AppDataSource = new DataSource({
     DriverLocation,
     ServiceZone,
     FareRule,
+    FareQuote,
+    Ride,
   ],
 
   migrations: [join(__dirname, 'migrations', '*.js')],

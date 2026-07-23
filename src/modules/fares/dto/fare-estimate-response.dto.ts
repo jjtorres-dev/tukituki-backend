@@ -1,8 +1,30 @@
 import { ApiProperty } from '@nestjs/swagger';
 
 import { ServiceZoneSummaryDto } from '../../service-zones/dto/service-zone-response.dto';
+import { FareQuoteStatus } from '../enums/fare-quote-status.enum';
+
+export class FareQuoteLocationResponseDto {
+  @ApiProperty()
+  latitude!: number;
+
+  @ApiProperty()
+  longitude!: number;
+
+  @ApiProperty()
+  address!: string;
+}
 
 export class FareEstimateResponseDto {
+  @ApiProperty({
+    format: 'uuid',
+  })
+  quoteId!: string;
+
+  @ApiProperty({
+    enum: FareQuoteStatus,
+  })
+  quoteStatus!: FareQuoteStatus;
+
   @ApiProperty({
     format: 'uuid',
   })
@@ -17,6 +39,16 @@ export class FareEstimateResponseDto {
     type: ServiceZoneSummaryDto,
   })
   destinationZone!: ServiceZoneSummaryDto;
+
+  @ApiProperty({
+    type: FareQuoteLocationResponseDto,
+  })
+  origin!: FareQuoteLocationResponseDto;
+
+  @ApiProperty({
+    type: FareQuoteLocationResponseDto,
+  })
+  destination!: FareQuoteLocationResponseDto;
 
   @ApiProperty()
   distanceMeters!: number;
@@ -49,4 +81,10 @@ export class FareEstimateResponseDto {
     example: 'PEN',
   })
   currency!: string;
+
+  @ApiProperty({
+    type: String,
+    format: 'date-time',
+  })
+  expiresAt!: Date;
 }

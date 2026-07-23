@@ -9,22 +9,22 @@ import {
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
-import { GeographicPointDto } from '../../service-zones/dto/geographic-point.dto';
+import { FareEstimateLocationDto } from './fare-estimate-location.dto';
 
 export class EstimateFareDto {
   @ApiProperty({
-    type: GeographicPointDto,
+    type: FareEstimateLocationDto,
   })
   @ValidateNested()
-  @Type(() => GeographicPointDto)
-  origin!: GeographicPointDto;
+  @Type(() => FareEstimateLocationDto)
+  origin!: FareEstimateLocationDto;
 
   @ApiProperty({
-    type: GeographicPointDto,
+    type: FareEstimateLocationDto,
   })
   @ValidateNested()
-  @Type(() => GeographicPointDto)
-  destination!: GeographicPointDto;
+  @Type(() => FareEstimateLocationDto)
+  destination!: FareEstimateLocationDto;
 
   @ApiProperty({
     example: 3200,
