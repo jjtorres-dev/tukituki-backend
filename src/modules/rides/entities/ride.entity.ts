@@ -11,6 +11,7 @@ import {
 import type { Relation } from 'typeorm';
 
 import { DriverProfile } from '../../drivers/entities/driver-profile.entity';
+import { CancellationPolicy } from './cancellation-policy.entity';
 import { FareQuote } from '../../fares/entities/fare-quote.entity';
 import type { FareQuotePoint } from '../../fares/entities/fare-quote.entity';
 import { ServiceZone } from '../../service-zones/entities/service-zone.entity';
@@ -399,6 +400,96 @@ export class Ride {
     nullable: true,
   })
   completionNotes!: string | null;
+
+  @Index('IDX_rides_cancellation_policy_id')
+  @Column({
+    name: 'cancellation_policy_id',
+    type: 'uuid',
+    nullable: true,
+  })
+  cancellationPolicyId!: string | null;
+
+  @ManyToOne(() => CancellationPolicy, {
+    nullable: true,
+    onDelete: 'SET NULL',
+  })
+  @JoinColumn({
+    name: 'cancellation_policy_id',
+  })
+  cancellationPolicy!: Relation<CancellationPolicy> | null;
+
+  @Column({
+    name: 'cancellation_grace_period_seconds',
+    type: 'integer',
+    nullable: true,
+  })
+  cancellationGracePeriodSeconds!: number | null;
+
+  @Column({
+    name: 'cancellation_assigned_fee',
+    type: 'numeric',
+    precision: 10,
+    scale: 2,
+    nullable: true,
+  })
+  cancellationAssignedFee!: string | null;
+
+  @Column({
+    name: 'cancellation_arriving_fee',
+    type: 'numeric',
+    precision: 10,
+    scale: 2,
+    nullable: true,
+  })
+  cancellationArrivingFee!: string | null;
+
+  @Column({
+    name: 'cancellation_arrived_fee',
+    type: 'numeric',
+    precision: 10,
+    scale: 2,
+    nullable: true,
+  })
+  cancellationArrivedFee!: string | null;
+
+  @Column({
+    name: 'passenger_no_show_fee',
+    type: 'numeric',
+    precision: 10,
+    scale: 2,
+    nullable: true,
+  })
+  passengerNoShowFee!: string | null;
+
+  @Column({
+    name: 'driver_no_show_compensation',
+    type: 'numeric',
+    precision: 10,
+    scale: 2,
+    nullable: true,
+  })
+  driverNoShowCompensation!: string | null;
+
+  @Column({
+    name: 'driver_arrival_wait_seconds',
+    type: 'integer',
+    nullable: true,
+  })
+  driverArrivalWaitSeconds!: number | null;
+
+  @Column({
+    name: 'driver_no_progress_seconds',
+    type: 'integer',
+    nullable: true,
+  })
+  driverNoProgressSeconds!: number | null;
+
+  @Column({
+    name: 'driver_no_progress_min_meters',
+    type: 'integer',
+    nullable: true,
+  })
+  driverNoProgressMinMeters!: number | null;
 
   @Column({
     name: 'cancelled_at',

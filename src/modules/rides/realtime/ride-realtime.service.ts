@@ -4,6 +4,7 @@ import { DataSource, In } from 'typeorm';
 import { DriverLocation } from '../../driver-operations/entities/driver-location.entity';
 import { RideFinalFare } from '../entities/ride-final-fare.entity';
 import { Ride } from '../entities/ride.entity';
+import { RideWaiting } from '../entities/ride-waiting.entity';
 import type { RideProgressUpdate } from '../../driver-operations/ride-progress-tracking.service';
 import { RideStatus } from '../enums/ride-status.enum';
 import { RidesGateway } from './rides.gateway';
@@ -50,6 +51,25 @@ export class RideRealtimeService {
       cancelledAt: ride.cancelledAt,
       cancelledBy: ride.cancelledBy,
       cancellationReason: ride.cancellationReason,
+    });
+  }
+
+  emitWaitingStarted(waiting: RideWaiting): void {
+    this.gateway.emitToRide(waiting.rideId, 'ride.waiting.started', {
+      rideId: waiting.rideId,
+      waitingStartedAt: waiting.waitingStartedAt,
+      noShowAvailableAt: waiting.noShowAvailableAt,
+      requiredWaitingSeconds: waiting.requiredWaitingSeconds,
+    });
+  }
+
+  emitRematching(ride: Ride, previousDriverProfileId: string): void {
+    this.gateway.emitToRide(ride.id, 'ride.rematching', {
+      rideId: ride.id,
+      status: ride.status,
+      stateVersion: ride.stateVersion,
+      previousDriverProfileId,
+      searchExpiresAt: ride.searchExpiresAt,
     });
   }
 

@@ -54,4 +54,68 @@ describe('NotificationEventHandler', () => {
     expect(notificationInput?.userId).toBe(ride.passengerUserId);
     expect(notificationInput?.data.rideId).toBe(ride.id);
   });
+
+  it('no duplica la notificación genérica de una cancelación avanzada', async () => {
+    const createAndDeliver = jest.fn<
+      ReturnType<NotificationsService['createAndDeliver']>,
+      Parameters<NotificationsService['createAndDeliver']>
+    >();
+    const handler = new NotificationEventHandler(
+      {} as DataSource,
+      { createAndDeliver } as unknown as NotificationsService,
+    );
+    const event = Object.assign(new OutboxEvent(), {
+      id: '00634ba5-bc50-480e-84df-45b354ac8c24',
+      aggregateId: '2b0dfa36-f004-4376-81df-7d944782458d',
+      eventType: OutboxEventType.RIDE_CANCELLED,
+      payload: {
+        metadata: {
+          advancedCancellation: true,
+        },
+      },
+    });
+
+    await handler.handle(event);
+
+    expect(createAndDeliver).not.toHaveBeenCalled();
+  });
+
+  it('notifica una obligación por tarifa de cancelación', async () => {
+    let capturedInput:
+      Parameters<NotificationsService['createAndDeliver']>[0] | undefined;
+    const createAndDeliver = jest.fn<
+      ReturnType<NotificationsService['createAndDeliver']>,
+      Parameters<NotificationsService['createAndDeliver']>
+    >((input) => {
+      capturedInput = input;
+      return Promise.resolve(
+        {} as Awaited<ReturnType<NotificationsService['createAndDeliver']>>,
+      );
+    });
+    const handler = new NotificationEventHandler(
+      {} as DataSource,
+      { createAndDeliver } as unknown as NotificationsService,
+    );
+    const userId = '54c6fe0d-ea8a-4aa9-9952-a82b70d88b7b';
+    const rideId = 'e13d56a5-af46-426e-b86f-16ee2db48dc8';
+    const event = Object.assign(new OutboxEvent(), {
+      id: '2f250727-64de-465d-af51-194ae877718a',
+      aggregateId: rideId,
+      eventType: OutboxEventType.CANCELLATION_FEE_CREATED,
+      payload: {
+        userId,
+        amount: '2.00',
+        currency: 'PEN',
+      },
+    });
+
+    await handler.handle(event);
+
+    expect(capturedInput).toBeDefined();
+    expect(capturedInput?.userId).toBe(userId);
+    expect(capturedInput?.body).toBe(
+      'Se registró una obligación pendiente de PEN 2.00.',
+    );
+    expect(capturedInput?.data.rideId).toBe(rideId);
+  });
 });

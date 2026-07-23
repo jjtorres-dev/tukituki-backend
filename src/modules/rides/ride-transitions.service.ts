@@ -51,10 +51,12 @@ const ALLOWED_TRANSITIONS: Readonly<Record<RideStatus, readonly RideStatus[]>> =
     ],
     [RideStatus.DRIVER_ASSIGNED]: [
       RideStatus.DRIVER_ARRIVING,
+      RideStatus.SEARCHING_DRIVER,
       RideStatus.CANCELLED,
     ],
     [RideStatus.DRIVER_ARRIVING]: [
       RideStatus.DRIVER_ARRIVED,
+      RideStatus.SEARCHING_DRIVER,
       RideStatus.CANCELLED,
     ],
     [RideStatus.DRIVER_ARRIVED]: [RideStatus.IN_PROGRESS, RideStatus.CANCELLED],
@@ -448,6 +450,7 @@ export class RideTransitionsService {
           actorType: context.actorType,
           actorUserId: context.actorUserId,
           occurredAt: context.occurredAt.toISOString(),
+          metadata: context.metadata ?? null,
         },
       });
     }
@@ -574,6 +577,10 @@ export class RideTransitionsService {
     }
 
     return value;
+  }
+
+  restoreDriverAvailability(driverProfileId: string): Promise<void> {
+    return this.restoreAvailability(driverProfileId);
   }
 
   private async restoreAvailability(driverProfileId: string): Promise<void> {

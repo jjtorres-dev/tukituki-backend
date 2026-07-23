@@ -31,6 +31,10 @@ import { Roles } from '../authorization/decorators/roles.decorator';
 import { RolesGuard } from '../authorization/guards/roles.guard';
 import { UserRole } from '../users/enums/user-role.enum';
 import { CompleteRideDto } from './dto/complete-ride.dto';
+import { DriverCancelRideDto } from './dto/driver-cancel-ride.dto';
+import { ConfirmPassengerNoShowDto } from './dto/confirm-passenger-no-show.dto';
+import { RideCancellationResponseDto } from './dto/ride-cancellation-response.dto';
+import { RideWaitingResponseDto } from './dto/ride-waiting-response.dto';
 import { DriverRideHistoryResponseDto } from './dto/driver-ride-history-response.dto';
 import { RideHistoryQueryDto } from './dto/ride-history-query.dto';
 import { RideRatingResponseDto } from './dto/ride-rating-response.dto';
@@ -46,6 +50,7 @@ import { RideCompletionService } from './ride-completion.service';
 import { RideReceiptsService } from './ride-receipts.service';
 import { RideHistoryService } from './ride-history.service';
 import { RideRatingsService } from './ride-ratings.service';
+import { RideCancellationsService } from './ride-cancellations.service';
 import { RideStartService } from './ride-start.service';
 import { RideTransitionsService } from './ride-transitions.service';
 
@@ -65,6 +70,7 @@ export class DriverRidesController {
     private readonly rideReceiptsService: RideReceiptsService,
     private readonly rideHistoryService: RideHistoryService,
     private readonly rideRatingsService: RideRatingsService,
+    private readonly rideCancellationsService: RideCancellationsService,
   ) {}
 
   @Get('active')
@@ -137,6 +143,67 @@ export class DriverRidesController {
     @Param('rideId', ParseUUIDPipe) rideId: string,
   ): Promise<RideTransitionResponseDto> {
     return this.transitionsService.markArrived(user.id, rideId);
+  }
+
+  @Post(':rideId/cancel')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Cancelar un viaje asignado como conductor' })
+  @ApiOkResponse({ type: RideCancellationResponseDto })
+  @ApiBadRequestResponse({ description: 'El estado no permite cancelación' })
+  @ApiConflictResponse({ description: 'El viaje ya fue cancelado' })
+  @ApiNotFoundResponse()
+  cancelRide(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('rideId', ParseUUIDPipe) rideId: string,
+    @Body() dto: DriverCancelRideDto,
+  ): Promise<RideCancellationResponseDto> {
+    return this.rideCancellationsService.cancelByDriver(user.id, rideId, dto);
+  }
+
+  @Post(':rideId/waiting/start')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Iniciar el tiempo de espera en el origen' })
+  @ApiOkResponse({ type: RideWaitingResponseDto })
+  @ApiBadRequestResponse({ description: 'GPS inválido o lejos del origen' })
+  @ApiConflictResponse({ description: 'El viaje no está en DRIVER_ARRIVED' })
+  startWaiting(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('rideId', ParseUUIDPipe) rideId: string,
+  ): Promise<RideWaitingResponseDto> {
+    return this.rideCancellationsService.startWaiting(user.id, rideId);
+  }
+
+  @Get(':rideId/waiting')
+  @ApiOperation({
+    summary: 'Consultar el tiempo de espera y disponibilidad de no-show',
+  })
+  @ApiOkResponse({ type: RideWaitingResponseDto })
+  @ApiNotFoundResponse()
+  getWaiting(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('rideId', ParseUUIDPipe) rideId: string,
+  ): Promise<RideWaitingResponseDto> {
+    return this.rideCancellationsService.getWaiting(user.id, rideId);
+  }
+
+  @Post(':rideId/no-show/passenger')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Confirmar no-show del pasajero después de la espera',
+  })
+  @ApiOkResponse({ type: RideCancellationResponseDto })
+  @ApiBadRequestResponse({ description: 'GPS inválido o lejos del origen' })
+  @ApiConflictResponse({ description: 'Tiempo de espera aún no cumplido' })
+  confirmPassengerNoShow(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('rideId', ParseUUIDPipe) rideId: string,
+    @Body() dto: ConfirmPassengerNoShowDto,
+  ): Promise<RideCancellationResponseDto> {
+    return this.rideCancellationsService.confirmPassengerNoShow(
+      user.id,
+      rideId,
+      dto.reasonDetail,
+    );
   }
 
   @Post(':rideId/complete')

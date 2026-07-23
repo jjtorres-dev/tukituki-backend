@@ -38,6 +38,8 @@ import { RideStatusActor } from './enums/ride-status-actor.enum';
 import { RideStatus } from './enums/ride-status.enum';
 import { RideStatusHistory } from './entities/ride-status-history.entity';
 import { RideDispatchService } from './ride-dispatch.service';
+import { CancellationPolicyService } from './cancellation-policy.service';
+import type { CancellationPolicySnapshot } from './interfaces/cancellation-policy-snapshot.interface';
 import { RideTransitionsService } from './ride-transitions.service';
 import { RideViewService } from './ride-view.service';
 
@@ -65,6 +67,8 @@ export class PassengerRidesService {
     private readonly transitionsService: RideTransitionsService,
     private readonly rideViewService: RideViewService,
     @Optional() private readonly outboxService?: OutboxService,
+    @Optional()
+    private readonly cancellationPolicyService?: CancellationPolicyService,
   ) {}
 
   async createRide(
@@ -144,6 +148,13 @@ export class PassengerRidesService {
             }
           }
 
+          const cancellationPolicy = this.cancellationPolicyService
+            ? await this.cancellationPolicyService.getActiveSnapshot(
+                manager,
+                now,
+              )
+            : this.fallbackCancellationPolicy();
+
           const ride = rideRepository.create({
             passengerUserId,
             driverProfileId: null,
@@ -186,6 +197,20 @@ export class PassengerRidesService {
             calculatedFinalFare: null,
             fareWasCapped: null,
             completionNotes: null,
+            cancellationPolicyId: cancellationPolicy.policyId,
+            cancellationGracePeriodSeconds:
+              cancellationPolicy.gracePeriodSeconds,
+            cancellationAssignedFee: cancellationPolicy.assignedFee,
+            cancellationArrivingFee: cancellationPolicy.arrivingFee,
+            cancellationArrivedFee: cancellationPolicy.arrivedFee,
+            passengerNoShowFee: cancellationPolicy.passengerNoShowFee,
+            driverNoShowCompensation:
+              cancellationPolicy.driverNoShowCompensation,
+            driverArrivalWaitSeconds:
+              cancellationPolicy.driverArrivalWaitSeconds,
+            driverNoProgressSeconds: cancellationPolicy.driverNoProgressSeconds,
+            driverNoProgressMinMeters:
+              cancellationPolicy.driverNoProgressMinMeters,
             cancelledAt: null,
             cancellationReason: null,
             cancelledBy: null,
@@ -450,6 +475,22 @@ export class PassengerRidesService {
 
   private errorMessage(error: unknown): string {
     return error instanceof Error ? error.message : 'error desconocido';
+  }
+
+  private fallbackCancellationPolicy(): CancellationPolicySnapshot {
+    return {
+      policyId: null,
+      gracePeriodSeconds: 60,
+      assignedFee: '1.00',
+      arrivingFee: '1.50',
+      arrivedFee: '2.00',
+      passengerNoShowFee: '2.50',
+      driverNoShowCompensation: '1.50',
+      driverArrivalWaitSeconds: 300,
+      driverNoProgressSeconds: 180,
+      driverNoProgressMinMeters: 100,
+      currency: 'PEN',
+    };
   }
 
   private isUniqueViolation(error: unknown): boolean {

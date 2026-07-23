@@ -32,6 +32,14 @@ import { Roles } from '../authorization/decorators/roles.decorator';
 import { RolesGuard } from '../authorization/guards/roles.guard';
 import { UserRole } from '../users/enums/user-role.enum';
 import { CancelPassengerRideDto } from './dto/cancel-passenger-ride.dto';
+import { PassengerCancelRideDto } from './dto/passenger-cancel-ride.dto';
+import { PassengerCancellationPreviewDto } from './dto/passenger-cancellation-preview.dto';
+import { ReportDriverNoShowDto } from './dto/report-driver-no-show.dto';
+import { DriverNoShowResponseDto } from './dto/driver-no-show-response.dto';
+import {
+  PassengerCancellationPreviewResponseDto,
+  RideCancellationResponseDto,
+} from './dto/ride-cancellation-response.dto';
 import { CreatePassengerRideDto } from './dto/create-passenger-ride.dto';
 import { PassengerRideHistoryResponseDto } from './dto/passenger-ride-history-response.dto';
 import { RideHistoryQueryDto } from './dto/ride-history-query.dto';
@@ -44,6 +52,8 @@ import { PassengerRidesService } from './passenger-rides.service';
 import { RideReceiptsService } from './ride-receipts.service';
 import { RideHistoryService } from './ride-history.service';
 import { RideRatingsService } from './ride-ratings.service';
+import { RideCancellationsService } from './ride-cancellations.service';
+import { PassengerCancellationReason } from './enums/passenger-cancellation-reason.enum';
 import { RideStartCodesService } from './ride-start-codes.service';
 
 const HTTP_STATUS_LOCKED = 423;
@@ -60,6 +70,7 @@ export class PassengerRidesController {
     private readonly rideReceiptsService: RideReceiptsService,
     private readonly rideHistoryService: RideHistoryService,
     private readonly rideRatingsService: RideRatingsService,
+    private readonly rideCancellationsService: RideCancellationsService,
   ) {}
 
   @Post()
@@ -185,6 +196,69 @@ export class PassengerRidesController {
     return this.rideRatingsService.rateDriver(user.id, rideId, dto);
   }
 
+  @Post(':rideId/cancellation-preview')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Calcular la tarifa antes de cancelar un viaje' })
+  @ApiOkResponse({ type: PassengerCancellationPreviewResponseDto })
+  @ApiBadRequestResponse({
+    description: 'El viaje ya no admite cancelación estándar',
+  })
+  @ApiNotFoundResponse()
+  previewCancellation(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('rideId', ParseUUIDPipe) rideId: string,
+    @Body() dto: PassengerCancellationPreviewDto,
+  ): Promise<PassengerCancellationPreviewResponseDto> {
+    return this.rideCancellationsService.previewPassengerCancellation(
+      user.id,
+      rideId,
+      dto,
+    );
+  }
+
+  @Post(':rideId/cancel')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Confirmar una cancelación con tarifa validada' })
+  @ApiOkResponse({ type: RideCancellationResponseDto })
+  @ApiConflictResponse({
+    description: 'La tarifa cambió o el viaje ya fue cancelado',
+  })
+  @ApiBadRequestResponse({ description: 'El estado no permite cancelación' })
+  @ApiNotFoundResponse()
+  cancelRideAdvanced(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('rideId', ParseUUIDPipe) rideId: string,
+    @Body() dto: PassengerCancelRideDto,
+  ): Promise<RideCancellationResponseDto> {
+    return this.rideCancellationsService.cancelByPassenger(
+      user.id,
+      rideId,
+      dto,
+    );
+  }
+
+  @Post(':rideId/no-show/driver')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Reportar conductor sin progreso y reiniciar matching o cancelar',
+  })
+  @ApiOkResponse({ type: DriverNoShowResponseDto })
+  @ApiConflictResponse({
+    description: 'Aún no transcurrió el tiempo mínimo o existe progreso',
+  })
+  reportDriverNoShow(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('rideId', ParseUUIDPipe) rideId: string,
+    @Body() dto: ReportDriverNoShowDto,
+  ): Promise<DriverNoShowResponseDto> {
+    return this.rideCancellationsService.reportDriverNoShow(
+      user.id,
+      rideId,
+      dto.continueSearching ?? true,
+      dto.reasonDetail,
+    );
+  }
+
   @Get(':rideId/receipt')
   @ApiOperation({ summary: 'Consultar el comprobante del viaje finalizado' })
   @ApiOkResponse({ type: RideReceiptResponseDto })
@@ -231,7 +305,7 @@ export class PassengerRidesController {
   @ApiNotFoundResponse({
     description: 'El viaje no existe o no pertenece al pasajero',
   })
-  cancelRide(
+  async cancelRide(
     @CurrentUser()
     user: AuthenticatedUser,
 
@@ -241,6 +315,10 @@ export class PassengerRidesController {
     @Body()
     dto: CancelPassengerRideDto,
   ): Promise<PassengerRideResponseDto> {
-    return this.passengerRidesService.cancelRide(user.id, rideId, dto);
+    await this.rideCancellationsService.cancelByPassenger(user.id, rideId, {
+      reason: PassengerCancellationReason.OTHER,
+      reasonDetail: dto.reason,
+    });
+    return this.passengerRidesService.getRide(user.id, rideId);
   }
 }

@@ -99,6 +99,50 @@ export const envValidationSchema = Joi.object({
     .max(3600)
     .default(60),
 
+  PASSENGER_CANCELLATION_GRACE_SECONDS: Joi.number()
+    .integer()
+    .min(0)
+    .max(3600)
+    .default(60),
+
+  PASSENGER_NO_SHOW_WAIT_SECONDS: Joi.number()
+    .integer()
+    .min(30)
+    .max(3600)
+    .default(300),
+
+  DRIVER_NO_PROGRESS_SECONDS: Joi.number()
+    .integer()
+    .min(30)
+    .max(3600)
+    .default(180),
+
+  DRIVER_NO_PROGRESS_MIN_METERS: Joi.number()
+    .integer()
+    .min(0)
+    .max(10000)
+    .default(100),
+
+  CANCELLATION_FEE_ASSIGNED_PEN: Joi.string()
+    .pattern(/^(0|[1-9]\d*)\.\d{2}$/)
+    .default('1.00'),
+
+  CANCELLATION_FEE_ARRIVING_PEN: Joi.string()
+    .pattern(/^(0|[1-9]\d*)\.\d{2}$/)
+    .default('1.50'),
+
+  CANCELLATION_FEE_ARRIVED_PEN: Joi.string()
+    .pattern(/^(0|[1-9]\d*)\.\d{2}$/)
+    .default('2.00'),
+
+  PASSENGER_NO_SHOW_FEE_PEN: Joi.string()
+    .pattern(/^(0|[1-9]\d*)\.\d{2}$/)
+    .default('2.50'),
+
+  DRIVER_NO_SHOW_COMPENSATION_PEN: Joi.string()
+    .pattern(/^(0|[1-9]\d*)\.\d{2}$/)
+    .default('1.50'),
+
   FCM_ENABLED: Joi.boolean().default(false),
 
   FIREBASE_PROJECT_ID: Joi.string().max(200).optional(),

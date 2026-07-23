@@ -15,7 +15,11 @@ import { PassengerProfile } from '../modules/passengers/entities/passenger-profi
 import { UserDevice } from '../modules/notifications/entities/user-device.entity';
 import { UserNotification } from '../modules/notifications/entities/user-notification.entity';
 import { OutboxEvent } from '../modules/outbox/entities/outbox-event.entity';
+import { CancellationPolicy } from '../modules/rides/entities/cancellation-policy.entity';
+import { RideCancellation } from '../modules/rides/entities/ride-cancellation.entity';
 import { RideFinalFare } from '../modules/rides/entities/ride-final-fare.entity';
+import { RideWaiting } from '../modules/rides/entities/ride-waiting.entity';
+import { UserFinancialObligation } from '../modules/rides/entities/user-financial-obligation.entity';
 import { RideLocationSample } from '../modules/rides/entities/ride-location-sample.entity';
 import { RideOffer } from '../modules/rides/entities/ride-offer.entity';
 import { RideProgressMetrics } from '../modules/rides/entities/ride-progress-metrics.entity';
@@ -75,6 +79,10 @@ const AppDataSource = new DataSource({
     FareRule,
     FareQuote,
     Ride,
+    CancellationPolicy,
+    RideCancellation,
+    RideWaiting,
+    UserFinancialObligation,
     RideOffer,
     RideStartCode,
     RideStatusHistory,

@@ -16,10 +16,16 @@ import { ServiceZone } from '../service-zones/entities/service-zone.entity';
 import { User } from '../users/entities/user.entity';
 import { OutboxModule } from '../outbox/outbox.module';
 import { DriverRideOffersController } from './driver-ride-offers.controller';
+import { AdminRideCancellationsController } from './admin-ride-cancellations.controller';
+import { FinancialObligationsController } from './financial-obligations.controller';
 import { DriverRideOffersService } from './driver-ride-offers.service';
 import { DriverRidesController } from './driver-rides.controller';
 import { DriverRidesService } from './driver-rides.service';
 import { RideFinalFare } from './entities/ride-final-fare.entity';
+import { CancellationPolicy } from './entities/cancellation-policy.entity';
+import { RideCancellation } from './entities/ride-cancellation.entity';
+import { RideWaiting } from './entities/ride-waiting.entity';
+import { UserFinancialObligation } from './entities/user-financial-obligation.entity';
 import { RideLocationSample } from './entities/ride-location-sample.entity';
 import { RideOffer } from './entities/ride-offer.entity';
 import { RideProgressMetrics } from './entities/ride-progress-metrics.entity';
@@ -31,6 +37,10 @@ import { PassengerRidesController } from './passenger-rides.controller';
 import { PassengerRidesService } from './passenger-rides.service';
 import { RideRealtimeModule } from './realtime/ride-realtime.module';
 import { RideCompletionService } from './ride-completion.service';
+import { CancellationPolicyService } from './cancellation-policy.service';
+import { CancellationFeeCalculatorService } from './cancellation-fee-calculator.service';
+import { RideCancellationsService } from './ride-cancellations.service';
+import { FinancialObligationsService } from './financial-obligations.service';
 import { RideDispatchService } from './ride-dispatch.service';
 import { RideDispatchWorker } from './ride-dispatch.worker';
 import { RideReceiptsService } from './ride-receipts.service';
@@ -45,6 +55,10 @@ import { RideViewService } from './ride-view.service';
   imports: [
     TypeOrmModule.forFeature([
       Ride,
+      CancellationPolicy,
+      RideCancellation,
+      RideWaiting,
+      UserFinancialObligation,
       RideOffer,
       RideStatusHistory,
       RideStartCode,
@@ -73,6 +87,8 @@ import { RideViewService } from './ride-view.service';
     PassengerRidesController,
     DriverRideOffersController,
     DriverRidesController,
+    FinancialObligationsController,
+    AdminRideCancellationsController,
   ],
   providers: [
     PassengerRidesService,
@@ -88,6 +104,10 @@ import { RideViewService } from './ride-view.service';
     RideReceiptsService,
     RideHistoryService,
     RideRatingsService,
+    CancellationPolicyService,
+    CancellationFeeCalculatorService,
+    RideCancellationsService,
+    FinancialObligationsService,
   ],
   exports: [
     PassengerRidesService,
@@ -102,6 +122,10 @@ import { RideViewService } from './ride-view.service';
     RideReceiptsService,
     RideHistoryService,
     RideRatingsService,
+    CancellationPolicyService,
+    CancellationFeeCalculatorService,
+    RideCancellationsService,
+    FinancialObligationsService,
   ],
 })
 export class RidesModule {}
