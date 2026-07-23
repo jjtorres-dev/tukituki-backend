@@ -5,6 +5,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { envValidationSchema } from './config/env.validation';
 import { RedisModule } from './infrastructure/redis/redis.module';
 import { AdminDriversModule } from './modules/admin-drivers/admin-drivers.module';
+import { AdminRidesModule } from './modules/admin-rides/admin-rides.module';
 import { AuthSessionsModule } from './modules/auth-sessions/auth-sessions.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { DriverOperationsModule } from './modules/driver-operations/driver-operations.module';
@@ -65,6 +66,7 @@ import { UsersModule } from './modules/users/users.module';
     OutboxModule,
     DriversModule,
     AdminDriversModule,
+    AdminRidesModule,
     DriverOperationsModule,
     ServiceZonesModule,
     FaresModule,

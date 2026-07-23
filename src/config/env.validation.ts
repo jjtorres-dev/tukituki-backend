@@ -183,11 +183,11 @@ export const envValidationSchema = Joi.object({
 
   FCM_ENABLED: Joi.boolean().default(false),
 
-  FIREBASE_PROJECT_ID: Joi.string().max(200).optional(),
+  FIREBASE_PROJECT_ID: Joi.string().allow('').max(200).optional(),
 
   FIREBASE_SERVICE_ACCOUNT_BASE64: Joi.when('FCM_ENABLED', {
     is: true,
     then: Joi.string().min(100).required(),
-    otherwise: Joi.string().optional(),
+    otherwise: Joi.string().allow('').optional(),
   }),
 });
