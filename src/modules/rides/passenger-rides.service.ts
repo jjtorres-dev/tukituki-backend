@@ -29,6 +29,7 @@ import { UserStatus } from '../users/enums/user-status.enum';
 import { OutboxEventType } from '../outbox/enums/outbox-event-type.enum';
 import { OutboxService } from '../outbox/outbox.service';
 import { CancelPassengerRideDto } from './dto/cancel-passenger-ride.dto';
+import { PaymentMethod } from '../payments/enums/payment-method.enum';
 import { CreatePassengerRideDto } from './dto/create-passenger-ride.dto';
 import { PassengerRideResponseDto } from './dto/passenger-ride-response.dto';
 import { RideOffer } from './entities/ride-offer.entity';
@@ -178,6 +179,7 @@ export class PassengerRidesService {
             pricingCurrency: quote.currency,
             pricingCalculationVersion: quote.pricingCalculationVersion,
             currency: quote.currency,
+            paymentMethod: dto.paymentMethod ?? PaymentMethod.CASH,
             status: RideStatus.SEARCHING_DRIVER,
             passengerNotes: dto.passengerNotes?.trim() || null,
             requestedAt: now,

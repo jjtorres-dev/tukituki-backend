@@ -7,6 +7,7 @@ import { DataSource } from 'typeorm';
 
 import { DriverProfile } from '../drivers/entities/driver-profile.entity';
 import { DriverStatus } from '../drivers/enums/driver-status.enum';
+import { RidePayment } from '../payments/entities/ride-payment.entity';
 import { RideReceiptResponseDto } from './dto/ride-receipt-response.dto';
 import { RideFinalFare } from './entities/ride-final-fare.entity';
 import { Ride } from './entities/ride.entity';
@@ -64,6 +65,9 @@ export class RideReceiptsService {
     const fare = await this.dataSource.getRepository(RideFinalFare).findOne({
       where: { rideId: ride.id },
     });
+    const payment = await this.dataSource.getRepository(RidePayment).findOne({
+      where: { rideId: ride.id },
+    });
     if (!fare || !ride.startedAt || !ride.completedAt) {
       throw new NotFoundException('El comprobante final no está disponible');
     }
@@ -79,6 +83,16 @@ export class RideReceiptsService {
       actualDurationSeconds: ride.actualDurationSeconds ?? 0,
       estimatedFare: ride.estimatedFare,
       completionNotes: ride.completionNotes,
+      payment: payment
+        ? {
+            method: payment.method,
+            status: payment.status,
+            amountDue: payment.amountDue,
+            cashReceived: payment.cashReceived,
+            changeGiven: payment.changeGiven,
+            confirmedAt: payment.confirmedAt,
+          }
+        : null,
       fare: {
         baseFare: fare.baseFare,
         distanceAmount: fare.distanceAmount,

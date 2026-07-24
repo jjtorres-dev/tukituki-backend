@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
+import { PaymentMethod } from '../../payments/enums/payment-method.enum';
 import { RideStatus } from '../enums/ride-status.enum';
 import { RideLocationResponseDto } from './passenger-ride-response.dto';
 
@@ -30,6 +31,9 @@ export class DriverActiveRideResponseDto {
 
   @ApiProperty({ example: 'PEN' })
   currency!: string;
+
+  @ApiProperty({ enum: PaymentMethod })
+  paymentMethod!: PaymentMethod;
 
   @ApiPropertyOptional({ nullable: true })
   passengerNotes!: string | null;

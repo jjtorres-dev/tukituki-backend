@@ -11,6 +11,9 @@ import { DriverProfile } from '../drivers/entities/driver-profile.entity';
 import { DriverVehicle } from '../drivers/entities/driver-vehicle.entity';
 import { DriverStatus } from '../drivers/enums/driver-status.enum';
 import { FareQuote } from '../fares/entities/fare-quote.entity';
+import { RidePayment } from '../payments/entities/ride-payment.entity';
+import { PaymentMethod } from '../payments/enums/payment-method.enum';
+import { RidePaymentStatus } from '../payments/enums/ride-payment-status.enum';
 import { RideFinalFare } from './entities/ride-final-fare.entity';
 import { RideProgressMetrics } from './entities/ride-progress-metrics.entity';
 import { Ride } from './entities/ride.entity';
@@ -43,6 +46,8 @@ describe('RideCompletionService', () => {
       stateVersion: 4,
       startedAt: new Date(now - 600_000),
       estimatedFare: '10.00',
+      passengerUserId: '2bb75614-f6d6-437f-b38f-e21aad622428',
+      paymentMethod: PaymentMethod.CASH,
       pricingBaseFare: '2.50',
       pricingMinimumFare: '4.00',
       pricingPricePerKm: '1.0000',
@@ -79,6 +84,7 @@ describe('RideCompletionService', () => {
     } as FareQuote;
     const savedFinalFare: RideFinalFare[] = [];
 
+    const savedPayments: RidePayment[] = [];
     const rideRepository = {
       findOne: jest.fn(() => Promise.resolve(ride)),
       save: jest.fn((value: Ride) => Promise.resolve(value)),
@@ -109,6 +115,13 @@ describe('RideCompletionService', () => {
         return Promise.resolve({ id: 'fare-id', ...value });
       }),
     };
+    const paymentRepository = {
+      create: jest.fn((value: Partial<RidePayment>) => value as RidePayment),
+      save: jest.fn((value: RidePayment) => {
+        savedPayments.push(value);
+        return Promise.resolve({ id: 'payment-id', ...value });
+      }),
+    };
     const manager = {
       getRepository: jest.fn((entity: unknown): unknown => {
         if (entity === Ride) return rideRepository;
@@ -118,6 +131,7 @@ describe('RideCompletionService', () => {
         if (entity === RideProgressMetrics) return metricsRepository;
         if (entity === FareQuote) return quoteRepository;
         if (entity === RideFinalFare) return finalFareRepository;
+        if (entity === RidePayment) return paymentRepository;
         throw new Error('Repositorio inesperado');
       }),
       query: jest.fn(() => Promise.resolve([{ distanceMeters: '25.50' }])),
@@ -179,6 +193,11 @@ describe('RideCompletionService', () => {
     expect(result.finalFare).toBe('7.50');
     expect(state.status).toBe(DriverOperationalStatus.AVAILABLE);
     expect(savedFinalFare).toHaveLength(1);
+    expect(savedPayments[0]).toMatchObject({
+      status: RidePaymentStatus.PENDING,
+      amountDue: '7.50',
+    });
+    expect(result.paymentStatus).toBe(RidePaymentStatus.PENDING);
     expect(realtime.emitCompleted).toHaveBeenCalledTimes(1);
   });
 });

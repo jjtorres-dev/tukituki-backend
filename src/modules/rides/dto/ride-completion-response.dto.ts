@@ -1,5 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 
+import { PaymentMethod } from '../../payments/enums/payment-method.enum';
+import { RidePaymentStatus } from '../../payments/enums/ride-payment-status.enum';
 import { RideStatus } from '../enums/ride-status.enum';
 
 export class RideCompletionResponseDto {
@@ -32,4 +34,10 @@ export class RideCompletionResponseDto {
 
   @ApiProperty({ example: false })
   fareWasCapped!: boolean;
+
+  @ApiProperty({ enum: PaymentMethod })
+  paymentMethod!: PaymentMethod;
+
+  @ApiProperty({ enum: RidePaymentStatus })
+  paymentStatus!: RidePaymentStatus;
 }

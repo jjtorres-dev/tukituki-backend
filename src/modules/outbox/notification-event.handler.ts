@@ -140,6 +140,32 @@ export class NotificationEventHandler {
         );
         return;
       case OutboxEventType.SAFETY_INCIDENT_CREATED:
+      case OutboxEventType.CASH_PAYMENT_CONFIRMED:
+        await this.notifyPayloadUser(
+          event,
+          'passengerUserId',
+          NotificationType.CASH_PAYMENT_CONFIRMED,
+          'Pago en efectivo confirmado',
+          'El conductor confirm? la recepci?n del efectivo y registr? el vuelto.',
+        );
+        return;
+      case OutboxEventType.CASH_PAYMENT_DISPUTED:
+        await this.notifyPayloadUser(
+          event,
+          'driverUserId',
+          NotificationType.CASH_PAYMENT_DISPUTED,
+          'Pago en efectivo observado',
+          'El pasajero report? una discrepancia y soporte revisar? el pago.',
+        );
+        return;
+      case OutboxEventType.CASH_PAYMENT_RESOLVED:
+        await this.notifyParticipants(
+          event,
+          NotificationType.CASH_PAYMENT_RESOLVED,
+          'Disputa de pago resuelta',
+          'Soporte resolvi? la discrepancia del pago en efectivo.',
+        );
+        return;
         await this.handleSafetyIncidentCreated(event);
         return;
       case OutboxEventType.EMERGENCY_CONTACT_NOTIFICATION_REQUESTED:

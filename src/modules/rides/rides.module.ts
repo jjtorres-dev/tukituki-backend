@@ -17,6 +17,7 @@ import { User } from '../users/entities/user.entity';
 import { OutboxModule } from '../outbox/outbox.module';
 import { DriverRideOffersController } from './driver-ride-offers.controller';
 import { AdminRideCancellationsController } from './admin-ride-cancellations.controller';
+import { RidePayment } from '../payments/entities/ride-payment.entity';
 import { FinancialObligationsController } from './financial-obligations.controller';
 import { DriverRideOffersService } from './driver-ride-offers.service';
 import { DriverRidesController } from './driver-rides.controller';
@@ -66,6 +67,7 @@ import { RideViewService } from './ride-view.service';
       RideProgressMetrics,
       RideFinalFare,
       RideRating,
+      RidePayment,
       FareQuote,
       FareRule,
       ServiceZone,

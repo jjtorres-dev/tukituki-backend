@@ -16,6 +16,7 @@ import { UserDevice } from '../modules/notifications/entities/user-device.entity
 import { UserNotification } from '../modules/notifications/entities/user-notification.entity';
 import { OutboxEvent } from '../modules/outbox/entities/outbox-event.entity';
 import { AdminAuditLog } from '../modules/operations/entities/admin-audit-log.entity';
+import { RidePayment } from '../modules/payments/entities/ride-payment.entity';
 import { CancellationPolicy } from '../modules/rides/entities/cancellation-policy.entity';
 import { RideCancellation } from '../modules/rides/entities/ride-cancellation.entity';
 import { RideFinalFare } from '../modules/rides/entities/ride-final-fare.entity';
@@ -77,6 +78,7 @@ const AppDataSource = new DataSource({
     UserNotification,
     OutboxEvent,
     AdminAuditLog,
+    RidePayment,
     DriverProfile,
     DriverVehicle,
     DriverDocument,

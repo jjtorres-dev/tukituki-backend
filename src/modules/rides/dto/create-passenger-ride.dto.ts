@@ -1,12 +1,14 @@
 import { Transform } from 'class-transformer';
 import {
   IsOptional,
+  IsEnum,
   IsString,
   IsUUID,
   MaxLength,
   MinLength,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { PaymentMethod } from '../../payments/enums/payment-method.enum';
 
 export class CreatePassengerRideDto {
   @ApiProperty({
@@ -14,6 +16,11 @@ export class CreatePassengerRideDto {
   })
   @IsUUID()
   fareQuoteId!: string;
+
+  @ApiPropertyOptional({ enum: PaymentMethod, default: PaymentMethod.CASH })
+  @IsOptional()
+  @IsEnum(PaymentMethod)
+  paymentMethod: PaymentMethod = PaymentMethod.CASH;
 
   @ApiPropertyOptional({
     example: 'Estoy frente a la puerta principal',

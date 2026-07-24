@@ -32,6 +32,9 @@ import {
 } from '../fares/utils/fixed-decimal.util';
 import { CompleteRideDto } from './dto/complete-ride.dto';
 import { RideCompletionResponseDto } from './dto/ride-completion-response.dto';
+import { RidePayment } from '../payments/entities/ride-payment.entity';
+import { RidePaymentStatus } from '../payments/enums/ride-payment-status.enum';
+
 import { RideFinalFare } from './entities/ride-final-fare.entity';
 import { RideProgressMetrics } from './entities/ride-progress-metrics.entity';
 import { Ride } from './entities/ride.entity';
@@ -67,6 +70,7 @@ interface CompletionOutcome {
   ride: Ride;
   previousStatus: RideStatus;
   finalFare: RideFinalFare;
+  payment: RidePayment;
   location: DriverLocation;
 }
 
@@ -201,6 +205,30 @@ export class RideCompletionService {
 
         const previousStatus = ride.status;
         ride.completedAt = now;
+
+        const paymentRepository = manager.getRepository(RidePayment);
+        const payment = await paymentRepository.save(
+          paymentRepository.create({
+            rideId: ride.id,
+            passengerUserId: ride.passengerUserId,
+            driverProfileId: profile.id,
+            method: ride.paymentMethod,
+            status: RidePaymentStatus.PENDING,
+            amountDue: calculation.finalFare,
+            cashReceived: null,
+            changeGiven: null,
+            currency: calculation.currency,
+            confirmedByDriverUserId: null,
+            confirmedAt: null,
+            confirmationNotes: null,
+            disputeReason: null,
+            disputeDetail: null,
+            disputedAt: null,
+            resolvedByAdminUserId: null,
+            resolvedAt: null,
+            resolutionNotes: null,
+          }),
+        );
         ride.actualDistanceMeters = trackedDistanceMeters;
         ride.actualDurationSeconds = actualDurationSeconds;
         ride.destinationArrivalDistanceMeters = destinationDistance.toFixed(2);
@@ -234,7 +262,7 @@ export class RideCompletionService {
         metrics.calculatedDurationSeconds = actualDurationSeconds;
         await manager.getRepository(RideProgressMetrics).save(metrics);
 
-        return { ride, previousStatus, finalFare, location: location };
+        return { ride, previousStatus, finalFare, payment, location };
       },
     );
 
@@ -255,6 +283,8 @@ export class RideCompletionService {
       finalFare: outcome.finalFare.finalFare,
       currency: outcome.finalFare.currency,
       fareWasCapped: outcome.finalFare.fareWasCapped,
+      paymentMethod: outcome.payment.method,
+      paymentStatus: outcome.payment.status,
     };
   }
 

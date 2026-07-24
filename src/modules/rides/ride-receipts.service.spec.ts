@@ -1,5 +1,8 @@
 import { DataSource } from 'typeorm';
 
+import { RidePayment } from '../payments/entities/ride-payment.entity';
+import { PaymentMethod } from '../payments/enums/payment-method.enum';
+import { RidePaymentStatus } from '../payments/enums/ride-payment-status.enum';
 import { RideFinalFare } from './entities/ride-final-fare.entity';
 import { Ride } from './entities/ride.entity';
 import { RideStatus } from './enums/ride-status.enum';
@@ -34,6 +37,15 @@ describe('RideReceiptsService', () => {
       fareWasCapped: false,
       currency: 'PEN',
     } as RideFinalFare;
+    const payment = {
+      rideId: ride.id,
+      method: PaymentMethod.CASH,
+      status: RidePaymentStatus.PAID,
+      amountDue: '7.00',
+      cashReceived: '10.00',
+      changeGiven: '3.00',
+      confirmedAt: new Date('2026-07-23T15:11:00.000Z'),
+    } as RidePayment;
     const dataSource = {
       getRepository: jest.fn((entity: unknown): unknown => {
         if (entity === Ride) {
@@ -41,6 +53,9 @@ describe('RideReceiptsService', () => {
         }
         if (entity === RideFinalFare) {
           return { findOne: jest.fn(() => Promise.resolve(fare)) };
+        }
+        if (entity === RidePayment) {
+          return { findOne: jest.fn(() => Promise.resolve(payment)) };
         }
         throw new Error('Repositorio inesperado');
       }),
@@ -56,5 +71,6 @@ describe('RideReceiptsService', () => {
 
     expect(result.status).toBe(RideStatus.COMPLETED);
     expect(result.fare.finalFare).toBe('7.00');
+    expect(result.payment?.changeGiven).toBe('3.00');
   });
 });

@@ -15,6 +15,7 @@ import { CancellationPolicy } from './cancellation-policy.entity';
 import { FareQuote } from '../../fares/entities/fare-quote.entity';
 import type { FareQuotePoint } from '../../fares/entities/fare-quote.entity';
 import { ServiceZone } from '../../service-zones/entities/service-zone.entity';
+import { PaymentMethod } from '../../payments/enums/payment-method.enum';
 import { User } from '../../users/entities/user.entity';
 import { RideCancellationActor } from '../enums/ride-cancellation-actor.enum';
 import { RideStatus } from '../enums/ride-status.enum';
@@ -266,6 +267,14 @@ export class Ride {
   })
   currency!: string;
 
+  @Column({
+    name: 'payment_method',
+    type: 'enum',
+    enum: PaymentMethod,
+    enumName: 'payment_method_enum',
+    default: PaymentMethod.CASH,
+  })
+  paymentMethod!: PaymentMethod;
   @Column({
     type: 'enum',
     enum: RideStatus,
