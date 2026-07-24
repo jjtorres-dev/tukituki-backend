@@ -1,4 +1,5 @@
 import {
+  Check,
   Column,
   CreateDateColumn,
   Entity,
@@ -10,6 +11,7 @@ import {
 } from 'typeorm';
 import type { Relation } from 'typeorm';
 
+import { CommissionPolicy } from '../../commissions/entities/commission-policy.entity';
 import { DriverProfile } from '../../drivers/entities/driver-profile.entity';
 import { CancellationPolicy } from './cancellation-policy.entity';
 import { FareQuote } from '../../fares/entities/fare-quote.entity';
@@ -45,6 +47,10 @@ import { RideStatus } from '../enums/ride-status.enum';
     `'DRIVER_ASSIGNED', 'DRIVER_ARRIVING', ` +
     `'DRIVER_ARRIVED', 'IN_PROGRESS')`,
 })
+@Check(
+  'CHK_rides_platform_commission_rate',
+  '"platform_commission_rate_bps" BETWEEN 300 AND 500',
+)
 export class Ride {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
@@ -275,6 +281,32 @@ export class Ride {
     default: PaymentMethod.CASH,
   })
   paymentMethod!: PaymentMethod;
+
+  @Index('IDX_rides_commission_policy_id')
+  @Column({
+    name: 'commission_policy_id',
+    type: 'uuid',
+    nullable: true,
+  })
+  commissionPolicyId!: string | null;
+
+  @ManyToOne(() => CommissionPolicy, {
+    nullable: true,
+    onDelete: 'SET NULL',
+  })
+  @JoinColumn({
+    name: 'commission_policy_id',
+    foreignKeyConstraintName: 'FK_rides_commission_policy',
+  })
+  commissionPolicy!: Relation<CommissionPolicy> | null;
+
+  @Column({
+    name: 'platform_commission_rate_bps',
+    type: 'smallint',
+    default: 500,
+  })
+  platformCommissionRateBps!: number;
+
   @Column({
     type: 'enum',
     enum: RideStatus,

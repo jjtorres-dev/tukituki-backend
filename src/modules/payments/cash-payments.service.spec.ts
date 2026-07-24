@@ -2,6 +2,7 @@ import { BadRequestException, ConflictException } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import type { EntityManager } from 'typeorm';
 
+import { CommissionsService } from '../commissions/commissions.service';
 import { DriverProfile } from '../drivers/entities/driver-profile.entity';
 import { DriverStatus } from '../drivers/enums/driver-status.enum';
 import type { EnqueueOutboxEventInput } from '../outbox/interfaces/enqueue-outbox-event.interface';
@@ -18,6 +19,14 @@ const DRIVER_PROFILE_ID = '72b81eb5-c53f-4de2-bd9f-11f33d64da64';
 const PASSENGER_USER_ID = '2bb75614-f6d6-437f-b38f-e21aad622428';
 const ADMIN_USER_ID = '9e14cab8-2714-4cf9-8024-c6c97c8729ca';
 const RIDE_ID = '3dbb6cbc-aee8-43f0-8247-e13d8e197b71';
+
+function commissionsService(): CommissionsService {
+  return {
+    accrueWithinTransaction: jest.fn(() => Promise.resolve()),
+    holdWithinTransaction: jest.fn(() => Promise.resolve()),
+    resolveDisputeWithinTransaction: jest.fn(() => Promise.resolve()),
+  } as unknown as CommissionsService;
+}
 
 function basePayment(status = RidePaymentStatus.PENDING): RidePayment {
   const now = new Date('2026-07-23T15:10:00.000Z');
@@ -102,8 +111,10 @@ function setup(payment: RidePayment) {
       },
     ),
   } as unknown as OutboxService;
+  const commissions = commissionsService();
   return {
-    service: new CashPaymentsService(dataSource, outbox),
+    service: new CashPaymentsService(dataSource, outbox, commissions),
+    commissions,
     saved,
     events,
     save,
@@ -125,6 +136,11 @@ describe('CashPaymentsService', () => {
     expect(fixture.saved).toHaveLength(1);
     expect(fixture.events).toHaveLength(1);
     expect(fixture.events[0]?.eventType).toBe('CASH_PAYMENT_CONFIRMED');
+    // Jest mock assertion; the method is not invoked unbound.
+    // eslint-disable-next-line @typescript-eslint/unbound-method
+    expect(fixture.commissions.accrueWithinTransaction).toHaveBeenCalledTimes(
+      1,
+    );
   });
 
   it('rechaza efectivo menor que la tarifa final', async () => {
@@ -187,6 +203,9 @@ describe('CashPaymentsService', () => {
       CashPaymentDisputeReason.CHANGE_NOT_RETURNED,
     );
     expect(fixture.events[0]?.eventType).toBe('CASH_PAYMENT_DISPUTED');
+    // Jest mock assertion; the method is not invoked unbound.
+    // eslint-disable-next-line @typescript-eslint/unbound-method
+    expect(fixture.commissions.holdWithinTransaction).toHaveBeenCalledTimes(1);
   });
 
   it('permite al administrador anular un pago disputado', async () => {
@@ -207,5 +226,11 @@ describe('CashPaymentsService', () => {
     expect(result.status).toBe(RidePaymentStatus.VOIDED);
     expect(result.resolvedByAdminUserId).toBe(ADMIN_USER_ID);
     expect(fixture.events[0]?.eventType).toBe('CASH_PAYMENT_RESOLVED');
+    // Jest mock assertion; the method is not invoked unbound.
+    /* eslint-disable @typescript-eslint/unbound-method */
+    expect(
+      fixture.commissions.resolveDisputeWithinTransaction,
+    ).toHaveBeenCalledWith(expect.anything(), payment, false, expect.any(Date));
+    /* eslint-enable @typescript-eslint/unbound-method */
   });
 });

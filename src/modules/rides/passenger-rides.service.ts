@@ -17,6 +17,8 @@ import {
 } from 'typeorm';
 import type { EntityManager, Repository } from 'typeorm';
 
+import { CommissionPolicyService } from '../commissions/commission-policy.service';
+import type { CommissionPolicySnapshot } from '../commissions/interfaces/commission-policy-snapshot.interface';
 import { FareQuote } from '../fares/entities/fare-quote.entity';
 import { FareQuoteStatus } from '../fares/enums/fare-quote-status.enum';
 import { FareRule } from '../fares/entities/fare-rule.entity';
@@ -70,6 +72,8 @@ export class PassengerRidesService {
     @Optional() private readonly outboxService?: OutboxService,
     @Optional()
     private readonly cancellationPolicyService?: CancellationPolicyService,
+    @Optional()
+    private readonly commissionPolicyService?: CommissionPolicyService,
   ) {}
 
   async createRide(
@@ -156,6 +160,10 @@ export class PassengerRidesService {
               )
             : this.fallbackCancellationPolicy();
 
+          const commissionPolicy = this.commissionPolicyService
+            ? await this.commissionPolicyService.getActiveSnapshot(manager, now)
+            : this.fallbackCommissionPolicy();
+
           const ride = rideRepository.create({
             passengerUserId,
             driverProfileId: null,
@@ -180,6 +188,8 @@ export class PassengerRidesService {
             pricingCalculationVersion: quote.pricingCalculationVersion,
             currency: quote.currency,
             paymentMethod: dto.paymentMethod ?? PaymentMethod.CASH,
+            commissionPolicyId: commissionPolicy.policyId,
+            platformCommissionRateBps: commissionPolicy.rateBps,
             status: RideStatus.SEARCHING_DRIVER,
             passengerNotes: dto.passengerNotes?.trim() || null,
             requestedAt: now,
@@ -492,6 +502,13 @@ export class PassengerRidesService {
       driverNoProgressSeconds: 180,
       driverNoProgressMinMeters: 100,
       currency: 'PEN',
+    };
+  }
+
+  private fallbackCommissionPolicy(): CommissionPolicySnapshot {
+    return {
+      policyId: null,
+      rateBps: 500,
     };
   }
 

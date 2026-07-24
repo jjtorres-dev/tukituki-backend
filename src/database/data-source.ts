@@ -4,6 +4,8 @@ import { join } from 'node:path';
 import { DataSource } from 'typeorm';
 
 import { AuthSession } from '../modules/auth-sessions/entities/auth-session.entity';
+import { CommissionPolicy } from '../modules/commissions/entities/commission-policy.entity';
+import { RideCommission } from '../modules/commissions/entities/ride-commission.entity';
 import { DriverLocation } from '../modules/driver-operations/entities/driver-location.entity';
 import { DriverOperationalState } from '../modules/driver-operations/entities/driver-operational-state.entity';
 import { DriverDocument } from '../modules/drivers/entities/driver-document.entity';
@@ -79,6 +81,8 @@ const AppDataSource = new DataSource({
     UserNotification,
     OutboxEvent,
     AdminAuditLog,
+    CommissionPolicy,
+    RideCommission,
     DigitalPaymentAttempt,
     RidePayment,
     DriverProfile,

@@ -12,6 +12,7 @@ import { ConfigService } from '@nestjs/config';
 import { DataSource, In } from 'typeorm';
 import type { EntityManager } from 'typeorm';
 
+import { CommissionsService } from '../commissions/commissions.service';
 import { DriverProfile } from '../drivers/entities/driver-profile.entity';
 import { parseScaledDecimal } from '../fares/utils/fixed-decimal.util';
 import { OutboxEventType } from '../outbox/enums/outbox-event-type.enum';
@@ -68,6 +69,7 @@ export class DigitalPaymentsService {
     private readonly outboxService: OutboxService,
     @Inject(PAYMENT_GATEWAY)
     private readonly paymentGateway: PaymentGateway,
+    private readonly commissionsService: CommissionsService,
   ) {}
 
   async createCheckoutSession(
@@ -240,8 +242,16 @@ export class DigitalPaymentsService {
         attempt.failureMessage = null;
         attempt.completedAt = now;
         payment.status = RidePaymentStatus.PAID;
+        payment.confirmedAt = now;
         await manager.getRepository(DigitalPaymentAttempt).save(attempt);
-        await manager.getRepository(RidePayment).save(payment);
+        const savedPayment = await manager
+          .getRepository(RidePayment)
+          .save(payment);
+        await this.commissionsService.accrueWithinTransaction(
+          manager,
+          savedPayment,
+          now,
+        );
 
         await this.enqueueDigitalEvent(
           manager,

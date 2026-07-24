@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { AuthModule } from '../auth/auth.module';
+import { CommissionsModule } from '../commissions/commissions.module';
 import { AuthorizationModule } from '../authorization/authorization.module';
 import { DriverProfile } from '../drivers/entities/driver-profile.entity';
 import { OutboxModule } from '../outbox/outbox.module';
@@ -31,6 +32,7 @@ import { PassengerDigitalPaymentsController } from './passenger-digital-payments
     AuthModule,
     AuthorizationModule,
     OutboxModule,
+    CommissionsModule,
   ],
   controllers: [
     DriverCashPaymentsController,

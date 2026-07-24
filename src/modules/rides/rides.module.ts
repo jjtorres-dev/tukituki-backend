@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { AuthModule } from '../auth/auth.module';
+import { CommissionsModule } from '../commissions/commissions.module';
 import { AuthorizationModule } from '../authorization/authorization.module';
 import { DriverOperationsModule } from '../driver-operations/driver-operations.module';
 import { PassengerProfile } from '../passengers/entities/passenger-profile.entity';
@@ -84,6 +85,7 @@ import { RideViewService } from './ride-view.service';
     RideRealtimeModule,
     DriverOperationsModule,
     OutboxModule,
+    CommissionsModule,
   ],
   controllers: [
     PassengerRidesController,

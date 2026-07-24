@@ -8,6 +8,7 @@ import { AdminDriversModule } from './modules/admin-drivers/admin-drivers.module
 import { AdminRidesModule } from './modules/admin-rides/admin-rides.module';
 import { AuthSessionsModule } from './modules/auth-sessions/auth-sessions.module';
 import { AuthModule } from './modules/auth/auth.module';
+import { CommissionsModule } from './modules/commissions/commissions.module';
 import { DriverOperationsModule } from './modules/driver-operations/driver-operations.module';
 import { DriversModule } from './modules/drivers/drivers.module';
 import { FaresModule } from './modules/fares/fares.module';
@@ -67,6 +68,7 @@ import { UsersModule } from './modules/users/users.module';
     NotificationsModule,
     OutboxModule,
     OperationsModule,
+    CommissionsModule,
     PaymentsModule,
     DriversModule,
     AdminDriversModule,

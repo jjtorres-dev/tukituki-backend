@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { DataSource } from 'typeorm';
 import type { EntityManager } from 'typeorm';
 
+import { CommissionsService } from '../commissions/commissions.service';
 import { DriverProfile } from '../drivers/entities/driver-profile.entity';
 import type { EnqueueOutboxEventInput } from '../outbox/interfaces/enqueue-outbox-event.interface';
 import { OutboxService } from '../outbox/outbox.service';
@@ -27,6 +28,12 @@ const ATTEMPT_ID = '4cf0be21-c71e-4398-a009-977663da43a2';
 const TRANSACTION_ID = '75ccdc41f33b4641b1a490664f61533f';
 const ORDER_NUMBER = 'TTORDER123';
 const KEY_HASH = 'sandbox-key-hash-with-enough-entropy';
+
+function commissionsService(): CommissionsService {
+  return {
+    accrueWithinTransaction: jest.fn(() => Promise.resolve()),
+  } as unknown as CommissionsService;
+}
 
 function payment(
   status = RidePaymentStatus.PENDING,
@@ -149,6 +156,7 @@ function checkoutFixture() {
     configService(),
     {} as OutboxService,
     gateway,
+    commissionsService(),
   );
   return { service, gateway, currentPayment, currentAttempt };
 }
@@ -197,13 +205,22 @@ function webhookFixture() {
       },
     ),
   } as unknown as OutboxService;
+  const commissions = commissionsService();
   const service = new DigitalPaymentsService(
     dataSource,
     configService(),
     outbox,
     {} as PaymentGateway,
+    commissions,
   );
-  return { service, currentPayment, currentAttempt, events, dataSource };
+  return {
+    service,
+    currentPayment,
+    currentAttempt,
+    events,
+    dataSource,
+    commissions,
+  };
 }
 
 function webhookDto(overrides: Record<string, unknown> = {}) {
@@ -282,8 +299,14 @@ describe('DigitalPaymentsService', () => {
       DigitalPaymentAttemptStatus.SUCCEEDED,
     );
     expect(fixture.currentPayment.status).toBe(RidePaymentStatus.PAID);
+    expect(fixture.currentPayment.confirmedAt).toBeInstanceOf(Date);
     expect(fixture.events).toHaveLength(1);
     expect(fixture.events[0]?.eventType).toBe('DIGITAL_PAYMENT_CONFIRMED');
+    // Jest mock assertion; the method is not invoked unbound.
+    // eslint-disable-next-line @typescript-eslint/unbound-method
+    expect(fixture.commissions.accrueWithinTransaction).toHaveBeenCalledTimes(
+      1,
+    );
   });
 
   it('registra un rechazo firmado aunque el payload interno omita transactionId', async () => {

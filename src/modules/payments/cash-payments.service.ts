@@ -8,6 +8,7 @@ import {
 import { DataSource } from 'typeorm';
 import type { EntityManager } from 'typeorm';
 
+import { CommissionsService } from '../commissions/commissions.service';
 import { DriverProfile } from '../drivers/entities/driver-profile.entity';
 import { DriverStatus } from '../drivers/enums/driver-status.enum';
 import {
@@ -34,6 +35,7 @@ export class CashPaymentsService {
   constructor(
     private readonly dataSource: DataSource,
     private readonly outboxService: OutboxService,
+    private readonly commissionsService: CommissionsService,
   ) {}
 
   async getPassengerPayment(
@@ -124,6 +126,12 @@ export class CashPaymentsService {
       payment.confirmationNotes = dto.notes?.trim() || null;
       const saved = await manager.getRepository(RidePayment).save(payment);
 
+      await this.commissionsService.accrueWithinTransaction(
+        manager,
+        saved,
+        now,
+      );
+
       await this.outboxService.enqueueWithinTransaction(manager, {
         aggregateType: 'RIDE',
         aggregateId: payment.rideId,
@@ -183,6 +191,11 @@ export class CashPaymentsService {
       payment.disputeDetail = detail;
       payment.disputedAt = now;
       const saved = await manager.getRepository(RidePayment).save(payment);
+      await this.commissionsService.holdWithinTransaction(
+        manager,
+        payment.id,
+        now,
+      );
       const driverUserId = await this.driverUserId(
         manager,
         payment.driverProfileId,
@@ -282,6 +295,12 @@ export class CashPaymentsService {
       payment.resolvedAt = now;
       payment.resolutionNotes = dto.notes.trim();
       const saved = await manager.getRepository(RidePayment).save(payment);
+      await this.commissionsService.resolveDisputeWithinTransaction(
+        manager,
+        saved,
+        dto.resolution === CashPaymentResolution.CONFIRM_PAID,
+        now,
+      );
       const driverUserId = await this.driverUserId(
         manager,
         payment.driverProfileId,
