@@ -1,0 +1,5726 @@
+{
+  "info": {
+    "name": "TukiTuki API",
+    "description": "API REST del servicio de mototaxis TukiTuki para pasajeros, conductores, operaciones y administración. Los importes monetarios se expresan en soles (PEN). Las fechas usan ISO 8601 en UTC. Las rutas protegidas requieren un access token JWT.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{accessToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3001",
+      "type": "string"
+    },
+    {
+      "key": "accessToken",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Comprobar que el proceso del backend está activo",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Comprobar que el proceso del backend está activo",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/health/live",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "health",
+                "live"
+              ],
+              "query": [],
+              "variable": []
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Comprobar el estado del backend y sus dependencias",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Comprobar el estado del backend y sus dependencias",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "health"
+              ],
+              "query": [],
+              "variable": []
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Comprobar que PostgreSQL y Redis aceptan tráfico",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Comprobar que PostgreSQL y Redis aceptan tráfico",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/health/ready",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "health",
+                "ready"
+              ],
+              "query": [],
+              "variable": []
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Registrar una cuenta de pasajero",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Registrar una cuenta de pasajero",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/register/passenger",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "register",
+                "passenger"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phoneE164\": \"+51987654321\",\n  \"password\": \"TukiTuki2026\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Solicitar código OTP para verificar el teléfono",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Solicitar código OTP para verificar el teléfono",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/otp/request",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "otp",
+                "request"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phoneE164\": \"+51987654321\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Verificar el código OTP",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Verificar el código OTP",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/otp/verify",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "otp",
+                "verify"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phoneE164\": \"+51987654321\",\n  \"code\": \"482913\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Iniciar sesión con teléfono y contraseña",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Iniciar sesión con teléfono y contraseña",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phoneE164\": \"+51987654321\",\n  \"password\": \"TukiTuki2026\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Obtener el usuario autenticado",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "description": "Obtener el usuario autenticado",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "me"
+              ],
+              "query": [],
+              "variable": []
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Renovar los tokens de una sesión",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Renovar los tokens de una sesión",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/refresh",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "refresh"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"f544d52a-39e0-4da3-8861-6010355c5dba.secreto-aleatorio\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Cerrar la sesión actual",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "description": "Cerrar la sesión actual",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/logout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "logout"
+              ],
+              "query": [],
+              "variable": []
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Listar las sesiones activas del usuario",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "description": "Listar las sesiones activas del usuario",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/sessions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "sessions"
+              ],
+              "query": [],
+              "variable": []
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Cerrar una sesión específica",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "description": "Cerrar una sesión específica",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/sessions/:sessionId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "sessions",
+                ":sessionId"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "sessionId",
+                  "value": "{{sessionId}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Cerrar todas las sesiones del usuario",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "description": "Cerrar todas las sesiones del usuario",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/logout-all",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "logout-all"
+              ],
+              "query": [],
+              "variable": []
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Passengers",
+      "item": [
+        {
+          "name": "Obtener el perfil del pasajero autenticado",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "description": "Obtener el perfil del pasajero autenticado",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/passengers/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "passengers",
+                "me"
+              ],
+              "query": [],
+              "variable": []
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Crear el perfil del pasajero autenticado",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "description": "Crear el perfil del pasajero autenticado",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/passengers/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "passengers",
+                "me"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Juan José\",\n  \"lastName\": \"Torres Solano\",\n  \"photoUrl\": \"https://cdn.tukituki.pe/passengers/profile.jpg\",\n  \"emergencyContactName\": \"María Torres\",\n  \"emergencyContactPhoneE164\": \"+51912345678\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Actualizar el perfil del pasajero autenticado",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "description": "Actualizar el perfil del pasajero autenticado",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/passengers/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "passengers",
+                "me"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Juan José\",\n  \"lastName\": \"Torres Solano\",\n  \"photoUrl\": \"https://cdn.tukituki.pe/passengers/profile.jpg\",\n  \"emergencyContactName\": \"María Torres\",\n  \"emergencyContactPhoneE164\": \"+51912345678\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Devices and notifications",
+      "item": [
+        {
+          "name": "Registrar o actualizar un dispositivo push",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "description": "Registrar o actualizar un dispositivo push",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/me/devices",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "me",
+                "devices"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"platform\": \"ANDROID\",\n  \"pushToken\": \"\",\n  \"deviceId\": \"\",\n  \"appVersion\": \"1.0.0+1\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Revocar un dispositivo propio",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "description": "Revocar un dispositivo propio",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/me/devices/:deviceId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "me",
+                "devices",
+                ":deviceId"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "deviceId",
+                  "value": "{{deviceId}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Consultar notificaciones persistentes",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "description": "Consultar notificaciones persistentes",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/me/notifications",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "me",
+                "notifications"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "{{page}}",
+                  "disabled": true
+                },
+                {
+                  "key": "limit",
+                  "value": "{{limit}}",
+                  "disabled": true
+                },
+                {
+                  "key": "unreadOnly",
+                  "value": "{{unreadOnly}}",
+                  "disabled": true
+                }
+              ],
+              "variable": []
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Consultar cantidad de notificaciones no leídas",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "description": "Consultar cantidad de notificaciones no leídas",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/me/notifications/unread-count",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "me",
+                "notifications",
+                "unread-count"
+              ],
+              "query": [],
+              "variable": []
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Marcar todas las notificaciones como leídas",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "description": "Marcar todas las notificaciones como leídas",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/me/notifications/read-all",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "me",
+                "notifications",
+                "read-all"
+              ],
+              "query": [],
+              "variable": []
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Marcar una notificación como leída",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "description": "Marcar una notificación como leída",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/me/notifications/:notificationId/read",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "me",
+                "notifications",
+                ":notificationId",
+                "read"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "notificationId",
+                  "value": "{{notificationId}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Admin audit",
+      "item": [
+        {
+          "name": "Consultar la bitácora inmutable de acciones administrativas",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "description": "Consultar la bitácora inmutable de acciones administrativas",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/audit-logs",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "audit-logs"
+              ],
+              "query": [
+                {
+                  "key": "actorUserId",
+                  "value": "{{actorUserId}}",
+                  "disabled": true
+                },
+                {
+                  "key": "action",
+                  "value": "{{action}}",
+                  "disabled": true
+                },
+                {
+                  "key": "resourceType",
+                  "value": "{{resourceType}}",
+                  "disabled": true
+                },
+                {
+                  "key": "resourceId",
+                  "value": "{{resourceId}}",
+                  "disabled": true
+                },
+                {
+                  "key": "outcome",
+                  "value": "{{outcome}}",
+                  "disabled": true
+                },
+                {
+                  "key": "dateFrom",
+                  "value": "{{dateFrom}}",
+                  "disabled": true
+                },
+                {
+                  "key": "dateTo",
+                  "value": "{{dateTo}}",
+                  "disabled": true
+                },
+                {
+                  "key": "page",
+                  "value": "{{page}}",
+                  "disabled": true
+                },
+                {
+                  "key": "limit",
+                  "value": "{{limit}}",
+                  "disabled": true
+                }
+              ],
+              "variable": []
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Admin operational reports",
+      "item": [
+        {
+          "name": "Consultar indicadores operativos consolidados",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "description": "Consultar indicadores operativos consolidados",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/operations/dashboard",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "operations",
+                "dashboard"
+              ],
+              "query": [
+                {
+                  "key": "dateFrom",
+                  "value": "{{dateFrom}}",
+                  "description": "Inicio inclusivo. Por defecto, hace 30 días.",
+                  "disabled": true
+                },
+                {
+                  "key": "dateTo",
+                  "value": "{{dateTo}}",
+                  "description": "Fin exclusivo. Por defecto, la fecha actual.",
+                  "disabled": true
+                },
+                {
+                  "key": "serviceZoneId",
+                  "value": "{{serviceZoneId}}",
+                  "description": "Filtra por la zona de origen del viaje.",
+                  "disabled": true
+                }
+              ],
+              "variable": []
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Consultar la evolución de viajes y facturación por intervalo",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "description": "Consultar la evolución de viajes y facturación por intervalo",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/operations/time-series",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "operations",
+                "time-series"
+              ],
+              "query": [
+                {
+                  "key": "dateFrom",
+                  "value": "{{dateFrom}}",
+                  "description": "Inicio inclusivo. Por defecto, hace 30 días.",
+                  "disabled": true
+                },
+                {
+                  "key": "dateTo",
+                  "value": "{{dateTo}}",
+                  "description": "Fin exclusivo. Por defecto, la fecha actual.",
+                  "disabled": true
+                },
+                {
+                  "key": "serviceZoneId",
+                  "value": "{{serviceZoneId}}",
+                  "description": "Filtra por la zona de origen del viaje.",
+                  "disabled": true
+                },
+                {
+                  "key": "interval",
+                  "value": "{{interval}}",
+                  "disabled": true
+                }
+              ],
+              "variable": []
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Comparar desempeño operativo por zona de origen",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "description": "Comparar desempeño operativo por zona de origen",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/operations/zones",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "operations",
+                "zones"
+              ],
+              "query": [
+                {
+                  "key": "dateFrom",
+                  "value": "{{dateFrom}}",
+                  "description": "Inicio inclusivo. Por defecto, hace 30 días.",
+                  "disabled": true
+                },
+                {
+                  "key": "dateTo",
+                  "value": "{{dateTo}}",
+                  "description": "Fin exclusivo. Por defecto, la fecha actual.",
+                  "disabled": true
+                },
+                {
+                  "key": "serviceZoneId",
+                  "value": "{{serviceZoneId}}",
+                  "description": "Filtra por la zona de origen del viaje.",
+                  "disabled": true
+                }
+              ],
+              "variable": []
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Exportar el reporte operativo de viajes en formato CSV",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "description": "Exportar el reporte operativo de viajes en formato CSV",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/operations/reports/rides.csv",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "operations",
+                "reports",
+                "rides.csv"
+              ],
+              "query": [
+                {
+                  "key": "dateFrom",
+                  "value": "{{dateFrom}}",
+                  "description": "Inicio inclusivo. Por defecto, hace 30 días.",
+                  "disabled": true
+                },
+                {
+                  "key": "dateTo",
+                  "value": "{{dateTo}}",
+                  "description": "Fin exclusivo. Por defecto, la fecha actual.",
+                  "disabled": true
+                },
+                {
+                  "key": "serviceZoneId",
+                  "value": "{{serviceZoneId}}",
+                  "description": "Filtra por la zona de origen del viaje.",
+                  "disabled": true
+                },
+                {
+                  "key": "limit",
+                  "value": "{{limit}}",
+                  "disabled": true
+                }
+              ],
+              "variable": []
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Driver commissions",
+      "item": [
+        {
+          "name": "Listar las comisiones de mis viajes",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "description": "Listar las comisiones de mis viajes",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/drivers/me/commissions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "drivers",
+                "me",
+                "commissions"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "{{status}}",
+                  "disabled": true
+                },
+                {
+                  "key": "paymentMethod",
+                  "value": "{{paymentMethod}}",
+                  "disabled": true
+                },
+                {
+                  "key": "collectionMode",
+                  "value": "{{collectionMode}}",
+                  "disabled": true
+                },
+                {
+                  "key": "dateFrom",
+                  "value": "{{dateFrom}}",
+                  "disabled": true
+                },
+                {
+                  "key": "dateTo",
+                  "value": "{{dateTo}}",
+                  "disabled": true
+                },
+                {
+                  "key": "page",
+                  "value": "{{page}}",
+                  "disabled": true
+                },
+                {
+                  "key": "limit",
+                  "value": "{{limit}}",
+                  "disabled": true
+                }
+              ],
+              "variable": []
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Consultar mi resumen de ingresos y comisiones",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "description": "Consultar mi resumen de ingresos y comisiones",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/drivers/me/commissions/summary",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "drivers",
+                "me",
+                "commissions",
+                "summary"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "{{status}}",
+                  "disabled": true
+                },
+                {
+                  "key": "paymentMethod",
+                  "value": "{{paymentMethod}}",
+                  "disabled": true
+                },
+                {
+                  "key": "collectionMode",
+                  "value": "{{collectionMode}}",
+                  "disabled": true
+                },
+                {
+                  "key": "dateFrom",
+                  "value": "{{dateFrom}}",
+                  "disabled": true
+                },
+                {
+                  "key": "dateTo",
+                  "value": "{{dateTo}}",
+                  "disabled": true
+                },
+                {
+                  "key": "page",
+                  "value": "{{page}}",
+                  "disabled": true
+                },
+                {
+                  "key": "limit",
+                  "value": "{{limit}}",
+                  "disabled": true
+                }
+              ],
+              "variable": []
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Admin commissions",
+      "item": [
+        {
+          "name": "Listar y filtrar comisiones de viajes",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "description": "Listar y filtrar comisiones de viajes",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/commissions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "commissions"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "{{status}}",
+                  "disabled": true
+                },
+                {
+                  "key": "paymentMethod",
+                  "value": "{{paymentMethod}}",
+                  "disabled": true
+                },
+                {
+                  "key": "collectionMode",
+                  "value": "{{collectionMode}}",
+                  "disabled": true
+                },
+                {
+                  "key": "dateFrom",
+                  "value": "{{dateFrom}}",
+                  "disabled": true
+                },
+                {
+                  "key": "dateTo",
+                  "value": "{{dateTo}}",
+                  "disabled": true
+                },
+                {
+                  "key": "page",
+                  "value": "{{page}}",
+                  "disabled": true
+                },
+                {
+                  "key": "limit",
+                  "value": "{{limit}}",
+                  "disabled": true
+                },
+                {
+                  "key": "driverProfileId",
+                  "value": "{{driverProfileId}}",
+                  "disabled": true
+                },
+                {
+                  "key": "rideId",
+                  "value": "{{rideId}}",
+                  "disabled": true
+                }
+              ],
+              "variable": []
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Consultar ingresos y comisiones consolidados",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "description": "Consultar ingresos y comisiones consolidados",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/commissions/summary",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "commissions",
+                "summary"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "{{status}}",
+                  "disabled": true
+                },
+                {
+                  "key": "paymentMethod",
+                  "value": "{{paymentMethod}}",
+                  "disabled": true
+                },
+                {
+                  "key": "collectionMode",
+                  "value": "{{collectionMode}}",
+                  "disabled": true
+                },
+                {
+                  "key": "dateFrom",
+                  "value": "{{dateFrom}}",
+                  "disabled": true
+                },
+                {
+                  "key": "dateTo",
+                  "value": "{{dateTo}}",
+                  "disabled": true
+                },
+                {
+                  "key": "page",
+                  "value": "{{page}}",
+                  "disabled": true
+                },
+                {
+                  "key": "limit",
+                  "value": "{{limit}}",
+                  "disabled": true
+                },
+                {
+                  "key": "driverProfileId",
+                  "value": "{{driverProfileId}}",
+                  "disabled": true
+                },
+                {
+                  "key": "rideId",
+                  "value": "{{rideId}}",
+                  "disabled": true
+                }
+              ],
+              "variable": []
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Consultar la política de comisión vigente",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "description": "Consultar la política de comisión vigente",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/commissions/policy",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "commissions",
+                "policy"
+              ],
+              "query": [],
+              "variable": []
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Cambiar inmediatamente la comisión entre 3% y 5%",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "description": "Cambiar inmediatamente la comisión entre 3% y 5%",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/commissions/policy",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "commissions",
+                "policy"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ratePercent\": \"5.00\",\n  \"reason\": \"Tarifa base para cubrir operación y costos de plataforma\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Driver cash payments",
+      "item": [
+        {
+          "name": "Consultar el pago de un viaje propio",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "description": "Consultar el pago de un viaje propio",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/drivers/me/rides/:rideId/payment",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "drivers",
+                "me",
+                "rides",
+                ":rideId",
+                "payment"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "rideId",
+                  "value": "{{rideId}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Confirmar la recepción del efectivo y calcular el vuelto",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "description": "Confirmar la recepción del efectivo y calcular el vuelto",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/drivers/me/rides/:rideId/payment/cash/confirm",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "drivers",
+                "me",
+                "rides",
+                ":rideId",
+                "payment",
+                "cash",
+                "confirm"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "rideId",
+                  "value": "{{rideId}}"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cashReceived\": \"10.00\",\n  \"notes\": \"\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Passenger cash payments",
+      "item": [
+        {
+          "name": "Consultar el pago de un viaje propio",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "description": "Consultar el pago de un viaje propio",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/passenger/rides/:rideId/payment",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "passenger",
+                "rides",
+                ":rideId",
+                "payment"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "rideId",
+                  "value": "{{rideId}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Reportar una discrepancia sobre un efectivo confirmado",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "description": "Reportar una discrepancia sobre un efectivo confirmado",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/passenger/rides/:rideId/payment/cash/dispute",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "passenger",
+                "rides",
+                ":rideId",
+                "payment",
+                "cash",
+                "dispute"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "rideId",
+                  "value": "{{rideId}}"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"WRONG_AMOUNT\",\n  \"detail\": \"\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Passenger digital payments",
+      "item": [
+        {
+          "name": "Crear o recuperar una sesión idempotente de checkout Izipay",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "description": "Crear o recuperar una sesión idempotente de checkout Izipay",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/passenger/rides/:rideId/payment/digital/session",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "passenger",
+                "rides",
+                ":rideId",
+                "payment",
+                "digital",
+                "session"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "rideId",
+                  "value": "{{rideId}}"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"pasajero@example.com\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Admin cash payments",
+      "item": [
+        {
+          "name": "Listar y filtrar los pagos de viajes",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "description": "Listar y filtrar los pagos de viajes",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/payments",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "payments"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "{{status}}",
+                  "disabled": true
+                },
+                {
+                  "key": "method",
+                  "value": "{{method}}",
+                  "disabled": true
+                },
+                {
+                  "key": "rideId",
+                  "value": "{{rideId}}",
+                  "disabled": true
+                },
+                {
+                  "key": "passengerUserId",
+                  "value": "{{passengerUserId}}",
+                  "disabled": true
+                },
+                {
+                  "key": "driverProfileId",
+                  "value": "{{driverProfileId}}",
+                  "disabled": true
+                },
+                {
+                  "key": "dateFrom",
+                  "value": "{{dateFrom}}",
+                  "disabled": true
+                },
+                {
+                  "key": "dateTo",
+                  "value": "{{dateTo}}",
+                  "disabled": true
+                },
+                {
+                  "key": "page",
+                  "value": "{{page}}",
+                  "disabled": true
+                },
+                {
+                  "key": "limit",
+                  "value": "{{limit}}",
+                  "disabled": true
+                }
+              ],
+              "variable": []
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Resolver una disputa de pago en efectivo",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "description": "Resolver una disputa de pago en efectivo",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/payments/:paymentId/resolve",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "payments",
+                ":paymentId",
+                "resolve"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "paymentId",
+                  "value": "{{paymentId}}"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"resolution\": \"CONFIRM_PAID\",\n  \"notes\": \"\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Payment webhooks",
+      "item": [
+        {
+          "name": "Recibir y verificar una notificación IPN firmada de Izipay",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Recibir y verificar una notificación IPN firmada de Izipay",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/payments/webhooks/izipay",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "payments",
+                "webhooks",
+                "izipay"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"00\",\n  \"message\": \"\",\n  \"messageUser\": \"\",\n  \"messageUserEng\": \"\",\n  \"response\": {},\n  \"payloadHttp\": \"\",\n  \"signature\": \"\",\n  \"transactionId\": \"\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Admin promotions",
+      "item": [
+        {
+          "name": "Listar promociones y sus usos",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "description": "Listar promociones y sus usos",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/promotions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "promotions"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "{{status}}",
+                  "disabled": true
+                },
+                {
+                  "key": "page",
+                  "value": "{{page}}",
+                  "disabled": true
+                },
+                {
+                  "key": "limit",
+                  "value": "{{limit}}",
+                  "disabled": true
+                }
+              ],
+              "variable": []
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Crear una promocion o cupon",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "description": "Crear una promocion o cupon",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/promotions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "promotions"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"BIENVENIDO20\",\n  \"name\": \"\",\n  \"description\": \"\",\n  \"discountType\": \"PERCENTAGE\",\n  \"discountBps\": 0,\n  \"fixedAmount\": \"5.00\",\n  \"maximumDiscountAmount\": \"10.00\",\n  \"minimumFareAmount\": \"8.00\",\n  \"startsAt\": \"2026-01-01T00:00:00.000Z\",\n  \"endsAt\": \"2026-01-01T00:00:00.000Z\",\n  \"totalUsageLimit\": 0,\n  \"perPassengerLimit\": 1,\n  \"firstRideOnly\": false,\n  \"status\": \"PAUSED\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Consultar una promocion",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "description": "Consultar una promocion",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/promotions/:promotionId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "promotions",
+                ":promotionId"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "promotionId",
+                  "value": "{{promotionId}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Editar, activar o pausar una promocion",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "description": "Editar, activar o pausar una promocion",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/promotions/:promotionId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "promotions",
+                ":promotionId"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "promotionId",
+                  "value": "{{promotionId}}"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"BIENVENIDO20\",\n  \"name\": \"\",\n  \"description\": \"\",\n  \"discountType\": \"PERCENTAGE\",\n  \"discountBps\": 0,\n  \"fixedAmount\": \"5.00\",\n  \"maximumDiscountAmount\": \"10.00\",\n  \"minimumFareAmount\": \"8.00\",\n  \"startsAt\": \"2026-01-01T00:00:00.000Z\",\n  \"endsAt\": \"2026-01-01T00:00:00.000Z\",\n  \"totalUsageLimit\": 0,\n  \"perPassengerLimit\": 1,\n  \"firstRideOnly\": false,\n  \"status\": \"PAUSED\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Passenger promotions",
+      "item": [
+        {
+          "name": "Validar un cupon contra una cotizacion vigente",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "description": "Validar un cupon contra una cotizacion vigente",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/passenger/promotions/validate",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "passenger",
+                "promotions",
+                "validate"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"\",\n  \"fareQuoteId\": \"00000000-0000-4000-8000-000000000000\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Drivers",
+      "item": [
+        {
+          "name": "Consultar la solicitud del conductor",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "description": "Consultar la solicitud del conductor",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/drivers/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "drivers",
+                "me"
+              ],
+              "query": [],
+              "variable": []
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Crear la solicitud de conductor",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "description": "Crear la solicitud de conductor",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/drivers/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "drivers",
+                "me"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Juan José\",\n  \"lastName\": \"Torres Solano\",\n  \"documentType\": \"DNI\",\n  \"documentNumber\": \"12345678\",\n  \"birthDate\": \"1995-06-15\",\n  \"address\": \"Jr. Los Jardines 245, Tarapoto\",\n  \"photoUrl\": \"https://cdn.tukituki.pe/drivers/profile.jpg\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Actualizar la solicitud del conductor",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "description": "Actualizar la solicitud del conductor",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/drivers/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "drivers",
+                "me"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Juan José\",\n  \"lastName\": \"Torres Solano\",\n  \"documentType\": \"DNI\",\n  \"documentNumber\": \"12345678\",\n  \"birthDate\": \"1995-06-15\",\n  \"address\": \"Jr. Los Jardines 245, Tarapoto\",\n  \"photoUrl\": \"https://cdn.tukituki.pe/drivers/profile.jpg\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Enviar la solicitud completa a revisión administrativa",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "description": "Enviar la solicitud completa a revisión administrativa",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/drivers/me/submit",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "drivers",
+                "me",
+                "submit"
+              ],
+              "query": [],
+              "variable": []
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Driver vehicles",
+      "item": [
+        {
+          "name": "Consultar el vehículo del conductor autenticado",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "description": "Consultar el vehículo del conductor autenticado",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/drivers/me/vehicle",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "drivers",
+                "me",
+                "vehicle"
+              ],
+              "query": [],
+              "variable": []
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Registrar el vehículo del conductor autenticado",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "description": "Registrar el vehículo del conductor autenticado",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/drivers/me/vehicle",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "drivers",
+                "me",
+                "vehicle"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"plate\": \"1234-AB\",\n  \"brand\": \"Bajaj\",\n  \"model\": \"RE 4S\",\n  \"year\": 2024,\n  \"color\": \"Azul\",\n  \"engineNumber\": \"ENG123456789\",\n  \"chassisNumber\": \"CHS123456789\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Actualizar el vehículo del conductor autenticado",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "description": "Actualizar el vehículo del conductor autenticado",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/drivers/me/vehicle",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "drivers",
+                "me",
+                "vehicle"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"plate\": \"1234-AB\",\n  \"brand\": \"Bajaj\",\n  \"model\": \"RE 4S\",\n  \"year\": 2024,\n  \"color\": \"Azul\",\n  \"engineNumber\": \"ENG123456789\",\n  \"chassisNumber\": \"CHS123456789\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Driver documents",
+      "item": [
+        {
+          "name": "Listar los documentos del conductor",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "description": "Listar los documentos del conductor",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/drivers/me/documents",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "drivers",
+                "me",
+                "documents"
+              ],
+              "query": [],
+              "variable": []
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Registrar un documento del conductor",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "description": "Registrar un documento del conductor",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/drivers/me/documents",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "drivers",
+                "me",
+                "documents"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"DRIVER_LICENSE\",\n  \"fileUrl\": \"https://cdn.tukituki.pe/documents/license.jpg\",\n  \"documentNumber\": \"Q12345678\",\n  \"issuedAt\": \"2024-05-10\",\n  \"expiresAt\": \"2029-05-10\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Consultar un documento específico",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "description": "Consultar un documento específico",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/drivers/me/documents/:documentId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "drivers",
+                "me",
+                "documents",
+                ":documentId"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "documentId",
+                  "value": "{{documentId}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Actualizar un documento del conductor",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "description": "Actualizar un documento del conductor",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/drivers/me/documents/:documentId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "drivers",
+                "me",
+                "documents",
+                ":documentId"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "documentId",
+                  "value": "{{documentId}}"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fileUrl\": \"https://cdn.tukituki.pe/documents/license.jpg\",\n  \"documentNumber\": \"Q12345678\",\n  \"issuedAt\": \"2024-05-10\",\n  \"expiresAt\": \"2029-05-10\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Eliminar un documento del conductor",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "description": "Eliminar un documento del conductor",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/drivers/me/documents/:documentId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "drivers",
+                "me",
+                "documents",
+                ":documentId"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "documentId",
+                  "value": "{{documentId}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Admin drivers",
+      "item": [
+        {
+          "name": "Listar solicitudes de conductores",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "description": "Listar solicitudes de conductores",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/drivers",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "drivers"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "{{status}}",
+                  "disabled": true
+                },
+                {
+                  "key": "documentNumber",
+                  "value": "{{documentNumber}}",
+                  "disabled": true
+                },
+                {
+                  "key": "plate",
+                  "value": "{{plate}}",
+                  "disabled": true
+                },
+                {
+                  "key": "phoneE164",
+                  "value": "{{phoneE164}}",
+                  "disabled": true
+                },
+                {
+                  "key": "submittedFrom",
+                  "value": "{{submittedFrom}}",
+                  "disabled": true
+                },
+                {
+                  "key": "submittedTo",
+                  "value": "{{submittedTo}}",
+                  "disabled": true
+                },
+                {
+                  "key": "page",
+                  "value": "{{page}}",
+                  "disabled": true
+                },
+                {
+                  "key": "limit",
+                  "value": "{{limit}}",
+                  "disabled": true
+                }
+              ],
+              "variable": []
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Consultar el expediente completo de un conductor",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "description": "Consultar el expediente completo de un conductor",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/drivers/:driverProfileId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "drivers",
+                ":driverProfileId"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "driverProfileId",
+                  "value": "{{driverProfileId}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Aprobar una solicitud de conductor",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "description": "Aprobar una solicitud de conductor",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/drivers/:driverProfileId/approve",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "drivers",
+                ":driverProfileId",
+                "approve"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "driverProfileId",
+                  "value": "{{driverProfileId}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Rechazar una solicitud con observaciones",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "description": "Rechazar una solicitud con observaciones",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/drivers/:driverProfileId/reject",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "drivers",
+                ":driverProfileId",
+                "reject"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "driverProfileId",
+                  "value": "{{driverProfileId}}"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"profileReason\": \"Los datos personales no coinciden con el DNI\",\n  \"vehicleReason\": \"La placa no coincide con la tarjeta de propiedad\",\n  \"documents\": [\n    {\n      \"documentId\": \"00000000-0000-4000-8000-000000000000\",\n      \"reason\": \"El documento no es legible\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Suspender a un conductor aprobado",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "description": "Suspender a un conductor aprobado",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/drivers/:driverProfileId/suspend",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "drivers",
+                ":driverProfileId",
+                "suspend"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "driverProfileId",
+                  "value": "{{driverProfileId}}"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Incumplimiento de las políticas de seguridad\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Admin rides",
+      "item": [
+        {
+          "name": "Listar y filtrar todos los viajes para el panel administrativo",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "description": "Listar y filtrar todos los viajes para el panel administrativo",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/rides",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "rides"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "{{status}}",
+                  "disabled": true
+                },
+                {
+                  "key": "search",
+                  "value": "{{search}}",
+                  "description": "Busca por ID del viaje, teléfono, nombre del pasajero o conductor y placa",
+                  "disabled": true
+                },
+                {
+                  "key": "passengerUserId",
+                  "value": "{{passengerUserId}}",
+                  "disabled": true
+                },
+                {
+                  "key": "driverProfileId",
+                  "value": "{{driverProfileId}}",
+                  "disabled": true
+                },
+                {
+                  "key": "serviceZoneId",
+                  "value": "{{serviceZoneId}}",
+                  "description": "Zona de origen o destino",
+                  "disabled": true
+                },
+                {
+                  "key": "requestedFrom",
+                  "value": "{{requestedFrom}}",
+                  "disabled": true
+                },
+                {
+                  "key": "requestedTo",
+                  "value": "{{requestedTo}}",
+                  "disabled": true
+                },
+                {
+                  "key": "hasSafetyIncident",
+                  "value": "{{hasSafetyIncident}}",
+                  "description": "Filtra viajes con al menos un incidente de seguridad",
+                  "disabled": true
+                },
+                {
+                  "key": "page",
+                  "value": "{{page}}",
+                  "disabled": true
+                },
+                {
+                  "key": "limit",
+                  "value": "{{limit}}",
+                  "disabled": true
+                }
+              ],
+              "variable": []
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Listar únicamente los viajes actualmente activos",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "description": "Listar únicamente los viajes actualmente activos",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/rides/active",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "rides",
+                "active"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "{{status}}",
+                  "disabled": true
+                },
+                {
+                  "key": "search",
+                  "value": "{{search}}",
+                  "description": "Busca por ID del viaje, teléfono, nombre del pasajero o conductor y placa",
+                  "disabled": true
+                },
+                {
+                  "key": "passengerUserId",
+                  "value": "{{passengerUserId}}",
+                  "disabled": true
+                },
+                {
+                  "key": "driverProfileId",
+                  "value": "{{driverProfileId}}",
+                  "disabled": true
+                },
+                {
+                  "key": "serviceZoneId",
+                  "value": "{{serviceZoneId}}",
+                  "description": "Zona de origen o destino",
+                  "disabled": true
+                },
+                {
+                  "key": "requestedFrom",
+                  "value": "{{requestedFrom}}",
+                  "disabled": true
+                },
+                {
+                  "key": "requestedTo",
+                  "value": "{{requestedTo}}",
+                  "disabled": true
+                },
+                {
+                  "key": "hasSafetyIncident",
+                  "value": "{{hasSafetyIncident}}",
+                  "description": "Filtra viajes con al menos un incidente de seguridad",
+                  "disabled": true
+                },
+                {
+                  "key": "page",
+                  "value": "{{page}}",
+                  "disabled": true
+                },
+                {
+                  "key": "limit",
+                  "value": "{{limit}}",
+                  "disabled": true
+                }
+              ],
+              "variable": []
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Consultar el detalle operativo consolidado de un viaje",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "description": "Consultar el detalle operativo consolidado de un viaje",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/rides/:rideId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "rides",
+                ":rideId"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "rideId",
+                  "value": "{{rideId}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Consultar la cronología de estados de un viaje",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "description": "Consultar la cronología de estados de un viaje",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/rides/:rideId/timeline",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "rides",
+                ":rideId",
+                "timeline"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "rideId",
+                  "value": "{{rideId}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Consultar las muestras GPS paginadas de un viaje",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "description": "Consultar las muestras GPS paginadas de un viaje",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/rides/:rideId/locations",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "rides",
+                ":rideId",
+                "locations"
+              ],
+              "query": [
+                {
+                  "key": "recordedFrom",
+                  "value": "{{recordedFrom}}",
+                  "disabled": true
+                },
+                {
+                  "key": "recordedTo",
+                  "value": "{{recordedTo}}",
+                  "disabled": true
+                },
+                {
+                  "key": "acceptedForMetrics",
+                  "value": "{{acceptedForMetrics}}",
+                  "description": "Filtra muestras aceptadas o rechazadas para métricas",
+                  "disabled": true
+                },
+                {
+                  "key": "page",
+                  "value": "{{page}}",
+                  "disabled": true
+                },
+                {
+                  "key": "limit",
+                  "value": "{{limit}}",
+                  "disabled": true
+                }
+              ],
+              "variable": [
+                {
+                  "key": "rideId",
+                  "value": "{{rideId}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Driver operations",
+      "item": [
+        {
+          "name": "Consultar el estado operativo del conductor",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "description": "Consultar el estado operativo del conductor",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/drivers/me/operational-status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "drivers",
+                "me",
+                "operational-status"
+              ],
+              "query": [],
+              "variable": []
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Conectar al conductor y dejarlo disponible",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "description": "Conectar al conductor y dejarlo disponible",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/drivers/me/operational-status/online",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "drivers",
+                "me",
+                "operational-status",
+                "online"
+              ],
+              "query": [],
+              "variable": []
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Desconectar al conductor",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "description": "Desconectar al conductor",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/drivers/me/operational-status/offline",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "drivers",
+                "me",
+                "operational-status",
+                "offline"
+              ],
+              "query": [],
+              "variable": []
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Registrar actividad de la aplicación del conductor",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "description": "Registrar actividad de la aplicación del conductor",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/drivers/me/operational-status/heartbeat",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "drivers",
+                "me",
+                "operational-status",
+                "heartbeat"
+              ],
+              "query": [],
+              "variable": []
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Driver locations",
+      "item": [
+        {
+          "name": "Consultar la última ubicación del conductor",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "description": "Consultar la última ubicación del conductor",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/drivers/me/location",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "drivers",
+                "me",
+                "location"
+              ],
+              "query": [],
+              "variable": []
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Crear o actualizar la ubicación GPS del conductor",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "description": "Crear o actualizar la ubicación GPS del conductor",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/drivers/me/location",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "drivers",
+                "me",
+                "location"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"latitude\": -6.4877,\n  \"longitude\": -76.3599,\n  \"recordedAt\": \"2026-01-01T00:00:00.000Z\",\n  \"heading\": 90,\n  \"speed\": 7.5,\n  \"accuracy\": 8\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Admin service zones",
+      "item": [
+        {
+          "name": "Listar zonas de cobertura",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "description": "Listar zonas de cobertura",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/service-zones",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "service-zones"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "{{page}}",
+                  "disabled": true
+                },
+                {
+                  "key": "limit",
+                  "value": "{{limit}}",
+                  "disabled": true
+                },
+                {
+                  "key": "status",
+                  "value": "{{status}}",
+                  "disabled": true
+                },
+                {
+                  "key": "search",
+                  "value": "{{search}}",
+                  "description": "Busca por nombre o código",
+                  "disabled": true
+                }
+              ],
+              "variable": []
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Crear una zona de cobertura inactiva",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "description": "Crear una zona de cobertura inactiva",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/service-zones",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "service-zones"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Tarapoto Centro\",\n  \"code\": \"TARAPOTO_CENTRO\",\n  \"description\": \"Zona principal de atención del servicio en Tarapoto\",\n  \"boundary\": {\n    \"type\": \"Polygon\",\n    \"coordinates\": [\n      [\n        [\n          -76.39,\n          -6.53\n        ],\n        [\n          -76.32,\n          -6.53\n        ],\n        [\n          -76.32,\n          -6.44\n        ],\n        [\n          -76.39,\n          -6.44\n        ],\n        [\n          -76.39,\n          -6.53\n        ]\n      ]\n    ]\n  },\n  \"priority\": 100\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Consultar una zona de cobertura",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "description": "Consultar una zona de cobertura",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/service-zones/:zoneId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "service-zones",
+                ":zoneId"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "zoneId",
+                  "value": "{{zoneId}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Actualizar una zona de cobertura",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "description": "Actualizar una zona de cobertura",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/service-zones/:zoneId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "service-zones",
+                ":zoneId"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "zoneId",
+                  "value": "{{zoneId}}"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"\",\n  \"code\": \"\",\n  \"description\": \"\",\n  \"boundary\": {\n    \"type\": \"Polygon\",\n    \"coordinates\": [\n      [\n        [\n          -76.39,\n          -6.53\n        ],\n        [\n          -76.32,\n          -6.53\n        ],\n        [\n          -76.32,\n          -6.44\n        ],\n        [\n          -76.39,\n          -6.44\n        ],\n        [\n          -76.39,\n          -6.53\n        ]\n      ]\n    ]\n  },\n  \"priority\": -1000\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Activar una zona de cobertura",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "description": "Activar una zona de cobertura",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/service-zones/:zoneId/activate",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "service-zones",
+                ":zoneId",
+                "activate"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "zoneId",
+                  "value": "{{zoneId}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Desactivar una zona de cobertura",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "description": "Desactivar una zona de cobertura",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/service-zones/:zoneId/deactivate",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "service-zones",
+                ":zoneId",
+                "deactivate"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "zoneId",
+                  "value": "{{zoneId}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Service zones",
+      "item": [
+        {
+          "name": "Validar si una coordenada está dentro de cobertura",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Validar si una coordenada está dentro de cobertura",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/service-zones/check-point",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "service-zones",
+                "check-point"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"latitude\": -6.4877,\n  \"longitude\": -76.3599\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Admin fare rules",
+      "item": [
+        {
+          "name": "Listar reglas tarifarias",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "description": "Listar reglas tarifarias",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/fare-rules",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "fare-rules"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "{{page}}",
+                  "disabled": true
+                },
+                {
+                  "key": "limit",
+                  "value": "{{limit}}",
+                  "disabled": true
+                },
+                {
+                  "key": "serviceZoneId",
+                  "value": "{{serviceZoneId}}",
+                  "disabled": true
+                },
+                {
+                  "key": "status",
+                  "value": "{{status}}",
+                  "disabled": true
+                },
+                {
+                  "key": "activeAt",
+                  "value": "{{activeAt}}",
+                  "description": "Filtra reglas aplicables en esta fecha y hora",
+                  "disabled": true
+                }
+              ],
+              "variable": []
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Crear una regla tarifaria en estado DRAFT",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "description": "Crear una regla tarifaria en estado DRAFT",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/fare-rules",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "fare-rules"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"serviceZoneId\": \"00000000-0000-4000-8000-000000000000\",\n  \"name\": \"Tarifa estándar Tarapoto\",\n  \"baseFare\": \"2.50\",\n  \"minimumFare\": \"5.00\",\n  \"pricePerKm\": \"1.0000\",\n  \"pricePerMinute\": \"0.1000\",\n  \"bookingFee\": \"0.50\",\n  \"waitingPricePerMinute\": \"0.1000\",\n  \"cancellationFee\": \"2.00\",\n  \"nightMultiplier\": \"1.150\",\n  \"rainMultiplier\": \"1.100\",\n  \"effectiveFrom\": \"2026-07-22T00:00:00.000Z\",\n  \"effectiveUntil\": \"2027-01-01T00:00:00.000Z\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Consultar una regla tarifaria",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "description": "Consultar una regla tarifaria",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/fare-rules/:fareRuleId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "fare-rules",
+                ":fareRuleId"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "fareRuleId",
+                  "value": "{{fareRuleId}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Actualizar una regla tarifaria",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "description": "Actualizar una regla tarifaria",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/fare-rules/:fareRuleId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "fare-rules",
+                ":fareRuleId"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "fareRuleId",
+                  "value": "{{fareRuleId}}"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"\",\n  \"baseFare\": \"\",\n  \"minimumFare\": \"\",\n  \"pricePerKm\": \"\",\n  \"pricePerMinute\": \"\",\n  \"bookingFee\": \"\",\n  \"waitingPricePerMinute\": \"\",\n  \"cancellationFee\": \"\",\n  \"nightMultiplier\": \"\",\n  \"rainMultiplier\": \"\",\n  \"effectiveFrom\": \"2026-01-01T00:00:00.000Z\",\n  \"effectiveUntil\": \"2026-01-01T00:00:00.000Z\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Activar una regla tarifaria sin superponer periodos",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "description": "Activar una regla tarifaria sin superponer periodos",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/fare-rules/:fareRuleId/activate",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "fare-rules",
+                ":fareRuleId",
+                "activate"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "fareRuleId",
+                  "value": "{{fareRuleId}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Desactivar una regla tarifaria",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "description": "Desactivar una regla tarifaria",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/fare-rules/:fareRuleId/deactivate",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "fare-rules",
+                ":fareRuleId",
+                "deactivate"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "fareRuleId",
+                  "value": "{{fareRuleId}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Fares",
+      "item": [
+        {
+          "name": "Calcular y persistir una cotización temporal de viaje",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "description": "La cotización pertenece al pasajero autenticado y expira después de cinco minutos.",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/fares/estimate",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "fares",
+                "estimate"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"origin\": {\n    \"latitude\": -6.4877,\n    \"longitude\": -76.3599,\n    \"address\": \"Jr. Lima 250, Tarapoto\"\n  },\n  \"destination\": {\n    \"latitude\": -6.4877,\n    \"longitude\": -76.3599,\n    \"address\": \"Jr. Lima 250, Tarapoto\"\n  },\n  \"distanceMeters\": 3200,\n  \"durationSeconds\": 720,\n  \"isNight\": false,\n  \"isRaining\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Admin driver settlements",
+      "item": [
+        {
+          "name": "Listar y filtrar liquidaciones de conductores",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "description": "Listar y filtrar liquidaciones de conductores",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/driver-settlements",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "driver-settlements"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "{{status}}",
+                  "disabled": true
+                },
+                {
+                  "key": "direction",
+                  "value": "{{direction}}",
+                  "disabled": true
+                },
+                {
+                  "key": "dateFrom",
+                  "value": "{{dateFrom}}",
+                  "disabled": true
+                },
+                {
+                  "key": "dateTo",
+                  "value": "{{dateTo}}",
+                  "disabled": true
+                },
+                {
+                  "key": "page",
+                  "value": "{{page}}",
+                  "disabled": true
+                },
+                {
+                  "key": "limit",
+                  "value": "{{limit}}",
+                  "disabled": true
+                },
+                {
+                  "key": "driverProfileId",
+                  "value": "{{driverProfileId}}",
+                  "disabled": true
+                }
+              ],
+              "variable": []
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Generar un borrador idempotente con comisiones elegibles",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "description": "Generar un borrador idempotente con comisiones elegibles",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/driver-settlements",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "driver-settlements"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"driverProfileId\": \"00000000-0000-4000-8000-000000000000\",\n  \"periodStart\": \"2026-01-01T00:00:00.000Z\",\n  \"periodEnd\": \"2026-01-01T00:00:00.000Z\",\n  \"notes\": \"\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Consultar una liquidacion con sus viajes",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "description": "Consultar una liquidacion con sus viajes",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/driver-settlements/:settlementId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "driver-settlements",
+                ":settlementId"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "settlementId",
+                  "value": "{{settlementId}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Aprobar una liquidacion calculada",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "description": "Aprobar una liquidacion calculada",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/driver-settlements/:settlementId/approve",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "driver-settlements",
+                ":settlementId",
+                "approve"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "settlementId",
+                  "value": "{{settlementId}}"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"notes\": \"\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Confirmar el pago, cobro o compensacion de una liquidacion",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "description": "Confirmar el pago, cobro o compensacion de una liquidacion",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/driver-settlements/:settlementId/complete",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "driver-settlements",
+                ":settlementId",
+                "complete"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "settlementId",
+                  "value": "{{settlementId}}"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"transferReference\": \"\",\n  \"notes\": \"\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Cancelar y liberar una liquidacion no cerrada",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "description": "Cancelar y liberar una liquidacion no cerrada",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/driver-settlements/:settlementId/cancel",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "driver-settlements",
+                ":settlementId",
+                "cancel"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "settlementId",
+                  "value": "{{settlementId}}"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Driver settlements",
+      "item": [
+        {
+          "name": "Listar mis liquidaciones",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "description": "Listar mis liquidaciones",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/drivers/me/settlements",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "drivers",
+                "me",
+                "settlements"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "{{status}}",
+                  "disabled": true
+                },
+                {
+                  "key": "direction",
+                  "value": "{{direction}}",
+                  "disabled": true
+                },
+                {
+                  "key": "dateFrom",
+                  "value": "{{dateFrom}}",
+                  "disabled": true
+                },
+                {
+                  "key": "dateTo",
+                  "value": "{{dateTo}}",
+                  "disabled": true
+                },
+                {
+                  "key": "page",
+                  "value": "{{page}}",
+                  "disabled": true
+                },
+                {
+                  "key": "limit",
+                  "value": "{{limit}}",
+                  "disabled": true
+                }
+              ],
+              "variable": []
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Consultar mi saldo disponible y reservado",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "description": "Consultar mi saldo disponible y reservado",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/drivers/me/settlements/balance",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "drivers",
+                "me",
+                "settlements",
+                "balance"
+              ],
+              "query": [],
+              "variable": []
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Consultar el detalle de mi liquidacion",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "description": "Consultar el detalle de mi liquidacion",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/drivers/me/settlements/:settlementId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "drivers",
+                "me",
+                "settlements",
+                ":settlementId"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "settlementId",
+                  "value": "{{settlementId}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Passenger rides",
+      "item": [
+        {
+          "name": "Crear una solicitud de viaje desde una cotización vigente",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "description": "Crear una solicitud de viaje desde una cotización vigente",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/passenger/rides",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "passenger",
+                "rides"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fareQuoteId\": \"00000000-0000-4000-8000-000000000000\",\n  \"paymentMethod\": \"CASH\",\n  \"couponCode\": \"BIENVENIDO20\",\n  \"passengerNotes\": \"Estoy frente a la puerta principal\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Consultar el viaje activo del pasajero",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "description": "Consultar el viaje activo del pasajero",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/passenger/rides/active",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "passenger",
+                "rides",
+                "active"
+              ],
+              "query": [],
+              "variable": []
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Consultar el historial paginado del pasajero",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "description": "Consultar el historial paginado del pasajero",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/passenger/rides/history",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "passenger",
+                "rides",
+                "history"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "{{page}}",
+                  "disabled": true
+                },
+                {
+                  "key": "limit",
+                  "value": "{{limit}}",
+                  "disabled": true
+                },
+                {
+                  "key": "status",
+                  "value": "{{status}}",
+                  "description": "Solo estados finales del viaje",
+                  "disabled": true
+                },
+                {
+                  "key": "dateFrom",
+                  "value": "{{dateFrom}}",
+                  "description": "Fecha UTC inicial inclusiva, formato YYYY-MM-DD",
+                  "disabled": true
+                },
+                {
+                  "key": "dateTo",
+                  "value": "{{dateTo}}",
+                  "description": "Fecha UTC final inclusiva, formato YYYY-MM-DD",
+                  "disabled": true
+                }
+              ],
+              "variable": []
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Consultar el código seguro para iniciar el viaje",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "description": "Consultar el código seguro para iniciar el viaje",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/passenger/rides/:rideId/start-code",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "passenger",
+                "rides",
+                ":rideId",
+                "start-code"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "rideId",
+                  "value": "{{rideId}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Regenerar e invalidar el código anterior de inicio",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "description": "Regenerar e invalidar el código anterior de inicio",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/passenger/rides/:rideId/start-code/regenerate",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "passenger",
+                "rides",
+                ":rideId",
+                "start-code",
+                "regenerate"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "rideId",
+                  "value": "{{rideId}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Calificar al conductor de un viaje completado",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "description": "Calificar al conductor de un viaje completado",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/passenger/rides/:rideId/rating",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "passenger",
+                "rides",
+                ":rideId",
+                "rating"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "rideId",
+                  "value": "{{rideId}}"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"score\": 5,\n  \"comment\": \"Conducción segura y trato amable\",\n  \"tags\": [\n    \"SAFE_DRIVING\",\n    \"FRIENDLY\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Calcular la tarifa antes de cancelar un viaje",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "description": "Calcular la tarifa antes de cancelar un viaje",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/passenger/rides/:rideId/cancellation-preview",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "passenger",
+                "rides",
+                ":rideId",
+                "cancellation-preview"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "rideId",
+                  "value": "{{rideId}}"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"CHANGED_MIND\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Confirmar una cancelación con tarifa validada",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "description": "Confirmar una cancelación con tarifa validada",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/passenger/rides/:rideId/cancel",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "passenger",
+                "rides",
+                ":rideId",
+                "cancel"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "rideId",
+                  "value": "{{rideId}}"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"CHANGED_MIND\",\n  \"reasonDetail\": \"\",\n  \"expectedFee\": \"2.00\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Cancelar un viaje antes de iniciar el recorrido",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "description": "Cancelar un viaje antes de iniciar el recorrido",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/passenger/rides/:rideId/cancel",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "passenger",
+                "rides",
+                ":rideId",
+                "cancel"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "rideId",
+                  "value": "{{rideId}}"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Ya no necesito el viaje\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Reportar conductor sin progreso y reiniciar matching o cancelar",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "description": "Reportar conductor sin progreso y reiniciar matching o cancelar",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/passenger/rides/:rideId/no-show/driver",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "passenger",
+                "rides",
+                ":rideId",
+                "no-show",
+                "driver"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "rideId",
+                  "value": "{{rideId}}"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"continueSearching\": true,\n  \"reasonDetail\": \"\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Consultar el comprobante del viaje finalizado",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "description": "Consultar el comprobante del viaje finalizado",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/passenger/rides/:rideId/receipt",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "passenger",
+                "rides",
+                ":rideId",
+                "receipt"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "rideId",
+                  "value": "{{rideId}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Consultar un viaje propio por identificador",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "description": "Consultar un viaje propio por identificador",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/passenger/rides/:rideId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "passenger",
+                "rides",
+                ":rideId"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "rideId",
+                  "value": "{{rideId}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Driver ride offers",
+      "item": [
+        {
+          "name": "Listar ofertas vigentes del conductor",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "description": "Listar ofertas vigentes del conductor",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/drivers/me/ride-offers/active",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "drivers",
+                "me",
+                "ride-offers",
+                "active"
+              ],
+              "query": [],
+              "variable": []
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Consultar una oferta propia",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "description": "Consultar una oferta propia",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/drivers/me/ride-offers/:offerId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "drivers",
+                "me",
+                "ride-offers",
+                ":offerId"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "offerId",
+                  "value": "{{offerId}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Aceptar una oferta de viaje",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "description": "Aceptar una oferta de viaje",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/drivers/me/ride-offers/:offerId/accept",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "drivers",
+                "me",
+                "ride-offers",
+                ":offerId",
+                "accept"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "offerId",
+                  "value": "{{offerId}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Rechazar una oferta de viaje",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "description": "Rechazar una oferta de viaje",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/drivers/me/ride-offers/:offerId/reject",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "drivers",
+                "me",
+                "ride-offers",
+                ":offerId",
+                "reject"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "offerId",
+                  "value": "{{offerId}}"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Estoy terminando otra actividad\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Driver rides",
+      "item": [
+        {
+          "name": "Consultar el viaje activo del conductor",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "description": "Consultar el viaje activo del conductor",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/drivers/me/rides/active",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "drivers",
+                "me",
+                "rides",
+                "active"
+              ],
+              "query": [],
+              "variable": []
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Consultar el historial paginado del conductor",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "description": "Consultar el historial paginado del conductor",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/drivers/me/rides/history",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "drivers",
+                "me",
+                "rides",
+                "history"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "{{page}}",
+                  "disabled": true
+                },
+                {
+                  "key": "limit",
+                  "value": "{{limit}}",
+                  "disabled": true
+                },
+                {
+                  "key": "status",
+                  "value": "{{status}}",
+                  "description": "Solo estados finales del viaje",
+                  "disabled": true
+                },
+                {
+                  "key": "dateFrom",
+                  "value": "{{dateFrom}}",
+                  "description": "Fecha UTC inicial inclusiva, formato YYYY-MM-DD",
+                  "disabled": true
+                },
+                {
+                  "key": "dateTo",
+                  "value": "{{dateTo}}",
+                  "description": "Fecha UTC final inclusiva, formato YYYY-MM-DD",
+                  "disabled": true
+                }
+              ],
+              "variable": []
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Consultar un viaje propio del conductor",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "description": "Consultar un viaje propio del conductor",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/drivers/me/rides/:rideId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "drivers",
+                "me",
+                "rides",
+                ":rideId"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "rideId",
+                  "value": "{{rideId}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Indicar que el conductor se dirige al punto de origen",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "description": "Indicar que el conductor se dirige al punto de origen",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/drivers/me/rides/:rideId/start-arrival",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "drivers",
+                "me",
+                "rides",
+                ":rideId",
+                "start-arrival"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "rideId",
+                  "value": "{{rideId}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Registrar llegada validada por ubicación PostGIS",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "description": "Registrar llegada validada por ubicación PostGIS",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/drivers/me/rides/:rideId/arrive",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "drivers",
+                "me",
+                "rides",
+                ":rideId",
+                "arrive"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "rideId",
+                  "value": "{{rideId}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Cancelar un viaje asignado como conductor",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "description": "Cancelar un viaje asignado como conductor",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/drivers/me/rides/:rideId/cancel",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "drivers",
+                "me",
+                "rides",
+                ":rideId",
+                "cancel"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "rideId",
+                  "value": "{{rideId}}"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"PASSENGER_REQUESTED_CANCEL\",\n  \"reasonDetail\": \"\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Iniciar el tiempo de espera en el origen",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "description": "Iniciar el tiempo de espera en el origen",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/drivers/me/rides/:rideId/waiting/start",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "drivers",
+                "me",
+                "rides",
+                ":rideId",
+                "waiting",
+                "start"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "rideId",
+                  "value": "{{rideId}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Consultar el tiempo de espera y disponibilidad de no-show",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "description": "Consultar el tiempo de espera y disponibilidad de no-show",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/drivers/me/rides/:rideId/waiting",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "drivers",
+                "me",
+                "rides",
+                ":rideId",
+                "waiting"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "rideId",
+                  "value": "{{rideId}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Confirmar no-show del pasajero después de la espera",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "description": "Confirmar no-show del pasajero después de la espera",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/drivers/me/rides/:rideId/no-show/passenger",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "drivers",
+                "me",
+                "rides",
+                ":rideId",
+                "no-show",
+                "passenger"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "rideId",
+                  "value": "{{rideId}}"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reasonDetail\": \"\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Finalizar el viaje cerca del destino y calcular la tarifa final",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "description": "Finalizar el viaje cerca del destino y calcular la tarifa final",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/drivers/me/rides/:rideId/complete",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "drivers",
+                "me",
+                "rides",
+                ":rideId",
+                "complete"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "rideId",
+                  "value": "{{rideId}}"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"completionNotes\": \"Pasajero dejado en la entrada principal\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Calificar al pasajero de un viaje completado",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "description": "Calificar al pasajero de un viaje completado",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/drivers/me/rides/:rideId/rating",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "drivers",
+                "me",
+                "rides",
+                ":rideId",
+                "rating"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "rideId",
+                  "value": "{{rideId}}"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"score\": 5,\n  \"comment\": \"Conducción segura y trato amable\",\n  \"tags\": [\n    \"SAFE_DRIVING\",\n    \"FRIENDLY\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Consultar el comprobante de un viaje finalizado",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "description": "Consultar el comprobante de un viaje finalizado",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/drivers/me/rides/:rideId/receipt",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "drivers",
+                "me",
+                "rides",
+                ":rideId",
+                "receipt"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "rideId",
+                  "value": "{{rideId}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Iniciar el viaje mediante el código entregado por el pasajero",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "description": "Iniciar el viaje mediante el código entregado por el pasajero",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/drivers/me/rides/:rideId/start",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "drivers",
+                "me",
+                "rides",
+                ":rideId",
+                "start"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "rideId",
+                  "value": "{{rideId}}"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"4827\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Financial obligations",
+      "item": [
+        {
+          "name": "Consultar obligaciones financieras pendientes e históricas",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "description": "Consultar obligaciones financieras pendientes e históricas",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/me/financial-obligations",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "me",
+                "financial-obligations"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "{{page}}",
+                  "disabled": true
+                },
+                {
+                  "key": "limit",
+                  "value": "{{limit}}",
+                  "disabled": true
+                },
+                {
+                  "key": "status",
+                  "value": "{{status}}",
+                  "disabled": true
+                }
+              ],
+              "variable": []
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Admin ride cancellations",
+      "item": [
+        {
+          "name": "Listar cancelaciones de viajes",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "description": "Listar cancelaciones de viajes",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/ride-cancellations",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "ride-cancellations"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "{{page}}",
+                  "disabled": true
+                },
+                {
+                  "key": "limit",
+                  "value": "{{limit}}",
+                  "disabled": true
+                },
+                {
+                  "key": "cancellationType",
+                  "value": "{{cancellationType}}",
+                  "disabled": true
+                },
+                {
+                  "key": "feeStatus",
+                  "value": "{{feeStatus}}",
+                  "disabled": true
+                }
+              ],
+              "variable": []
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Consultar una cancelación",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "description": "Consultar una cancelación",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/ride-cancellations/:cancellationId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "ride-cancellations",
+                ":cancellationId"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "cancellationId",
+                  "value": "{{cancellationId}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Exonerar una tarifa de cancelación pendiente",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "description": "Exonerar una tarifa de cancelación pendiente",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/ride-cancellations/:cancellationId/waive-fee",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "ride-cancellations",
+                ":cancellationId",
+                "waive-fee"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "cancellationId",
+                  "value": "{{cancellationId}}"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Emergency contacts",
+      "item": [
+        {
+          "name": "Listar contactos de emergencia propios",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "description": "Listar contactos de emergencia propios",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/me/emergency-contacts",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "me",
+                "emergency-contacts"
+              ],
+              "query": [],
+              "variable": []
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Registrar un contacto de emergencia",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "description": "Registrar un contacto de emergencia",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/me/emergency-contacts",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "me",
+                "emergency-contacts"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"María Torres\",\n  \"phoneE164\": \"+51987654321\",\n  \"relationship\": \"SPOUSE\",\n  \"isPrimary\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Actualizar un contacto de emergencia",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "description": "Actualizar un contacto de emergencia",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/me/emergency-contacts/:contactId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "me",
+                "emergency-contacts",
+                ":contactId"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "contactId",
+                  "value": "{{contactId}}"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"María Torres\",\n  \"phoneE164\": \"+51987654321\",\n  \"relationship\": \"SPOUSE\",\n  \"isPrimary\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Eliminar un contacto de emergencia",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "description": "Eliminar un contacto de emergencia",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/me/emergency-contacts/:contactId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "me",
+                "emergency-contacts",
+                ":contactId"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "contactId",
+                  "value": "{{contactId}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Marcar un contacto como principal",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "description": "Marcar un contacto como principal",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/me/emergency-contacts/:contactId/primary",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "me",
+                "emergency-contacts",
+                ":contactId",
+                "primary"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "contactId",
+                  "value": "{{contactId}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Ride safety",
+      "item": [
+        {
+          "name": "Activar SOS para un viaje propio",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "description": "Activar SOS para un viaje propio",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/rides/:rideId/sos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "rides",
+                ":rideId",
+                "sos"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "rideId",
+                  "value": "{{rideId}}"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"incidentType\": \"MEDICAL_EMERGENCY\",\n  \"description\": \"Necesito ayuda inmediata\",\n  \"latitude\": -6.4877,\n  \"longitude\": -76.3599,\n  \"accuracy\": 8\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Ride sharing",
+      "item": [
+        {
+          "name": "Listar enlaces creados por el usuario",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "description": "Listar enlaces creados por el usuario",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/rides/:rideId/share-links",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "rides",
+                ":rideId",
+                "share-links"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "rideId",
+                  "value": "{{rideId}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Crear un enlace seguro para compartir el viaje",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "description": "Crear un enlace seguro para compartir el viaje",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/rides/:rideId/share-links",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "rides",
+                ":rideId",
+                "share-links"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "rideId",
+                  "value": "{{rideId}}"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"expiresInMinutes\": 120\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Revocar un enlace compartido",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "description": "Revocar un enlace compartido",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/rides/:rideId/share-links/:shareLinkId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "rides",
+                ":rideId",
+                "share-links",
+                ":shareLinkId"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "rideId",
+                  "value": "{{rideId}}"
+                },
+                {
+                  "key": "shareLinkId",
+                  "value": "{{shareLinkId}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Public ride sharing",
+      "item": [
+        {
+          "name": "Consultar un viaje mediante un enlace compartido",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Consultar un viaje mediante un enlace compartido",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/public/rides/shared/:token",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "public",
+                "rides",
+                "shared",
+                ":token"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "token",
+                  "value": "{{token}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Admin safety incidents",
+      "item": [
+        {
+          "name": "Listar incidentes de seguridad",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "description": "Listar incidentes de seguridad",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/safety-incidents",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "safety-incidents"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "{{page}}",
+                  "disabled": true
+                },
+                {
+                  "key": "limit",
+                  "value": "{{limit}}",
+                  "disabled": true
+                },
+                {
+                  "key": "status",
+                  "value": "{{status}}",
+                  "disabled": true
+                },
+                {
+                  "key": "severity",
+                  "value": "{{severity}}",
+                  "disabled": true
+                },
+                {
+                  "key": "incidentType",
+                  "value": "{{incidentType}}",
+                  "disabled": true
+                },
+                {
+                  "key": "reporterRole",
+                  "value": "{{reporterRole}}",
+                  "disabled": true
+                },
+                {
+                  "key": "rideId",
+                  "value": "{{rideId}}",
+                  "disabled": true
+                },
+                {
+                  "key": "dateFrom",
+                  "value": "{{dateFrom}}",
+                  "disabled": true
+                },
+                {
+                  "key": "dateTo",
+                  "value": "{{dateTo}}",
+                  "disabled": true
+                }
+              ],
+              "variable": []
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Consultar un incidente de seguridad",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "description": "Consultar un incidente de seguridad",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/safety-incidents/:incidentId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "safety-incidents",
+                ":incidentId"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "incidentId",
+                  "value": "{{incidentId}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Reconocer un incidente abierto",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "description": "Reconocer un incidente abierto",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/safety-incidents/:incidentId/acknowledge",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "safety-incidents",
+                ":incidentId",
+                "acknowledge"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "incidentId",
+                  "value": "{{incidentId}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Resolver o marcar como falsa alarma",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "description": "Resolver o marcar como falsa alarma",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/safety-incidents/:incidentId/resolve",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "safety-incidents",
+                ":incidentId",
+                "resolve"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "incidentId",
+                  "value": "{{incidentId}}"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"RESOLVED\",\n  \"resolutionNotes\": \"Se contactó a los participantes y están seguros.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

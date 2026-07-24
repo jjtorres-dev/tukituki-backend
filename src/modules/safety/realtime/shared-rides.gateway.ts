@@ -9,12 +9,14 @@ import {
 } from '@nestjs/websockets';
 import type { Namespace, Socket } from 'socket.io';
 
+import { websocketCorsOrigin } from '../../../config/cors.config';
+
 import { SharedRideJoinDto } from './dto/shared-ride-join.dto';
 import { SharedRideAccessService } from './shared-ride-access.service';
 
 @WebSocketGateway({
   namespace: '/shared-rides',
-  cors: { origin: true, credentials: false },
+  cors: { origin: websocketCorsOrigin, credentials: false },
 })
 @UsePipes(
   new ValidationPipe({

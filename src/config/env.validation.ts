@@ -9,9 +9,46 @@ export const envValidationSchema = Joi.object({
 
   PORT: Joi.number().port().default(3001),
 
-  API_PREFIX: Joi.string().default('api/v1'),
+  API_PREFIX: Joi.string()
+    .pattern(/^[A-Za-z0-9][A-Za-z0-9/_-]*$/)
+    .default('api/v1'),
 
   ADMIN_WEB_ORIGIN: Joi.string().uri().default('http://localhost:3000'),
+
+  CORS_ALLOWED_ORIGINS: Joi.string()
+    .max(4096)
+    .custom(validateCorsOrigins)
+    .optional(),
+
+  SWAGGER_ENABLED: Joi.boolean().default(true),
+
+  REQUEST_BODY_LIMIT: Joi.string()
+    .pattern(/^\d+(kb|mb)$/i)
+    .default('1mb'),
+
+  TRUST_PROXY_HOPS: Joi.number().integer().min(0).max(10).default(1),
+
+  RATE_LIMIT_TTL_MS: Joi.number()
+    .integer()
+    .min(1000)
+    .max(3600000)
+    .default(60000),
+
+  RATE_LIMIT_MAX: Joi.number().integer().min(1).max(10000).default(120),
+
+  RATE_LIMIT_BLOCK_DURATION_MS: Joi.number()
+    .integer()
+    .min(0)
+    .max(3600000)
+    .default(60000),
+
+  LOG_FORMAT: Joi.string().valid('pretty', 'json').default('pretty'),
+
+  LOG_LEVEL: Joi.string()
+    .pattern(
+      /^(fatal|error|warn|log|debug|verbose)(,(fatal|error|warn|log|debug|verbose))*$/,
+    )
+    .default('fatal,error,warn,log'),
 
   DATABASE_HOST: Joi.string().required(),
 
@@ -24,6 +61,10 @@ export const envValidationSchema = Joi.object({
   DATABASE_PASSWORD: Joi.string().min(8).required(),
 
   DATABASE_SSL: Joi.boolean().default(false),
+
+  DATABASE_SSL_REJECT_UNAUTHORIZED: Joi.boolean().default(true),
+
+  DATABASE_SSL_CA_BASE64: Joi.string().base64().allow('').optional(),
 
   REDIS_HOST: Joi.string().required(),
 
@@ -237,3 +278,25 @@ export const envValidationSchema = Joi.object({
     otherwise: Joi.string().allow('').optional(),
   }),
 });
+
+function validateCorsOrigins(
+  value: string,
+  helpers: Joi.CustomHelpers,
+): string | Joi.ErrorReport {
+  const origins = value
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+
+  if (origins.length === 0 || origins.some((origin) => origin === '*')) {
+    return helpers.error('any.invalid');
+  }
+
+  try {
+    origins.forEach((origin) => new URL(origin));
+  } catch {
+    return helpers.error('string.uri');
+  }
+
+  return value;
+}

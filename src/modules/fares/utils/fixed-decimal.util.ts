@@ -75,11 +75,19 @@ export function applyMultiplierToCents(
 }
 
 export function formatScaledInteger(value: bigint, scale: number): string {
-  const base = 10n ** BigInt(scale);
-  const wholePart = value / base;
-  const fractionPart = (value % base).toString().padStart(scale, '0');
+  if (!Number.isInteger(scale) || scale < 0) {
+    throw new Error('La escala decimal no es válida');
+  }
 
-  return scale === 0 ? wholePart.toString() : `${wholePart}.${fractionPart}`;
+  const negative = value < 0n;
+  const absoluteValue = negative ? -value : value;
+  const base = 10n ** BigInt(scale);
+  const wholePart = absoluteValue / base;
+  const fractionPart = (absoluteValue % base).toString().padStart(scale, '0');
+  const formatted =
+    scale === 0 ? wholePart.toString() : `${wholePart}.${fractionPart}`;
+
+  return negative ? `-${formatted}` : formatted;
 }
 
 export function formatCents(value: bigint): string {

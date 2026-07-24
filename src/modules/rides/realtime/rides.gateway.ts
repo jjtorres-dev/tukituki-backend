@@ -9,6 +9,8 @@ import {
 } from '@nestjs/websockets';
 import type { Namespace } from 'socket.io';
 
+import { websocketCorsOrigin } from '../../../config/cors.config';
+
 import type { AuthenticatedSocket } from './authenticated-socket.interface';
 import { RideRealtimeAccessService } from './ride-realtime-access.service';
 import { RideRoomDto } from './dto/ride-room.dto';
@@ -17,7 +19,7 @@ import { WsJwtAuthGuard } from './ws-jwt-auth.guard';
 @WebSocketGateway({
   namespace: '/rides',
   cors: {
-    origin: true,
+    origin: websocketCorsOrigin,
     credentials: true,
   },
 })

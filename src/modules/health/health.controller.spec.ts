@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { HealthCheckService, TypeOrmHealthIndicator } from '@nestjs/terminus';
 
 import { HealthController } from './health.controller';
+import { RedisHealthIndicator } from './redis-health.indicator';
 
 describe('HealthController', () => {
   let controller: HealthController;
@@ -12,6 +13,10 @@ describe('HealthController', () => {
 
   const databaseMock = {
     pingCheck: jest.fn(),
+  };
+
+  const redisMock = {
+    isHealthy: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -27,6 +32,10 @@ describe('HealthController', () => {
         {
           provide: TypeOrmHealthIndicator,
           useValue: databaseMock,
+        },
+        {
+          provide: RedisHealthIndicator,
+          useValue: redisMock,
         },
       ],
     }).compile();

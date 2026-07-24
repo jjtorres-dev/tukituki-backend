@@ -1,8 +1,12 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { APP_GUARD } from '@nestjs/core';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
+import { createDatabaseSslOptions } from './config/database-ssl.config';
 import { envValidationSchema } from './config/env.validation';
+import { createThrottlerOptions } from './config/throttling.config';
 import { RedisModule } from './infrastructure/redis/redis.module';
 import { AdminDriversModule } from './modules/admin-drivers/admin-drivers.module';
 import { AdminRidesModule } from './modules/admin-rides/admin-rides.module';
@@ -33,6 +37,11 @@ import { UsersModule } from './modules/users/users.module';
       validationSchema: envValidationSchema,
     }),
 
+    ThrottlerModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: createThrottlerOptions,
+    }),
+
     TypeOrmModule.forRootAsync({
       inject: [ConfigService],
 
@@ -46,7 +55,11 @@ import { UsersModule } from './modules/users/users.module';
         username: configService.getOrThrow<string>('DATABASE_USER'),
         password: configService.getOrThrow<string>('DATABASE_PASSWORD'),
 
-        ssl: configService.getOrThrow<boolean>('DATABASE_SSL'),
+        ssl: createDatabaseSslOptions(
+          configService.getOrThrow<boolean>('DATABASE_SSL'),
+          configService.getOrThrow<boolean>('DATABASE_SSL_REJECT_UNAUTHORIZED'),
+          configService.get<string>('DATABASE_SSL_CA_BASE64'),
+        ),
 
         autoLoadEntities: true,
 
@@ -82,6 +95,12 @@ import { UsersModule } from './modules/users/users.module';
     SettlementsModule,
     RidesModule,
     SafetyModule,
+  ],
+  providers: [
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
   ],
 })
 export class AppModule {}

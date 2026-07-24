@@ -1,0 +1,91 @@
+name: Backend CI
+
+on:
+  pull_request:
+  push:
+    branches: [main, master]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backend-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgis/postgis:18-3.6
+        env:
+          POSTGRES_DB: tukituki_test
+          POSTGRES_USER: tukituki
+          POSTGRES_PASSWORD: test-password
+        ports: [5432:5432]
+        options: >-
+          --health-cmd "pg_isready -U tukituki -d tukituki_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:8.2.7-alpine
+        ports: [6379:6379]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      NODE_ENV: test
+      APP_NAME: TukiTuki Backend CI
+      PORT: 3001
+      API_PREFIX: api/v1
+      ADMIN_WEB_ORIGIN: http://localhost:3000
+      CORS_ALLOWED_ORIGINS: http://localhost:3000
+      DATABASE_HOST: 127.0.0.1
+      DATABASE_PORT: 5432
+      DATABASE_NAME: tukituki_test
+      DATABASE_USER: tukituki
+      DATABASE_PASSWORD: test-password
+      DATABASE_SSL: 'false'
+      DATABASE_SSL_REJECT_UNAUTHORIZED: 'true'
+      REDIS_HOST: 127.0.0.1
+      REDIS_PORT: 6379
+      OTP_HASH_SECRET: ci-otp-secret-with-at-least-thirty-two-characters
+      JWT_ACCESS_SECRET: ci-jwt-secret-with-at-least-sixty-four-characters-0123456789abcdef
+      RIDE_START_CODE_SECRET: ci-ride-start-secret-with-at-least-thirty-two-characters
+      PUBLIC_APP_ORIGIN: http://localhost:3000
+      PUBLIC_API_ORIGIN: http://localhost:3001
+      WORKERS_ENABLED: 'false'
+      IZIPAY_ENABLED: 'false'
+      FCM_ENABLED: 'false'
+      SWAGGER_ENABLED: 'false'
+      LOG_FORMAT: json
+      LOG_LEVEL: error,warn
+      TRUST_PROXY_HOPS: 0
+      RATE_LIMIT_TTL_MS: 60000
+      RATE_LIMIT_MAX: 1000
+      RATE_LIMIT_BLOCK_DURATION_MS: 0
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Lint
+        run: npm run lint:check
+      - name: Unit tests
+        run: npm test -- --runInBand
+      - name: Build
+        run: npm run build
+      - name: Clean database migrations and seed smoke
+        run: npm run test:db:smoke
+      - name: End-to-end tests
+        run: npm run test:e2e -- --runInBand
+      - name: Validate and export API contracts
+        run: npm run openapi:export
+      - name: Build production image
+        run: docker build --target production -t tukituki-backend:ci .

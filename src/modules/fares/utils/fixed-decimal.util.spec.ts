@@ -28,4 +28,7 @@ describe('fixed-decimal.util', () => {
     expect(applyMultiplierToCents(740n, multiplier)).toBe(936n);
     expect(formatCents(936n)).toBe('9.36');
   });
+  it('debe formatear importes negativos menores a una unidad', () => {
+    expect(formatCents(-28n)).toBe('-0.28');
+  });
 });

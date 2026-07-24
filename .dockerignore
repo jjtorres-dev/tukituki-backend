@@ -1,0 +1,14 @@
+.git
+.github
+.tukituki-backups
+.env
+.env.*
+!.env.example
+coverage
+dist
+node_modules
+npm-debug.log*
+*.log
+Dockerfile*
+docker-compose*.yml
+README.md
