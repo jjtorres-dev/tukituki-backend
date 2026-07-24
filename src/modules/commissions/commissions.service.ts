@@ -19,6 +19,7 @@ import { RidePayment } from '../payments/entities/ride-payment.entity';
 import { PaymentMethod } from '../payments/enums/payment-method.enum';
 import { RidePaymentStatus } from '../payments/enums/ride-payment-status.enum';
 import { Ride } from '../rides/entities/ride.entity';
+import { COMMISSION_SETTLEMENT_HOLDBACK_MS } from './commission-lifecycle.constants';
 import {
   AdminCommissionQueryDto,
   CommissionQueryDto,
@@ -100,6 +101,9 @@ export class CommissionsService {
       driverNetAmount: formatCents(baseCents - commissionCents),
       currency: payment.currency,
       accruedAt,
+      eligibleAt: new Date(
+        accruedAt.getTime() + COMMISSION_SETTLEMENT_HOLDBACK_MS,
+      ),
       heldAt: null,
       settledAt: null,
       reversedAt: null,
@@ -137,9 +141,18 @@ export class CommissionsService {
       where: { paymentId },
       lock: { mode: 'pessimistic_write' },
     });
-    if (!commission || commission.status !== RideCommissionStatus.ACCRUED) {
-      return;
+    if (!commission) return;
+    if (
+      [RideCommissionStatus.ALLOCATED, RideCommissionStatus.SETTLED].includes(
+        commission.status,
+      ) ||
+      heldAt.getTime() >= commission.eligibleAt.getTime()
+    ) {
+      throw new ConflictException(
+        'El plazo de disputa termino porque el pago entro al cierre contable',
+      );
     }
+    if (commission.status !== RideCommissionStatus.ACCRUED) return;
     commission.status = RideCommissionStatus.HELD;
     commission.heldAt = heldAt;
     await repository.save(commission);
@@ -382,6 +395,7 @@ export class CommissionsService {
       driverNetAmount: commission.driverNetAmount,
       currency: commission.currency,
       accruedAt: commission.accruedAt,
+      eligibleAt: commission.eligibleAt,
       heldAt: commission.heldAt,
       settledAt: commission.settledAt,
       reversedAt: commission.reversedAt,

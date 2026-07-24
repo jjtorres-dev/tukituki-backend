@@ -1,0 +1,5 @@
+export enum SettlementDirection {
+  PLATFORM_TO_DRIVER = 'PLATFORM_TO_DRIVER',
+  DRIVER_TO_PLATFORM = 'DRIVER_TO_PLATFORM',
+  BALANCED = 'BALANCED',
+}

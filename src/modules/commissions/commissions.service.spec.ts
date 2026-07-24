@@ -53,6 +53,7 @@ function existingCommission(
     driverNetAmount: '8.07',
     currency: 'PEN',
     accruedAt: new Date('2026-07-24T10:00:00.000Z'),
+    eligibleAt: new Date('2026-07-25T10:00:00.000Z'),
     heldAt: null,
     settledAt: null,
     reversedAt: null,
@@ -140,6 +141,7 @@ describe('CommissionsService', () => {
     expect(result.baseAmount).toBe('8.50');
     expect(result.commissionAmount).toBe('0.43');
     expect(result.driverNetAmount).toBe('8.07');
+    expect(result.eligibleAt).toEqual(new Date('2026-07-25T10:00:00.000Z'));
     expect(result.collectionMode).toBe(CommissionCollectionMode.DRIVER_PAYABLE);
     expect(fixture.events).toHaveLength(1);
     expect(fixture.events[0]?.eventType).toBe('PLATFORM_COMMISSION_ACCRUED');
@@ -199,6 +201,20 @@ describe('CommissionsService', () => {
 
     expect(fixture.current?.status).toBe(RideCommissionStatus.HELD);
     expect(fixture.current?.heldAt).toBe(heldAt);
+  });
+
+  it('rechaza una disputa cuando termino la ventana de 24 horas', async () => {
+    const fixture = setup(existingCommission());
+
+    await expect(
+      fixture.service.holdWithinTransaction(
+        fixture.manager,
+        PAYMENT_ID,
+        new Date('2026-07-25T10:00:00.000Z'),
+      ),
+    ).rejects.toBeInstanceOf(ConflictException);
+
+    expect(fixture.current?.status).toBe(RideCommissionStatus.ACCRUED);
   });
 
   it('restaura la comision retenida si soporte confirma el pago', async () => {

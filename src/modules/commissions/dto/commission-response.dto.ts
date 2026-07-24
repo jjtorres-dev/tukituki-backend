@@ -73,6 +73,9 @@ export class RideCommissionResponseDto {
   @ApiProperty({ type: Date })
   accruedAt!: Date;
 
+  @ApiProperty({ type: Date })
+  eligibleAt!: Date;
+
   @ApiPropertyOptional({ type: Date, nullable: true })
   heldAt!: Date | null;
 

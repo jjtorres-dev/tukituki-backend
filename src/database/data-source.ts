@@ -37,6 +37,8 @@ import { EmergencyContact } from '../modules/safety/entities/emergency-contact.e
 import { RideSafetyIncident } from '../modules/safety/entities/ride-safety-incident.entity';
 import { RideShareAccessLog } from '../modules/safety/entities/ride-share-access-log.entity';
 import { RideShareLink } from '../modules/safety/entities/ride-share-link.entity';
+import { DriverSettlementItem } from '../modules/settlements/entities/driver-settlement-item.entity';
+import { DriverSettlement } from '../modules/settlements/entities/driver-settlement.entity';
 import { ServiceZone } from '../modules/service-zones/entities/service-zone.entity';
 import { User } from '../modules/users/entities/user.entity';
 
@@ -110,6 +112,8 @@ const AppDataSource = new DataSource({
     RideShareLink,
     RideShareAccessLog,
     EmergencyContactAlert,
+    DriverSettlement,
+    DriverSettlementItem,
   ],
 
   migrations: [join(__dirname, 'migrations', '*.js')],

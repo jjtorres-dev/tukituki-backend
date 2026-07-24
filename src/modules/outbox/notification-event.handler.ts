@@ -182,6 +182,30 @@ export class NotificationEventHandler {
           'Revisa el método de pago e intenta nuevamente.',
         );
         return;
+      case OutboxEventType.DRIVER_SETTLEMENT_APPROVED:
+        await this.handleDriverSettlement(
+          event,
+          NotificationType.DRIVER_SETTLEMENT_APPROVED,
+          'Liquidacion aprobada',
+          'Tu liquidacion fue aprobada y esta pendiente de cierre.',
+        );
+        return;
+      case OutboxEventType.DRIVER_SETTLEMENT_SETTLED:
+        await this.handleDriverSettlement(
+          event,
+          NotificationType.DRIVER_SETTLEMENT_SETTLED,
+          'Liquidacion completada',
+          'La liquidacion de tus viajes fue cerrada correctamente.',
+        );
+        return;
+      case OutboxEventType.DRIVER_SETTLEMENT_CANCELLED:
+        await this.handleDriverSettlement(
+          event,
+          NotificationType.DRIVER_SETTLEMENT_CANCELLED,
+          'Liquidacion cancelada',
+          'La liquidacion fue cancelada y sus movimientos quedaron disponibles nuevamente.',
+        );
+        return;
       case OutboxEventType.SAFETY_INCIDENT_CREATED:
         await this.handleSafetyIncidentCreated(event);
         return;
@@ -438,6 +462,32 @@ export class NotificationEventHandler {
         await alertRepository.save(alert);
       }
     }
+  }
+
+  private async handleDriverSettlement(
+    event: OutboxEvent,
+    type: NotificationType,
+    title: string,
+    body: string,
+  ): Promise<void> {
+    const driverUserId = this.payloadString(event.payload, 'driverUserId');
+    const settlementId = this.payloadString(event.payload, 'settlementId');
+    if (!driverUserId || !settlementId) return;
+    await this.notificationsService.createAndDeliver({
+      userId: driverUserId,
+      type,
+      title,
+      body,
+      data: {
+        route: 'driver-settlement',
+        settlementId,
+        status: this.payloadString(event.payload, 'status') ?? '',
+        direction: this.payloadString(event.payload, 'direction') ?? '',
+        amount: this.payloadString(event.payload, 'amount') ?? '0.00',
+        currency: this.payloadString(event.payload, 'currency') ?? 'PEN',
+      },
+      dedupeKey: `${event.id}:${driverUserId}:${type}`,
+    });
   }
 
   private async handleRideShareLink(

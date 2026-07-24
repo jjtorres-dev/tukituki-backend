@@ -20,6 +20,7 @@ import { OperationsModule } from './modules/operations/operations.module';
 import { PaymentsModule } from './modules/payments/payments.module';
 import { RidesModule } from './modules/rides/rides.module';
 import { ServiceZonesModule } from './modules/service-zones/service-zones.module';
+import { SettlementsModule } from './modules/settlements/settlements.module';
 import { SafetyModule } from './modules/safety/safety.module';
 import { UsersModule } from './modules/users/users.module';
 
@@ -76,6 +77,7 @@ import { UsersModule } from './modules/users/users.module';
     DriverOperationsModule,
     ServiceZonesModule,
     FaresModule,
+    SettlementsModule,
     RidesModule,
     SafetyModule,
   ],

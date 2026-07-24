@@ -33,6 +33,12 @@ import { CommissionPolicy } from './commission-policy.entity';
   'accruedAt',
 ])
 @Index('IDX_ride_commissions_status_accrued', ['status', 'accruedAt'])
+@Index('IDX_ride_commissions_settlement_eligibility', [
+  'driverProfileId',
+  'status',
+  'currency',
+  'eligibleAt',
+])
 export class RideCommission {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
@@ -131,6 +137,9 @@ export class RideCommission {
 
   @Column({ name: 'accrued_at', type: 'timestamptz' })
   accruedAt!: Date;
+
+  @Column({ name: 'eligible_at', type: 'timestamptz' })
+  eligibleAt!: Date;
 
   @Column({ name: 'held_at', type: 'timestamptz', nullable: true })
   heldAt!: Date | null;
