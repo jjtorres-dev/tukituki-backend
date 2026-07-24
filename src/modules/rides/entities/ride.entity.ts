@@ -22,6 +22,11 @@ import { RideStatus } from '../enums/ride-status.enum';
 @Entity({
   name: 'rides',
 })
+@Index('IDX_rides_requested_at_status_reporting', ['requestedAt', 'status'])
+@Index('IDX_rides_origin_zone_requested_reporting', [
+  'originZoneId',
+  'requestedAt',
+])
 @Index('IDX_rides_passenger_requested_at', ['passengerUserId', 'requestedAt'])
 @Index('IDX_rides_driver_status', ['driverProfileId', 'status'])
 @Index('IDX_rides_status_search_expires_at', ['status', 'searchExpiresAt'])

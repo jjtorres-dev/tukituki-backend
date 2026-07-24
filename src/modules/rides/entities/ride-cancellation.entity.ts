@@ -30,6 +30,7 @@ import { Ride } from './ride.entity';
   'feeStatus',
   'createdAt',
 ])
+@Index('IDX_ride_cancellations_created_reporting', ['createdAt'])
 export class RideCancellation {
   @PrimaryGeneratedColumn('uuid')
   id!: string;

@@ -15,6 +15,7 @@ import { HealthModule } from './modules/health/health.module';
 import { PassengersModule } from './modules/passengers/passengers.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { OutboxModule } from './modules/outbox/outbox.module';
+import { OperationsModule } from './modules/operations/operations.module';
 import { RidesModule } from './modules/rides/rides.module';
 import { ServiceZonesModule } from './modules/service-zones/service-zones.module';
 import { SafetyModule } from './modules/safety/safety.module';
@@ -64,6 +65,7 @@ import { UsersModule } from './modules/users/users.module';
     PassengersModule,
     NotificationsModule,
     OutboxModule,
+    OperationsModule,
     DriversModule,
     AdminDriversModule,
     AdminRidesModule,
