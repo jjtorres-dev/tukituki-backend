@@ -1,6 +1,9 @@
 export enum RidePaymentStatus {
   PENDING = 'PENDING',
+  PROCESSING = 'PROCESSING',
   PAID = 'PAID',
+  FAILED = 'FAILED',
+  EXPIRED = 'EXPIRED',
   DISPUTED = 'DISPUTED',
   VOIDED = 'VOIDED',
 }

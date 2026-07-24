@@ -181,6 +181,52 @@ export const envValidationSchema = Joi.object({
     .max(100000)
     .default(20000),
 
+  PUBLIC_API_ORIGIN: Joi.string().uri().default('http://localhost:3001'),
+
+  IZIPAY_ENABLED: Joi.boolean().default(false),
+
+  IZIPAY_MERCHANT_CODE: Joi.when('IZIPAY_ENABLED', {
+    is: true,
+    then: Joi.string().min(3).max(40).required(),
+    otherwise: Joi.string().allow('').optional(),
+  }),
+
+  IZIPAY_API_KEY: Joi.when('IZIPAY_ENABLED', {
+    is: true,
+    then: Joi.string().min(8).max(500).required(),
+    otherwise: Joi.string().allow('').optional(),
+  }),
+
+  IZIPAY_KEY_HASH: Joi.when('IZIPAY_ENABLED', {
+    is: true,
+    then: Joi.string().min(16).max(500).required(),
+    otherwise: Joi.string().allow('').optional(),
+  }),
+
+  IZIPAY_PUBLIC_KEY: Joi.when('IZIPAY_ENABLED', {
+    is: true,
+    then: Joi.string().min(100).max(10000).required(),
+    otherwise: Joi.string().allow('').optional(),
+  }),
+
+  IZIPAY_TOKEN_SESSION_URL: Joi.string()
+    .uri()
+    .default('https://sandbox-api-pw.izipay.pe/security/v1/Token/Generate'),
+
+  IZIPAY_API_KEY_HEADER: Joi.string()
+    .pattern(/^[A-Za-z0-9-]{1,100}$/)
+    .default('X-Api-Key'),
+
+  IZIPAY_CHECKOUT_SCRIPT_URL: Joi.string()
+    .uri()
+    .default('https://sandbox-checkout.izipay.pe/payments/v1/js/index.js'),
+
+  IZIPAY_SESSION_TTL_SECONDS: Joi.number()
+    .integer()
+    .min(60)
+    .max(3600)
+    .default(900),
+
   FCM_ENABLED: Joi.boolean().default(false),
 
   FIREBASE_PROJECT_ID: Joi.string().allow('').max(200).optional(),

@@ -139,14 +139,13 @@ export class NotificationEventHandler {
           'Reiniciamos la búsqueda porque el conductor anterior no mostró progreso.',
         );
         return;
-      case OutboxEventType.SAFETY_INCIDENT_CREATED:
       case OutboxEventType.CASH_PAYMENT_CONFIRMED:
         await this.notifyPayloadUser(
           event,
           'passengerUserId',
           NotificationType.CASH_PAYMENT_CONFIRMED,
           'Pago en efectivo confirmado',
-          'El conductor confirm? la recepci?n del efectivo y registr? el vuelto.',
+          'El conductor confirmó la recepción del efectivo y registró el vuelto.',
         );
         return;
       case OutboxEventType.CASH_PAYMENT_DISPUTED:
@@ -155,7 +154,7 @@ export class NotificationEventHandler {
           'driverUserId',
           NotificationType.CASH_PAYMENT_DISPUTED,
           'Pago en efectivo observado',
-          'El pasajero report? una discrepancia y soporte revisar? el pago.',
+          'El pasajero reportó una discrepancia y soporte revisará el pago.',
         );
         return;
       case OutboxEventType.CASH_PAYMENT_RESOLVED:
@@ -163,9 +162,27 @@ export class NotificationEventHandler {
           event,
           NotificationType.CASH_PAYMENT_RESOLVED,
           'Disputa de pago resuelta',
-          'Soporte resolvi? la discrepancia del pago en efectivo.',
+          'Soporte resolvió la discrepancia del pago en efectivo.',
         );
         return;
+      case OutboxEventType.DIGITAL_PAYMENT_CONFIRMED:
+        await this.notifyParticipants(
+          event,
+          NotificationType.DIGITAL_PAYMENT_CONFIRMED,
+          'Pago digital confirmado',
+          'El pago del viaje fue confirmado correctamente.',
+        );
+        return;
+      case OutboxEventType.DIGITAL_PAYMENT_FAILED:
+        await this.notifyPayloadUser(
+          event,
+          'passengerUserId',
+          NotificationType.DIGITAL_PAYMENT_FAILED,
+          'No se pudo confirmar el pago',
+          'Revisa el método de pago e intenta nuevamente.',
+        );
+        return;
+      case OutboxEventType.SAFETY_INCIDENT_CREATED:
         await this.handleSafetyIncidentCreated(event);
         return;
       case OutboxEventType.EMERGENCY_CONTACT_NOTIFICATION_REQUESTED:

@@ -156,6 +156,9 @@ export class CashPaymentsService {
       if (!payment) {
         throw new NotFoundException('El pago no existe');
       }
+      if (payment.method !== PaymentMethod.CASH) {
+        throw new ConflictException('El viaje no utiliza pago en efectivo');
+      }
       const detail = dto.detail?.trim() || null;
       if (payment.status === RidePaymentStatus.DISPUTED) {
         if (
