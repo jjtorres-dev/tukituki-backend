@@ -32,21 +32,22 @@ export class OutboxService {
     input: EnqueueOutboxEventInput,
   ): Promise<OutboxEvent> {
     const repository = manager.getRepository(OutboxEvent);
-    return repository.save(
-      repository.create({
-        aggregateType: input.aggregateType,
-        aggregateId: input.aggregateId,
-        eventType: input.eventType,
-        payload: input.payload ?? {},
-        status: OutboxEventStatus.PENDING,
-        attempts: 0,
-        availableAt: input.availableAt ?? new Date(),
-        lockedAt: null,
-        lockedBy: null,
-        processedAt: null,
-        lastError: null,
-      }),
-    );
+
+    const event = repository.create({
+      aggregateType: input.aggregateType,
+      aggregateId: input.aggregateId,
+      eventType: input.eventType,
+      payload: input.payload ?? {},
+      status: OutboxEventStatus.PENDING,
+      attempts: 0,
+      availableAt: input.availableAt ?? new Date(),
+      lockedAt: null,
+      lockedBy: null,
+      processedAt: null,
+      lastError: null,
+    });
+
+    return repository.save(event);
   }
 
   enqueue(input: EnqueueOutboxEventInput): Promise<OutboxEvent> {
@@ -65,13 +66,19 @@ export class OutboxService {
          SELECT id
          FROM outbox_events
          WHERE (
-           (status = 'PENDING' AND available_at <= NOW())
+           (
+             status = 'PENDING'
+             AND available_at <= NOW()
+           )
            OR
-           (status = 'PROCESSING' AND locked_at <= NOW() - ($3 * INTERVAL '1 second'))
+           (
+             status = 'PROCESSING'
+             AND locked_at <= NOW() - ($3 * INTERVAL '1 second')
+           )
          )
          AND NOT EXISTS (
            SELECT 1
-           FROM outbox_events earlier
+           FROM outbox_events AS earlier
            WHERE earlier.aggregate_type = outbox_events.aggregate_type
              AND earlier.aggregate_id = outbox_events.aggregate_id
              AND earlier.created_at < outbox_events.created_at
@@ -107,10 +114,26 @@ export class OutboxService {
       [batchSize, workerId, lockTimeoutSeconds],
     );
 
-    return (result as ClaimedOutboxRow[]).map((row) => this.mapClaimedRow(row));
+    const rows = this.extractClaimedRows(result);
+
+    return rows
+      .filter((row) => typeof row.id === 'string' && row.id.length > 0)
+      .map((row) => this.mapClaimedRow(row));
   }
 
   async markProcessed(eventId: string, workerId: string): Promise<void> {
+    if (!eventId) {
+      throw new Error(
+        'No se puede marcar un evento outbox como procesado sin un ID.',
+      );
+    }
+
+    if (!workerId) {
+      throw new Error(
+        'No se puede marcar un evento outbox como procesado sin workerId.',
+      );
+    }
+
     await this.dataSource.getRepository(OutboxEvent).update(
       {
         id: eventId,
@@ -133,8 +156,22 @@ export class OutboxService {
     error: unknown,
     maxAttempts: number,
   ): Promise<void> {
+    if (!event.id) {
+      throw new Error(
+        'No se puede marcar un evento outbox como fallido sin un ID.',
+      );
+    }
+
+    if (!workerId) {
+      throw new Error(
+        'No se puede marcar un evento outbox como fallido sin workerId.',
+      );
+    }
+
     const dead = event.attempts >= maxAttempts;
+
     const backoffSeconds = Math.min(3600, 2 ** Math.min(event.attempts, 10));
+
     await this.dataSource.getRepository(OutboxEvent).update(
       {
         id: event.id,
@@ -143,9 +180,11 @@ export class OutboxService {
       },
       {
         status: dead ? OutboxEventStatus.DEAD : OutboxEventStatus.PENDING,
+
         availableAt: dead
           ? event.availableAt
           : new Date(Date.now() + backoffSeconds * 1000),
+
         lockedAt: null,
         lockedBy: null,
         lastError: this.errorMessage(error).slice(0, 4000),
@@ -153,18 +192,74 @@ export class OutboxService {
     );
   }
 
+  private extractClaimedRows(result: unknown): ClaimedOutboxRow[] {
+    if (!Array.isArray(result)) {
+      return [];
+    }
+
+    /*
+     * Dependiendo de la versión de TypeORM y del driver de PostgreSQL,
+     * DataSource.query() puede devolver:
+     *
+     * 1. Las filas directamente:
+     *    [{ id: '...', ... }]
+     *
+     * 2. Una tupla con las filas y la cantidad afectada:
+     *    [[{ id: '...', ... }], 1]
+     *
+     * Esta validación admite ambas formas.
+     */
+    if (result.length > 0 && Array.isArray(result[0])) {
+      return result[0].filter((row): row is ClaimedOutboxRow =>
+        this.isClaimedOutboxRow(row),
+      );
+    }
+
+    return result.filter((row): row is ClaimedOutboxRow =>
+      this.isClaimedOutboxRow(row),
+    );
+  }
+
+  private isClaimedOutboxRow(value: unknown): value is ClaimedOutboxRow {
+    if (typeof value !== 'object' || value === null) {
+      return false;
+    }
+
+    const row = value as Partial<ClaimedOutboxRow>;
+
+    return (
+      typeof row.id === 'string' &&
+      row.id.length > 0 &&
+      typeof row.aggregateType === 'string' &&
+      typeof row.aggregateId === 'string' &&
+      typeof row.eventType === 'string' &&
+      typeof row.attempts === 'number'
+    );
+  }
+
   private mapClaimedRow(row: ClaimedOutboxRow): OutboxEvent {
     return Object.assign(new OutboxEvent(), {
       ...row,
+
+      payload:
+        row.payload && typeof row.payload === 'object' ? row.payload : {},
+
       availableAt: new Date(row.availableAt),
+
       lockedAt: row.lockedAt ? new Date(row.lockedAt) : null,
+
       processedAt: row.processedAt ? new Date(row.processedAt) : null,
+
       createdAt: new Date(row.createdAt),
       updatedAt: new Date(row.updatedAt),
     });
   }
 
   private errorMessage(error: unknown): string {
-    return error instanceof Error ? error.message : String(error);
+    if (error instanceof Error) {
+      return error.message;
+    }
+
+    return String(error);
   }
 }
