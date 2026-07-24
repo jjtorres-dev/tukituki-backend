@@ -47,14 +47,17 @@ interface SettlementTotals {
   platformCommissionCents: bigint;
   digitalNetCents: bigint;
   cashCommissionCents: bigint;
+  promotionCreditCents: bigint;
   settlementCents: bigint;
   direction: SettlementDirection;
 }
 
 interface BalanceRow {
   availableDigitalNet?: string;
+  availablePromotionCredit?: string;
   availableCashCommission?: string;
   allocatedDigitalNet?: string;
+  allocatedPromotionCredit?: string;
   allocatedCashCommission?: string;
   heldCommission?: string;
 }
@@ -157,6 +160,7 @@ export class DriverSettlementsService {
         platformCommissionAmount: formatCents(totals.platformCommissionCents),
         digitalNetAmount: formatCents(totals.digitalNetCents),
         cashCommissionAmount: formatCents(totals.cashCommissionCents),
+        promotionCreditAmount: formatCents(totals.promotionCreditCents),
         settlementAmount: formatCents(totals.settlementCents),
         createdByAdminUserId: adminUserId,
         approvedByAdminUserId: null,
@@ -179,6 +183,7 @@ export class DriverSettlementsService {
           baseAmount: commission.baseAmount,
           commissionAmount: commission.commissionAmount,
           driverNetAmount: commission.driverNetAmount,
+          promotionCreditAmount: commission.promotionCreditAmount ?? '0.00',
           netEffectAmount: this.netEffect(commission),
           currency: commission.currency,
           accruedAt: commission.accruedAt,
@@ -446,6 +451,14 @@ export class DriverSettlementsService {
         'availableCashCommission',
       )
       .addSelect(
+        `COALESCE(SUM(commission.promotionCreditAmount) FILTER (
+          WHERE commission.status = :accrued
+            AND commission.collectionMode = :cash
+            AND commission.eligibleAt <= :now
+        ), 0)`,
+        'availablePromotionCredit',
+      )
+      .addSelect(
         `COALESCE(SUM(commission.driverNetAmount) FILTER (
           WHERE commission.status = :allocated
             AND commission.collectionMode = :digital
@@ -458,6 +471,13 @@ export class DriverSettlementsService {
             AND commission.collectionMode = :cash
         ), 0)`,
         'allocatedCashCommission',
+      )
+      .addSelect(
+        `COALESCE(SUM(commission.promotionCreditAmount) FILTER (
+          WHERE commission.status = :allocated
+            AND commission.collectionMode = :cash
+        ), 0)`,
+        'allocatedPromotionCredit',
       )
       .addSelect(
         `COALESCE(SUM(commission.commissionAmount) FILTER (
@@ -485,6 +505,10 @@ export class DriverSettlementsService {
       row?.availableCashCommission ?? '0',
       2,
     );
+    const availablePromotion = parseScaledDecimal(
+      row?.availablePromotionCredit ?? '0',
+      2,
+    );
     const allocatedDigital = parseScaledDecimal(
       row?.allocatedDigitalNet ?? '0',
       2,
@@ -493,15 +517,27 @@ export class DriverSettlementsService {
       row?.allocatedCashCommission ?? '0',
       2,
     );
-    const available = this.signedDirection(availableDigital, availableCash);
-    const allocated = this.signedDirection(allocatedDigital, allocatedCash);
+    const allocatedPromotion = parseScaledDecimal(
+      row?.allocatedPromotionCredit ?? '0',
+      2,
+    );
+    const available = this.signedDirection(
+      availableDigital + availablePromotion,
+      availableCash,
+    );
+    const allocated = this.signedDirection(
+      allocatedDigital + allocatedPromotion,
+      allocatedCash,
+    );
     return {
       availableDigitalNet: formatCents(availableDigital),
       availableCashCommissionDebt: formatCents(availableCash),
+      availablePromotionCredit: formatCents(availablePromotion),
       availableSettlementAmount: formatCents(available.amount),
       availableDirection: available.direction,
       allocatedNetAmount: formatCents(allocated.amount),
       allocatedDirection: allocated.direction,
+      allocatedPromotionCredit: formatCents(allocatedPromotion),
       heldCommissionAmount: this.decimal(row?.heldCommission),
       currency: 'PEN',
       asOf: now,
@@ -560,6 +596,7 @@ export class DriverSettlementsService {
     let platformCommissionCents = 0n;
     let digitalNetCents = 0n;
     let cashCommissionCents = 0n;
+    let promotionCreditCents = 0n;
     for (const commission of commissions) {
       grossFareCents += parseScaledDecimal(commission.baseAmount, 2);
       const commissionCents = parseScaledDecimal(
@@ -574,15 +611,23 @@ export class DriverSettlementsService {
         digitalNetCents += parseScaledDecimal(commission.driverNetAmount, 2);
       } else {
         cashCommissionCents += commissionCents;
+        promotionCreditCents += parseScaledDecimal(
+          commission.promotionCreditAmount ?? '0',
+          2,
+        );
       }
     }
-    const signed = this.signedDirection(digitalNetCents, cashCommissionCents);
+    const signed = this.signedDirection(
+      digitalNetCents + promotionCreditCents,
+      cashCommissionCents,
+    );
     return {
       grossFareCents,
       platformCommissionCents,
       digitalNetCents,
       cashCommissionCents,
       settlementCents: signed.amount,
+      promotionCreditCents,
       direction: signed.direction,
     };
   }
@@ -612,7 +657,12 @@ export class DriverSettlementsService {
     ) {
       return commission.driverNetAmount;
     }
-    return `-${commission.commissionAmount}`;
+    const credit = parseScaledDecimal(
+      commission.promotionCreditAmount ?? '0',
+      2,
+    );
+    const debt = parseScaledDecimal(commission.commissionAmount, 2);
+    return formatCents(credit - debt);
   }
 
   private validateIdempotencyKey(value: string | undefined): string {
@@ -786,6 +836,7 @@ export class DriverSettlementsService {
       digitalNetAmount: settlement.digitalNetAmount,
       cashCommissionAmount: settlement.cashCommissionAmount,
       settlementAmount: settlement.settlementAmount,
+      promotionCreditAmount: settlement.promotionCreditAmount,
       createdByAdminUserId: settlement.createdByAdminUserId,
       approvedByAdminUserId: settlement.approvedByAdminUserId,
       settledByAdminUserId: settlement.settledByAdminUserId,
@@ -820,6 +871,7 @@ export class DriverSettlementsService {
       commissionAmount: item.commissionAmount,
       driverNetAmount: item.driverNetAmount,
       netEffectAmount: item.netEffectAmount,
+      promotionCreditAmount: item.promotionCreditAmount,
       currency: item.currency,
       accruedAt: item.accruedAt,
       releasedAt: item.releasedAt,

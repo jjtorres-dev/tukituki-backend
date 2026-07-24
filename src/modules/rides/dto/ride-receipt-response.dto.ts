@@ -49,6 +49,12 @@ export class RideReceiptPaymentDto {
   @ApiProperty({ example: '8.50' })
   amountDue!: string;
 
+  @ApiProperty({ example: '10.50' })
+  grossAmount!: string;
+
+  @ApiProperty({ example: '2.00' })
+  discountAmount!: string;
+
   @ApiPropertyOptional({ nullable: true, example: '10.00' })
   cashReceived!: string | null;
 

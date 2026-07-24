@@ -21,7 +21,7 @@ import { RidePaymentStatus } from '../enums/ride-payment-status.enum';
 @Entity({ name: 'ride_payments' })
 @Check(
   'CHK_ride_payments_amounts',
-  '"amount_due" >= 0 AND ("cash_received" IS NULL OR "cash_received" >= 0) AND ("change_given" IS NULL OR "change_given" >= 0)',
+  '"gross_amount" >= 0 AND "discount_amount" >= 0 AND "gross_amount" = "amount_due" + "discount_amount" AND "amount_due" >= 0 AND ("cash_received" IS NULL OR "cash_received" >= 0) AND ("change_given" IS NULL OR "change_given" >= 0)',
 )
 @Check(
   'CHK_ride_payments_cash_totals',
@@ -85,6 +85,18 @@ export class RidePayment {
 
   @Column({ name: 'amount_due', type: 'numeric', precision: 10, scale: 2 })
   amountDue!: string;
+
+  @Column({ name: 'gross_amount', type: 'numeric', precision: 10, scale: 2 })
+  grossAmount!: string;
+
+  @Column({
+    name: 'discount_amount',
+    type: 'numeric',
+    precision: 10,
+    scale: 2,
+    default: '0.00',
+  })
+  discountAmount!: string;
 
   @Column({
     name: 'cash_received',

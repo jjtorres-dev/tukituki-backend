@@ -21,7 +21,7 @@ import { DriverSettlement } from './driver-settlement.entity';
 )
 @Check(
   'CHK_driver_settlement_items_effect',
-  '("collection_mode" = \'DEDUCT_FROM_PAYOUT\' AND "net_effect_amount" = "driver_net_amount") OR ("collection_mode" = \'DRIVER_PAYABLE\' AND "net_effect_amount" = -"commission_amount")',
+  '("collection_mode" = \'DEDUCT_FROM_PAYOUT\' AND "net_effect_amount" = "driver_net_amount") OR ("collection_mode" = \'DRIVER_PAYABLE\' AND "net_effect_amount" = "promotion_credit_amount" - "commission_amount")',
 )
 @Index('IDX_driver_settlement_items_settlement', ['settlementId'])
 @Index('UQ_driver_settlement_items_active_commission', ['commissionId'], {
@@ -84,6 +84,15 @@ export class DriverSettlementItem {
     scale: 2,
   })
   driverNetAmount!: string;
+
+  @Column({
+    name: 'promotion_credit_amount',
+    type: 'numeric',
+    precision: 10,
+    scale: 2,
+    default: '0.00',
+  })
+  promotionCreditAmount!: string;
 
   @Column({
     name: 'net_effect_amount',

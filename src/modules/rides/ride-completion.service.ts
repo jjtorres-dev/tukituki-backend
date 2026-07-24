@@ -5,6 +5,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DataSource } from 'typeorm';
@@ -34,6 +35,7 @@ import { CompleteRideDto } from './dto/complete-ride.dto';
 import { RideCompletionResponseDto } from './dto/ride-completion-response.dto';
 import { RidePayment } from '../payments/entities/ride-payment.entity';
 import { RidePaymentStatus } from '../payments/enums/ride-payment-status.enum';
+import { PromotionsService } from '../promotions/promotions.service';
 
 import { RideFinalFare } from './entities/ride-final-fare.entity';
 import { RideProgressMetrics } from './entities/ride-progress-metrics.entity';
@@ -85,6 +87,8 @@ export class RideCompletionService {
     private readonly transitionsService: RideTransitionsService,
     private readonly realtimeService: RideRealtimeService,
     private readonly availabilityRedisService: DriverAvailabilityRedisService,
+    @Optional()
+    private readonly promotionsService?: PromotionsService,
   ) {
     const configured = Number(
       this.configService.get<string>('RIDE_FINAL_FARE_MAX_INCREASE_PERCENT') ??
@@ -207,6 +211,17 @@ export class RideCompletionService {
         ride.completedAt = now;
 
         const paymentRepository = manager.getRepository(RidePayment);
+        const promotion = this.promotionsService
+          ? await this.promotionsService.finalizeWithinTransaction(
+              manager,
+              ride.id,
+              calculation.finalFare,
+              now,
+            )
+          : {
+              discountAmount: '0.00',
+              passengerAmountDue: calculation.finalFare,
+            };
         const payment = await paymentRepository.save(
           paymentRepository.create({
             rideId: ride.id,
@@ -214,7 +229,9 @@ export class RideCompletionService {
             driverProfileId: profile.id,
             method: ride.paymentMethod,
             status: RidePaymentStatus.PENDING,
-            amountDue: calculation.finalFare,
+            grossAmount: calculation.finalFare,
+            discountAmount: promotion.discountAmount,
+            amountDue: promotion.passengerAmountDue,
             cashReceived: null,
             changeGiven: null,
             currency: calculation.currency,
@@ -235,6 +252,8 @@ export class RideCompletionService {
         ride.calculatedFinalFare = calculation.calculatedFinalFare;
         ride.finalFare = calculation.finalFare;
         ride.fareWasCapped = calculation.fareWasCapped;
+        ride.finalDiscount = promotion.discountAmount;
+        ride.passengerAmountDue = promotion.passengerAmountDue;
         ride.completionNotes = dto.completionNotes?.trim() || null;
 
         await this.transitionsService.transitionWithinTransaction(
@@ -281,6 +300,9 @@ export class RideCompletionService {
       actualDurationSeconds: outcome.ride.actualDurationSeconds!,
       estimatedFare: outcome.ride.estimatedFare,
       finalFare: outcome.finalFare.finalFare,
+      discountAmount: outcome.payment.discountAmount,
+      passengerAmountDue: outcome.payment.amountDue,
+      promotionCode: outcome.ride.promotionCode,
       currency: outcome.finalFare.currency,
       fareWasCapped: outcome.finalFare.fareWasCapped,
       paymentMethod: outcome.payment.method,

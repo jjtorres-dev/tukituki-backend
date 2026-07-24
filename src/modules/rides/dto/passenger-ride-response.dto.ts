@@ -101,6 +101,21 @@ export class PassengerRideResponseDto {
   @ApiPropertyOptional({ nullable: true })
   finalFare!: string | null;
 
+  @ApiPropertyOptional({ nullable: true })
+  promotionCode!: string | null;
+
+  @ApiProperty()
+  estimatedDiscount!: string;
+
+  @ApiProperty()
+  estimatedPassengerFare!: string;
+
+  @ApiPropertyOptional({ nullable: true })
+  finalDiscount!: string | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  passengerAmountDue!: string | null;
+
   @ApiProperty({ example: 'PEN' })
   currency!: string;
 

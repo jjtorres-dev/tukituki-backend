@@ -88,6 +88,8 @@ export class RideReceiptsService {
             method: payment.method,
             status: payment.status,
             amountDue: payment.amountDue,
+            grossAmount: payment.grossAmount,
+            discountAmount: payment.discountAmount,
             cashReceived: payment.cashReceived,
             changeGiven: payment.changeGiven,
             confirmedAt: payment.confirmedAt,

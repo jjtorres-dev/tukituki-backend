@@ -67,6 +67,9 @@ export class RideCommissionResponseDto {
   @ApiProperty({ example: '9.50' })
   driverNetAmount!: string;
 
+  @ApiProperty({ example: '5.00' })
+  promotionCreditAmount!: string;
+
   @ApiProperty({ example: 'PEN' })
   currency!: string;
 

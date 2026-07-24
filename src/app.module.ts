@@ -18,6 +18,7 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
 import { OutboxModule } from './modules/outbox/outbox.module';
 import { OperationsModule } from './modules/operations/operations.module';
 import { PaymentsModule } from './modules/payments/payments.module';
+import { PromotionsModule } from './modules/promotions/promotions.module';
 import { RidesModule } from './modules/rides/rides.module';
 import { ServiceZonesModule } from './modules/service-zones/service-zones.module';
 import { SettlementsModule } from './modules/settlements/settlements.module';
@@ -71,6 +72,7 @@ import { UsersModule } from './modules/users/users.module';
     OperationsModule,
     CommissionsModule,
     PaymentsModule,
+    PromotionsModule,
     DriversModule,
     AdminDriversModule,
     AdminRidesModule,

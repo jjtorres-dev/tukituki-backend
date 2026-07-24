@@ -23,7 +23,7 @@ import { CommissionPolicy } from './commission-policy.entity';
 @Check('CHK_ride_commissions_rate', '"rate_bps" BETWEEN 300 AND 500')
 @Check(
   'CHK_ride_commissions_amounts',
-  '"base_amount" >= 0 AND "commission_amount" >= 0 AND "driver_net_amount" >= 0 AND "base_amount" = "commission_amount" + "driver_net_amount"',
+  '"base_amount" >= 0 AND "commission_amount" >= 0 AND "driver_net_amount" >= 0 AND "promotion_credit_amount" >= 0 AND "base_amount" = "commission_amount" + "driver_net_amount"',
 )
 @Index('UQ_ride_commissions_ride', ['rideId'], { unique: true })
 @Index('UQ_ride_commissions_payment', ['paymentId'], { unique: true })
@@ -131,6 +131,15 @@ export class RideCommission {
     scale: 2,
   })
   driverNetAmount!: string;
+
+  @Column({
+    name: 'promotion_credit_amount',
+    type: 'numeric',
+    precision: 10,
+    scale: 2,
+    default: '0.00',
+  })
+  promotionCreditAmount!: string;
 
   @Column({ type: 'char', length: 3 })
   currency!: string;

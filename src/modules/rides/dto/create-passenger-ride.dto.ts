@@ -4,6 +4,7 @@ import {
   IsEnum,
   IsString,
   IsUUID,
+  Matches,
   MaxLength,
   MinLength,
 } from 'class-validator';
@@ -21,6 +22,15 @@ export class CreatePassengerRideDto {
   @IsOptional()
   @IsEnum(PaymentMethod)
   paymentMethod: PaymentMethod = PaymentMethod.CASH;
+
+  @ApiPropertyOptional({
+    example: 'BIENVENIDO20',
+    description: 'Codigo promocional previamente validado',
+  })
+  @IsOptional()
+  @IsString()
+  @Matches(/^[A-Za-z0-9_-]{3,30}$/)
+  couponCode?: string;
 
   @ApiPropertyOptional({
     example: 'Estoy frente a la puerta principal',

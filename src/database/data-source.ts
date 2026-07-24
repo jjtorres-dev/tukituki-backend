@@ -20,6 +20,8 @@ import { OutboxEvent } from '../modules/outbox/entities/outbox-event.entity';
 import { AdminAuditLog } from '../modules/operations/entities/admin-audit-log.entity';
 import { DigitalPaymentAttempt } from '../modules/payments/entities/digital-payment-attempt.entity';
 import { RidePayment } from '../modules/payments/entities/ride-payment.entity';
+import { PromotionRedemption } from '../modules/promotions/entities/promotion-redemption.entity';
+import { Promotion } from '../modules/promotions/entities/promotion.entity';
 import { CancellationPolicy } from '../modules/rides/entities/cancellation-policy.entity';
 import { RideCancellation } from '../modules/rides/entities/ride-cancellation.entity';
 import { RideFinalFare } from '../modules/rides/entities/ride-final-fare.entity';
@@ -87,6 +89,8 @@ const AppDataSource = new DataSource({
     RideCommission,
     DigitalPaymentAttempt,
     RidePayment,
+    Promotion,
+    PromotionRedemption,
     DriverProfile,
     DriverVehicle,
     DriverDocument,

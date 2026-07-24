@@ -80,7 +80,10 @@ export class CommissionsService {
       throw new NotFoundException('El conductor de la comisión no existe');
     }
 
-    const baseCents = parseScaledDecimal(payment.amountDue, 2);
+    const baseCents = parseScaledDecimal(
+      payment.grossAmount ?? payment.amountDue,
+      2,
+    );
     const rateBps = ride.platformCommissionRateBps;
     const commissionCents = (baseCents * BigInt(rateBps) + 5_000n) / 10_000n;
     const collectionMode =
@@ -99,6 +102,9 @@ export class CommissionsService {
       baseAmount: formatCents(baseCents),
       commissionAmount: formatCents(commissionCents),
       driverNetAmount: formatCents(baseCents - commissionCents),
+      promotionCreditAmount: formatCents(
+        parseScaledDecimal(payment.discountAmount ?? '0', 2),
+      ),
       currency: payment.currency,
       accruedAt,
       eligibleAt: new Date(
@@ -123,6 +129,7 @@ export class CommissionsService {
         baseAmount: saved.baseAmount,
         commissionAmount: saved.commissionAmount,
         driverNetAmount: saved.driverNetAmount,
+        promotionCreditAmount: saved.promotionCreditAmount,
         currency: saved.currency,
         collectionMode,
         accruedAt: accruedAt.toISOString(),
@@ -393,6 +400,7 @@ export class CommissionsService {
       baseAmount: commission.baseAmount,
       commissionAmount: commission.commissionAmount,
       driverNetAmount: commission.driverNetAmount,
+      promotionCreditAmount: commission.promotionCreditAmount,
       currency: commission.currency,
       accruedAt: commission.accruedAt,
       eligibleAt: commission.eligibleAt,

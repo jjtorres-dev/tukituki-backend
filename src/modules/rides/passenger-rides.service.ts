@@ -30,6 +30,7 @@ import { UserRole } from '../users/enums/user-role.enum';
 import { UserStatus } from '../users/enums/user-status.enum';
 import { OutboxEventType } from '../outbox/enums/outbox-event-type.enum';
 import { OutboxService } from '../outbox/outbox.service';
+import { PromotionsService } from '../promotions/promotions.service';
 import { CancelPassengerRideDto } from './dto/cancel-passenger-ride.dto';
 import { PaymentMethod } from '../payments/enums/payment-method.enum';
 import { CreatePassengerRideDto } from './dto/create-passenger-ride.dto';
@@ -74,6 +75,8 @@ export class PassengerRidesService {
     private readonly cancellationPolicyService?: CancellationPolicyService,
     @Optional()
     private readonly commissionPolicyService?: CommissionPolicyService,
+    @Optional()
+    private readonly promotionsService?: PromotionsService,
   ) {}
 
   async createRide(
@@ -176,6 +179,11 @@ export class PassengerRidesService {
             destinationAddress: quote.destinationAddress,
             distanceMeters: quote.distanceMeters,
             estimatedDurationSeconds: quote.durationSeconds,
+            promotionCode: null,
+            estimatedDiscount: '0.00',
+            estimatedPassengerFare: quote.estimatedFare,
+            finalDiscount: null,
+            passengerAmountDue: null,
             estimatedFare: quote.estimatedFare,
             finalFare: null,
             pricingBaseFare: quote.baseFare,
@@ -228,6 +236,25 @@ export class PassengerRidesService {
             cancelledBy: null,
           });
           const savedRide = await rideRepository.save(ride);
+
+          if (dto.couponCode) {
+            const reserved =
+              await this.promotionsService?.reserveWithinTransaction(
+                manager,
+                passengerUserId,
+                savedRide.id,
+                dto.couponCode,
+                quote.estimatedFare,
+                quote.currency,
+                now,
+              );
+            if (!reserved)
+              throw new ConflictException('Promociones no disponibles');
+            savedRide.promotionCode = reserved.code;
+            savedRide.estimatedDiscount = reserved.discountAmount;
+            savedRide.estimatedPassengerFare = reserved.passengerAmountDue;
+            await rideRepository.save(savedRide);
+          }
 
           const initialHistory = manager
             .getRepository(RideStatusHistory)

@@ -16,6 +16,7 @@ import { FareRule } from '../fares/entities/fare-rule.entity';
 import { ServiceZone } from '../service-zones/entities/service-zone.entity';
 import { User } from '../users/entities/user.entity';
 import { OutboxModule } from '../outbox/outbox.module';
+import { PromotionsModule } from '../promotions/promotions.module';
 import { DriverRideOffersController } from './driver-ride-offers.controller';
 import { AdminRideCancellationsController } from './admin-ride-cancellations.controller';
 import { RidePayment } from '../payments/entities/ride-payment.entity';
@@ -86,6 +87,7 @@ import { RideViewService } from './ride-view.service';
     DriverOperationsModule,
     OutboxModule,
     CommissionsModule,
+    PromotionsModule,
   ],
   controllers: [
     PassengerRidesController,

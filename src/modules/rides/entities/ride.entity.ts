@@ -198,6 +198,49 @@ export class Ride {
   finalFare!: string | null;
 
   @Column({
+    name: 'promotion_code',
+    type: 'varchar',
+    length: 30,
+    nullable: true,
+  })
+  promotionCode!: string | null;
+
+  @Column({
+    name: 'estimated_discount',
+    type: 'numeric',
+    precision: 10,
+    scale: 2,
+    default: '0.00',
+  })
+  estimatedDiscount!: string;
+
+  @Column({
+    name: 'estimated_passenger_fare',
+    type: 'numeric',
+    precision: 10,
+    scale: 2,
+  })
+  estimatedPassengerFare!: string;
+
+  @Column({
+    name: 'final_discount',
+    type: 'numeric',
+    precision: 10,
+    scale: 2,
+    nullable: true,
+  })
+  finalDiscount!: string | null;
+
+  @Column({
+    name: 'passenger_amount_due',
+    type: 'numeric',
+    precision: 10,
+    scale: 2,
+    nullable: true,
+  })
+  passengerAmountDue!: string | null;
+
+  @Column({
     name: 'pricing_base_fare',
     type: 'numeric',
     precision: 10,

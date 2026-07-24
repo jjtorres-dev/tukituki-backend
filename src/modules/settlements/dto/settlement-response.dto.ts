@@ -41,6 +41,9 @@ export class DriverSettlementResponseDto {
   @ApiProperty({ example: '2.00' })
   cashCommissionAmount!: string;
 
+  @ApiProperty({ example: '5.00' })
+  promotionCreditAmount!: string;
+
   @ApiProperty({ example: '74.00' })
   settlementAmount!: string;
 
@@ -100,6 +103,9 @@ export class DriverSettlementItemResponseDto {
   @ApiProperty({ example: '9.50' })
   driverNetAmount!: string;
 
+  @ApiProperty({ example: '5.00' })
+  promotionCreditAmount!: string;
+
   @ApiProperty({ example: '9.50' })
   netEffectAmount!: string;
 
@@ -135,6 +141,9 @@ export class DriverSettlementBalanceResponseDto {
   @ApiProperty({ example: '76.00' })
   availableDigitalNet!: string;
 
+  @ApiProperty({ example: '5.00' })
+  availablePromotionCredit!: string;
+
   @ApiProperty({ example: '2.00' })
   availableCashCommissionDebt!: string;
 
@@ -146,6 +155,9 @@ export class DriverSettlementBalanceResponseDto {
 
   @ApiProperty({ example: '20.00' })
   allocatedNetAmount!: string;
+
+  @ApiProperty({ example: '5.00' })
+  allocatedPromotionCredit!: string;
 
   @ApiProperty({ enum: SettlementDirection })
   allocatedDirection!: SettlementDirection;

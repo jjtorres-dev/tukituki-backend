@@ -29,6 +29,15 @@ export class RideCompletionResponseDto {
   @ApiProperty({ example: '8.10' })
   finalFare!: string;
 
+  @ApiProperty({ example: '2.00' })
+  discountAmount!: string;
+
+  @ApiProperty({ example: '6.10' })
+  passengerAmountDue!: string;
+
+  @ApiProperty({ nullable: true })
+  promotionCode!: string | null;
+
   @ApiProperty({ example: 'PEN' })
   currency!: string;
 

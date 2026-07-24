@@ -18,6 +18,7 @@ import { DriverProfile } from '../drivers/entities/driver-profile.entity';
 import { DriverStatus } from '../drivers/enums/driver-status.enum';
 import { OutboxEventType } from '../outbox/enums/outbox-event-type.enum';
 import { OutboxService } from '../outbox/outbox.service';
+import { PromotionsService } from '../promotions/promotions.service';
 import { User } from '../users/entities/user.entity';
 import { UserRole } from '../users/enums/user-role.enum';
 import { UserStatus } from '../users/enums/user-status.enum';
@@ -92,6 +93,8 @@ export class RideCancellationsService {
     private readonly realtimeService: RideRealtimeService,
     private readonly availabilityRedisService: DriverAvailabilityRedisService,
     @Optional() private readonly outboxService?: OutboxService,
+    @Optional()
+    private readonly promotionsService?: PromotionsService,
   ) {}
 
   async previewPassengerCancellation(
@@ -893,6 +896,12 @@ export class RideCancellationsService {
       metadata: Record<string, unknown>;
     },
   ): Promise<RideCancellation> {
+    await this.promotionsService?.releaseWithinTransaction(
+      manager,
+      input.ride.id,
+      input.reasonCode,
+      input.now,
+    );
     const repository = manager.getRepository(RideCancellation);
     const entity = repository.create({
       rideId: input.ride.id,

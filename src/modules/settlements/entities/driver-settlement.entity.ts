@@ -27,7 +27,7 @@ import { DriverSettlementItem } from './driver-settlement-item.entity';
 )
 @Check(
   'CHK_driver_settlements_direction',
-  '("direction" = \'PLATFORM_TO_DRIVER\' AND "digital_net_amount" > "cash_commission_amount" AND "settlement_amount" = "digital_net_amount" - "cash_commission_amount") OR ("direction" = \'DRIVER_TO_PLATFORM\' AND "cash_commission_amount" > "digital_net_amount" AND "settlement_amount" = "cash_commission_amount" - "digital_net_amount") OR ("direction" = \'BALANCED\' AND "digital_net_amount" = "cash_commission_amount" AND "settlement_amount" = 0)',
+  '("direction" = \'PLATFORM_TO_DRIVER\' AND "digital_net_amount" + "promotion_credit_amount" > "cash_commission_amount" AND "settlement_amount" = "digital_net_amount" + "promotion_credit_amount" - "cash_commission_amount") OR ("direction" = \'DRIVER_TO_PLATFORM\' AND "cash_commission_amount" > "digital_net_amount" + "promotion_credit_amount" AND "settlement_amount" = "cash_commission_amount" - "digital_net_amount" - "promotion_credit_amount") OR ("direction" = \'BALANCED\' AND "digital_net_amount" + "promotion_credit_amount" = "cash_commission_amount" AND "settlement_amount" = 0)',
 )
 @Check(
   'CHK_driver_settlements_lifecycle',
@@ -128,6 +128,15 @@ export class DriverSettlement {
     scale: 2,
   })
   cashCommissionAmount!: string;
+
+  @Column({
+    name: 'promotion_credit_amount',
+    type: 'numeric',
+    precision: 14,
+    scale: 2,
+    default: '0.00',
+  })
+  promotionCreditAmount!: string;
 
   @Column({
     name: 'settlement_amount',

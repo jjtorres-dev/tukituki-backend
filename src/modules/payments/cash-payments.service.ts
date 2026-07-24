@@ -374,6 +374,8 @@ export class CashPaymentsService {
       method: payment.method,
       status: payment.status,
       amountDue: payment.amountDue,
+      grossAmount: payment.grossAmount,
+      discountAmount: payment.discountAmount,
       cashReceived: payment.cashReceived,
       changeGiven: payment.changeGiven,
       currency: payment.currency,
