@@ -19,13 +19,20 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   private readonly client: ReturnType<typeof createClient>;
 
   constructor(private readonly configService: ConfigService) {
-    const host = this.configService.getOrThrow<string>('REDIS_HOST');
+    const redisUrl = this.configService.get<string>('REDIS_URL')?.trim();
 
-    const port = this.configService.getOrThrow<number>('REDIS_PORT');
+    if (redisUrl) {
+      this.client = createClient({
+        url: redisUrl,
+      });
+    } else {
+      const host = this.configService.getOrThrow<string>('REDIS_HOST');
+      const port = this.configService.getOrThrow<number>('REDIS_PORT');
 
-    this.client = createClient({
-      url: `redis://${host}:${port}`,
-    });
+      this.client = createClient({
+        url: `redis://${host}:${port}`,
+      });
+    }
 
     this.client.on('error', (error: unknown) => {
       this.logger.error('Error de conexión con Redis', error);

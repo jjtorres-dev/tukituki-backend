@@ -70,6 +70,11 @@ export const envValidationSchema = Joi.object({
 
   REDIS_PORT: Joi.number().port().default(6379),
 
+  REDIS_URL: Joi.string()
+    .uri({ scheme: ['redis', 'rediss'] })
+    .allow('')
+    .optional(),
+
   OTP_TTL_SECONDS: Joi.number().integer().min(60).max(600).default(300),
 
   OTP_RESEND_COOLDOWN_SECONDS: Joi.number()
