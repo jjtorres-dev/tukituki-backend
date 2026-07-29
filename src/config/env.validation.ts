@@ -87,6 +87,8 @@ export const envValidationSchema = Joi.object({
 
   OTP_HASH_SECRET: Joi.string().min(32).required(),
 
+  OTP_DEBUG_ENABLED: Joi.boolean().truthy('true').falsy('false').default(false),
+
   JWT_ACCESS_SECRET: Joi.string().min(64).required(),
 
   JWT_ACCESS_TTL_SECONDS: Joi.number()

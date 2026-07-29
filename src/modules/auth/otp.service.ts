@@ -66,10 +66,13 @@ export class OtpService {
 
     const nodeEnvironment = this.configService.getOrThrow<string>('NODE_ENV');
 
+    const otpDebugEnabled =
+      this.configService.get<boolean>('OTP_DEBUG_ENABLED') ?? false;
+
     return {
       expiresIn: ttl,
 
-      ...(nodeEnvironment === 'development'
+      ...(nodeEnvironment === 'development' || otpDebugEnabled
         ? {
             debugOtp: code,
           }
