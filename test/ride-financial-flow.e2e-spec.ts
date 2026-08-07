@@ -16,6 +16,7 @@ import { DriverLocation } from '../src/modules/driver-operations/entities/driver
 import { DriverOperationalState } from '../src/modules/driver-operations/entities/driver-operational-state.entity';
 import { DriverOperationalStatus } from '../src/modules/driver-operations/enums/driver-operational-status.enum';
 import { FaresService } from '../src/modules/fares/fares.service';
+import { GoogleRoutesService } from '../src/modules/fares/google-routes.service';
 import { DriverAvailabilityRedisService } from '../src/infrastructure/redis/driver-availability-redis.service';
 import { OutboxService } from '../src/modules/outbox/outbox.service';
 import { CashPaymentsService } from '../src/modules/payments/cash-payments.service';
@@ -63,11 +64,21 @@ function runCompiledMigrations(): void {
 
 describe('Flujo financiero real: cotización a liquidación', () => {
   let dataSource: DataSource;
+
   let faresService: FaresService;
+
   let passengerRidesService: PassengerRidesService;
+
   let rideCompletionService: RideCompletionService;
+
   let cashPaymentsService: CashPaymentsService;
+
   let settlementsService: DriverSettlementsService;
+
+  let googleRoutesServiceMock: {
+    computeRoute: jest.Mock;
+  };
+
   let adminUserId: string;
   let passengerUserId: string;
   let driverUserId: string;
@@ -79,12 +90,15 @@ describe('Flujo financiero real: cotización a liquidación', () => {
     }
 
     dataSource = AppDataSource;
+
     await dataSource.initialize();
 
     const databaseResult: unknown = await dataSource.query(
       `SELECT current_database() AS "databaseName"`,
     );
+
     const databaseRows = databaseResult as DatabaseNameRow[];
+
     const databaseName = databaseRows[0]?.databaseName ?? '';
 
     if (!/(?:^|[_-])(test|smoke)(?:$|[_-])/i.test(databaseName)) {
@@ -94,15 +108,18 @@ describe('Flujo financiero real: cotización a liquidación', () => {
     }
 
     await dataSource.destroy();
+
     runCompiledMigrations();
+
     await dataSource.initialize();
 
     const extensionResult: unknown = await dataSource.query(
       `SELECT extname AS "extensionName"
-         FROM pg_extension
-         WHERE extname IN ('postgis', 'uuid-ossp')
-         ORDER BY extname`,
+             FROM pg_extension
+             WHERE extname IN ('postgis', 'uuid-ossp')
+             ORDER BY extname`,
     );
+
     const extensions = extensionResult as ExtensionRow[];
 
     expect(extensions.map((row) => row.extensionName)).toEqual([
@@ -111,24 +128,35 @@ describe('Flujo financiero real: cotización a liquidación', () => {
     ]);
 
     const seed = await seedDevelopmentData(dataSource);
+
     adminUserId = seed.adminUserId;
+
     passengerUserId = seed.passengerUserId;
+
     driverUserId = seed.driverUserId;
+
     driverProfileId = seed.driverProfileId;
 
     const configService = new ConfigService({
       RIDE_FINAL_FARE_MAX_INCREASE_PERCENT: '20',
     });
+
     const outboxService = new OutboxService(dataSource);
+
     const availabilityRedisService = {
       publishAvailableDriver: jest.fn().mockResolvedValue(undefined),
+
       removeDriverAvailability: jest.fn().mockResolvedValue(undefined),
     } as unknown as DriverAvailabilityRedisService;
+
     const realtimeService = {
       emitStatusChanged: jest.fn(),
+
       emitCompleted: jest.fn(),
     } as unknown as RideRealtimeService;
+
     const rideStartCodesService = {} as RideStartCodesService;
+
     const transitionsService = new RideTransitionsService(
       dataSource,
       availabilityRedisService,
@@ -136,20 +164,50 @@ describe('Flujo financiero real: cotización a liquidación', () => {
       rideStartCodesService,
       outboxService,
     );
+
     const rideDispatchService = {
       dispatchRide: jest.fn().mockResolvedValue(undefined),
     } as unknown as RideDispatchService;
+
     const rideViewService = new RideViewService(dataSource);
+
     const cancellationPolicyService = new CancellationPolicyService(
       configService,
     );
+
     const commissionPolicyService = new CommissionPolicyService(dataSource);
+
     const commissionsService = new CommissionsService(
       dataSource,
       outboxService,
     );
 
-    faresService = new FaresService(dataSource);
+    /*
+     * IMPORTANTE:
+     *
+     * El E2E no debe consultar
+     * Google Routes real.
+     *
+     * Así mantenemos el test:
+     * - determinista
+     * - rápido
+     * - sin Internet
+     * - sin API key
+     * - sin consumo de billing
+     */
+    googleRoutesServiceMock = {
+      computeRoute: jest.fn().mockResolvedValue({
+        distanceMeters: 1800,
+        durationSeconds: 540,
+      }),
+    };
+
+    faresService = new FaresService(
+      dataSource,
+
+      googleRoutesServiceMock as unknown as GoogleRoutesService,
+    );
+
     passengerRidesService = new PassengerRidesService(
       dataSource,
       rideDispatchService,
@@ -159,6 +217,7 @@ describe('Flujo financiero real: cotización a liquidación', () => {
       cancellationPolicyService,
       commissionPolicyService,
     );
+
     rideCompletionService = new RideCompletionService(
       dataSource,
       configService,
@@ -166,11 +225,13 @@ describe('Flujo financiero real: cotización a liquidación', () => {
       realtimeService,
       availabilityRedisService,
     );
+
     cashPaymentsService = new CashPaymentsService(
       dataSource,
       outboxService,
       commissionsService,
     );
+
     settlementsService = new DriverSettlementsService(
       dataSource,
       outboxService,
@@ -184,84 +245,162 @@ describe('Flujo financiero real: cotización a liquidación', () => {
   });
 
   it('cotiza, crea y completa el viaje, confirma efectivo y liquida la comisión', async () => {
+    /*
+     * Ya no enviamos distanceMeters
+     * ni durationSeconds.
+     *
+     * El backend obtiene ambas
+     * métricas desde GoogleRoutesService,
+     * que en este E2E está mockeado.
+     */
     const quote = await faresService.estimate(passengerUserId, {
       origin: {
         latitude: -6.4865,
+
         longitude: -76.3599,
+
         address: 'Plaza de Armas de Tarapoto',
       },
+
       destination: {
         latitude: -6.4805,
+
         longitude: -76.3505,
+
         address: 'Destino smoke Tarapoto',
       },
-      distanceMeters: 1800,
-      durationSeconds: 540,
+
       isNight: false,
+
       isRaining: false,
     });
+
+    /*
+     * Verificamos que el flujo
+     * realmente pasó por Routes.
+     */
+    expect(googleRoutesServiceMock.computeRoute).toHaveBeenCalledWith(
+      {
+        latitude: -6.4865,
+
+        longitude: -76.3599,
+
+        address: 'Plaza de Armas de Tarapoto',
+      },
+      {
+        latitude: -6.4805,
+
+        longitude: -76.3505,
+
+        address: 'Destino smoke Tarapoto',
+      },
+    );
+
+    /*
+     * Las métricas vienen del mock.
+     */
+    expect(quote.distanceMeters).toBe(1800);
+
+    expect(quote.durationSeconds).toBe(540);
+
     expect(Number(quote.estimatedFare)).toBeGreaterThan(0);
 
     const createdRide = await passengerRidesService.createRide(
       passengerUserId,
       {
         fareQuoteId: quote.quoteId,
+
         paymentMethod: PaymentMethod.CASH,
+
         passengerNotes: 'Viaje financiero smoke',
       },
     );
+
     expect(createdRide.status).toBe(RideStatus.SEARCHING_DRIVER);
 
     const startedAt = new Date(Date.now() - 9 * 60 * 1000);
+
     await dataSource.transaction(async (manager) => {
       const rideRepository = manager.getRepository(Ride);
+
       const ride = await rideRepository.findOneByOrFail({
         id: createdRide.id,
       });
+
       ride.driverProfileId = driverProfileId;
+
       ride.status = RideStatus.IN_PROGRESS;
+
       ride.driverAssignedAt = startedAt;
+
       ride.driverArrivingAt = startedAt;
+
       ride.driverArrivedAt = startedAt;
+
       ride.startedAt = startedAt;
+
       ride.stateVersion += 4;
+
       await rideRepository.save(ride);
 
       const stateRepository = manager.getRepository(DriverOperationalState);
+
       const state = await stateRepository.findOneByOrFail({
         driverProfileId,
       });
+
       state.status = DriverOperationalStatus.BUSY;
+
       state.connectedAt = startedAt;
+
       state.disconnectedAt = null;
+
       state.lastSeenAt = new Date();
+
       await stateRepository.save(state);
 
       const locationRepository = manager.getRepository(DriverLocation);
+
       const location = await locationRepository.findOneByOrFail({
         driverProfileId,
       });
+
       location.position = {
         type: 'Point',
+
         coordinates: [-76.3505, -6.4805],
       };
+
       location.latitude = -6.4805;
+
       location.longitude = -76.3505;
+
       location.accuracy = 5;
+
       location.recordedAt = new Date();
+
       await locationRepository.save(location);
 
       const metricsRepository = manager.getRepository(RideProgressMetrics);
+
       await metricsRepository.save(
         metricsRepository.create({
           rideId: ride.id,
+
           acceptedSamples: 2,
+
           rejectedSamples: 0,
+
           trackedDistanceMeters: '1850.00',
+
           startedAt,
+
           lastReceivedSampleAt: new Date(),
+
           lastAcceptedSampleAt: new Date(),
+
           lastAcceptedSampleId: null,
+
           calculatedDurationSeconds: 0,
         }),
       );
@@ -270,10 +409,15 @@ describe('Flujo financiero real: cotización a liquidación', () => {
     const completion = await rideCompletionService.completeRide(
       driverUserId,
       createdRide.id,
-      { completionNotes: 'Finalizado por smoke financiero' },
+      {
+        completionNotes: 'Finalizado por smoke financiero',
+      },
     );
+
     expect(completion.status).toBe(RideStatus.COMPLETED);
+
     expect(completion.paymentStatus).toBe(RidePaymentStatus.PENDING);
+
     expect(completion.paymentMethod).toBe(PaymentMethod.CASH);
 
     const payment = await cashPaymentsService.confirmCash(
@@ -281,52 +425,75 @@ describe('Flujo financiero real: cotización a liquidación', () => {
       createdRide.id,
       {
         cashReceived: completion.passengerAmountDue,
+
         notes: 'Efectivo exacto recibido',
       },
     );
+
     expect(payment.status).toBe(RidePaymentStatus.PAID);
+
     expect(payment.changeGiven).toBe('0.00');
 
     const commissionRepository = dataSource.getRepository(RideCommission);
+
     const commission = await commissionRepository.findOneByOrFail({
       rideId: createdRide.id,
     });
+
     expect(commission.status).toBe(RideCommissionStatus.ACCRUED);
+
     expect(commission.collectionMode).toBe(
       CommissionCollectionMode.DRIVER_PAYABLE,
     );
+
     expect(commission.baseAmount).toBe(completion.finalFare);
+
     expect(Number(commission.commissionAmount)).toBeGreaterThan(0);
 
     commission.eligibleAt = new Date(Date.now() - 1_000);
+
     await commissionRepository.save(commission);
 
     const periodEnd = new Date();
+
     const periodStart = new Date(periodEnd.getTime() - 60 * 60 * 1000);
+
     const idempotencyKey = `smoke_${createdRide.id.replaceAll('-', '')}`;
+
     const settlement = await settlementsService.create(
       adminUserId,
       idempotencyKey,
       {
         driverProfileId,
+
         periodStart: periodStart.toISOString(),
+
         periodEnd: periodEnd.toISOString(),
+
         notes: 'Liquidación generada por smoke financiero',
       },
     );
 
     expect(settlement.status).toBe(SettlementStatus.DRAFT);
+
     expect(settlement.direction).toBe(SettlementDirection.DRIVER_TO_PLATFORM);
+
     expect(settlement.rideCount).toBe(1);
+
     expect(settlement.cashCommissionAmount).toBe(commission.commissionAmount);
+
     expect(settlement.items).toHaveLength(1);
+
     expect(settlement.items[0]?.commissionId).toBe(commission.id);
 
     const approved = await settlementsService.approve(
       adminUserId,
       settlement.id,
-      { notes: 'Aprobada automáticamente por smoke' },
+      {
+        notes: 'Aprobada automáticamente por smoke',
+      },
     );
+
     expect(approved.status).toBe(SettlementStatus.APPROVED);
 
     const completedSettlement = await settlementsService.complete(
@@ -334,15 +501,19 @@ describe('Flujo financiero real: cotización a liquidación', () => {
       settlement.id,
       {
         transferReference: `SMOKE-${createdRide.id}`,
+
         notes: 'Cierre automático del smoke',
       },
     );
+
     expect(completedSettlement.status).toBe(SettlementStatus.SETTLED);
 
     const settledCommission = await commissionRepository.findOneByOrFail({
       id: commission.id,
     });
+
     expect(settledCommission.status).toBe(RideCommissionStatus.SETTLED);
+
     expect(settledCommission.settledAt).not.toBeNull();
   }, 30_000);
 });
