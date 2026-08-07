@@ -26,27 +26,46 @@ export class EstimateFareDto {
   @Type(() => FareEstimateLocationDto)
   destination!: FareEstimateLocationDto;
 
-  @ApiProperty({
+  /*
+   * Campos heredados del cliente anterior.
+   *
+   * Se mantienen temporalmente para no romper
+   * versiones de Passenger que todavía los envían.
+   *
+   * IMPORTANTE:
+   * FaresService ya NO confía en estos valores.
+   * La distancia y duración reales de la cotización
+   * son obtenidas desde Google Routes.
+   */
+  @ApiPropertyOptional({
     example: 3200,
     minimum: 1,
     maximum: 100000,
+    deprecated: true,
+    description:
+      'Obsoleto. El backend calcula la distancia usando Google Routes.',
   })
+  @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)
   @Max(100000)
-  distanceMeters!: number;
+  distanceMeters?: number;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     example: 720,
     minimum: 1,
     maximum: 86400,
+    deprecated: true,
+    description:
+      'Obsoleto. El backend calcula la duración usando Google Routes.',
   })
+  @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)
   @Max(86400)
-  durationSeconds!: number;
+  durationSeconds?: number;
 
   @ApiPropertyOptional({
     default: false,

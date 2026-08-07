@@ -12,6 +12,7 @@ import { FareRule } from './entities/fare-rule.entity';
 import { FareRulesService } from './fare-rules.service';
 import { FaresController } from './fares.controller';
 import { FaresService } from './fares.service';
+import { GoogleRoutesService } from './google-routes.service';
 
 @Module({
   imports: [
@@ -20,8 +21,11 @@ import { FaresService } from './fares.service';
     AuthorizationModule,
     ServiceZonesModule,
   ],
+
   controllers: [AdminFareRulesController, FaresController],
-  providers: [FareRulesService, FaresService],
+
+  providers: [FareRulesService, GoogleRoutesService, FaresService],
+
   exports: [FareRulesService, FaresService],
 })
 export class FaresModule {}

@@ -18,6 +18,7 @@ import { FareQuote } from './entities/fare-quote.entity';
 import { FareRule } from './entities/fare-rule.entity';
 import { FareQuoteStatus } from './enums/fare-quote-status.enum';
 import { FareRuleStatus } from './enums/fare-rule-status.enum';
+import { GoogleRoutesService, RouteMetrics } from './google-routes.service';
 import {
   applyMultiplierToCents,
   calculateDistanceAmountCents,
@@ -32,13 +33,15 @@ const FARE_QUOTE_TTL_MS = 5 * 60 * 1000;
 
 @Injectable()
 export class FaresService {
-  constructor(private readonly dataSource: DataSource) {}
+  constructor(
+    private readonly dataSource: DataSource,
+    private readonly googleRoutesService: GoogleRoutesService,
+  ) {}
 
   estimate(
     passengerUserId: string,
     dto: EstimateFareDto,
   ): Promise<FareEstimateResponseDto> {
-    this.assertRouteMetrics(dto.distanceMeters, dto.durationSeconds);
     this.assertDifferentPoints(dto);
 
     return this.dataSource.transaction(async (manager) => {
@@ -46,11 +49,19 @@ export class FaresService {
 
       this.assertPassengerEnabled(passenger);
 
+      /*
+       * Primero comprobamos cobertura.
+       *
+       * De esta forma evitamos consumir
+       * Google Routes para puntos que TukiTuki
+       * ni siquiera atiende.
+       */
       const originZone = await this.findActiveZoneForPoint(
         manager,
         dto.origin.latitude,
         dto.origin.longitude,
       );
+
       const destinationZone = await this.findActiveZoneForPoint(
         manager,
         dto.destination.latitude,
@@ -69,7 +80,29 @@ export class FaresService {
         );
       }
 
+      /*
+       * IMPORTANTE:
+       *
+       * Desde este punto distanceMeters y
+       * durationSeconds provienen exclusivamente
+       * del backend.
+       *
+       * Cualquier valor enviado por Passenger
+       * en dto.distanceMeters / dto.durationSeconds
+       * es ignorado.
+       */
+      const routeMetrics = await this.googleRoutesService.computeRoute(
+        dto.origin,
+        dto.destination,
+      );
+
+      this.assertRouteMetrics(
+        routeMetrics.distanceMeters,
+        routeMetrics.durationSeconds,
+      );
+
       const now = new Date();
+
       const fareRule = await this.lockApplicableFareRule(
         manager,
         originZone.id,
@@ -82,80 +115,134 @@ export class FaresService {
         );
       }
 
-      const amounts = this.calculateAmounts(fareRule, dto);
+      const amounts = this.calculateAmounts(fareRule, routeMetrics, dto);
+
       const expiresAt = new Date(now.getTime() + FARE_QUOTE_TTL_MS);
+
       const quoteRepository = manager.getRepository(FareQuote);
+
       const quote = quoteRepository.create({
         passengerUserId,
         fareRuleId: fareRule.id,
+
         originZoneId: originZone.id,
+
         destinationZoneId: destinationZone.id,
+
         originPosition: {
           type: 'Point',
           coordinates: [dto.origin.longitude, dto.origin.latitude],
         },
+
         destinationPosition: {
           type: 'Point',
           coordinates: [dto.destination.longitude, dto.destination.latitude],
         },
+
         originAddress: dto.origin.address.trim(),
+
         destinationAddress: dto.destination.address.trim(),
-        distanceMeters: dto.distanceMeters,
-        durationSeconds: dto.durationSeconds,
+
+        /*
+         * Métricas verificadas por
+         * Google Routes.
+         */
+        distanceMeters: routeMetrics.distanceMeters,
+
+        durationSeconds: routeMetrics.durationSeconds,
+
         baseFare: amounts.baseFare,
+
         distanceAmount: amounts.distanceAmount,
+
         timeAmount: amounts.timeAmount,
+
         bookingFee: amounts.bookingFee,
+
         pricingMinimumFare: fareRule.minimumFare,
+
         pricingPricePerKm: fareRule.pricePerKm,
+
         pricingPricePerMinute: fareRule.pricePerMinute,
+
         pricingCalculationVersion: 'fixed-decimal-v1',
+
         subtotal: amounts.subtotal,
+
         adjustmentMultiplier: amounts.adjustmentMultiplier,
+
         estimatedFare: amounts.estimatedFare,
+
         currency: fareRule.currency,
+
         isNight: dto.isNight === true,
+
         isRaining: dto.isRaining === true,
+
         status: FareQuoteStatus.ACTIVE,
+
         expiresAt,
+
         usedAt: null,
       });
+
       const savedQuote = await quoteRepository.save(quote);
 
       return {
         quoteId: savedQuote.id,
+
         quoteStatus: savedQuote.status,
+
         fareRuleId: fareRule.id,
+
         originZone: {
           id: originZone.id,
           name: originZone.name,
           code: originZone.code,
         },
+
         destinationZone: {
           id: destinationZone.id,
           name: destinationZone.name,
           code: destinationZone.code,
         },
+
         origin: {
           latitude: dto.origin.latitude,
+
           longitude: dto.origin.longitude,
+
           address: savedQuote.originAddress,
         },
+
         destination: {
           latitude: dto.destination.latitude,
+
           longitude: dto.destination.longitude,
+
           address: savedQuote.destinationAddress,
         },
+
         distanceMeters: savedQuote.distanceMeters,
+
         durationSeconds: savedQuote.durationSeconds,
+
         baseFare: savedQuote.baseFare,
+
         distanceAmount: savedQuote.distanceAmount,
+
         timeAmount: savedQuote.timeAmount,
+
         bookingFee: savedQuote.bookingFee,
+
         subtotal: savedQuote.subtotal,
+
         adjustmentMultiplier: savedQuote.adjustmentMultiplier,
+
         estimatedFare: savedQuote.estimatedFare,
+
         currency: savedQuote.currency,
+
         expiresAt: savedQuote.expiresAt,
       };
     });
@@ -251,6 +338,7 @@ export class FaresService {
 
   private calculateAmounts(
     fareRule: FareRule,
+    routeMetrics: RouteMetrics,
     dto: EstimateFareDto,
   ): {
     baseFare: string;
@@ -262,18 +350,24 @@ export class FaresService {
     estimatedFare: string;
   } {
     const baseFareCents = parseScaledDecimal(fareRule.baseFare, 2);
+
     const minimumFareCents = parseScaledDecimal(fareRule.minimumFare, 2);
+
     const bookingFeeCents = parseScaledDecimal(fareRule.bookingFee, 2);
+
     const distanceAmountCents = calculateDistanceAmountCents(
       fareRule.pricePerKm,
-      dto.distanceMeters,
+      routeMetrics.distanceMeters,
     );
+
     const timeAmountCents = calculateTimeAmountCents(
       fareRule.pricePerMinute,
-      dto.durationSeconds,
+      routeMetrics.durationSeconds,
     );
+
     const subtotalCents =
       baseFareCents + distanceAmountCents + timeAmountCents + bookingFeeCents;
+
     const multipliers: string[] = [];
 
     if (dto.isNight === true) {
@@ -285,20 +379,28 @@ export class FaresService {
     }
 
     const multiplierScaledThree = combineMultipliersScaledThree(multipliers);
+
     const adjustedCents = applyMultiplierToCents(
       subtotalCents,
       multiplierScaledThree,
     );
+
     const estimatedFareCents =
       adjustedCents > minimumFareCents ? adjustedCents : minimumFareCents;
 
     return {
       baseFare: formatCents(baseFareCents),
+
       distanceAmount: formatCents(distanceAmountCents),
+
       timeAmount: formatCents(timeAmountCents),
+
       bookingFee: formatCents(bookingFeeCents),
+
       subtotal: formatCents(subtotalCents),
+
       adjustmentMultiplier: formatScaledInteger(multiplierScaledThree, 3),
+
       estimatedFare: formatCents(estimatedFareCents),
     };
   }
