@@ -231,6 +231,10 @@ export const envValidationSchema = Joi.object({
 
   PUBLIC_API_ORIGIN: Joi.string().uri().default('http://localhost:3001'),
 
+  GOOGLE_ROUTES_API_KEY: Joi.string().min(20).max(500).allow('').optional(),
+
+  GOOGLE_PLACES_API_KEY: Joi.string().min(20).max(500).allow('').optional(),
+
   IZIPAY_ENABLED: Joi.boolean().default(false),
 
   IZIPAY_MERCHANT_CODE: Joi.when('IZIPAY_ENABLED', {
