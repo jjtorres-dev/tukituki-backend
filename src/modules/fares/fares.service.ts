@@ -35,6 +35,7 @@ const FARE_QUOTE_TTL_MS = 5 * 60 * 1000;
 export class FaresService {
   constructor(
     private readonly dataSource: DataSource,
+
     private readonly googleRoutesService: GoogleRoutesService,
   ) {}
 
@@ -53,8 +54,8 @@ export class FaresService {
        * Primero comprobamos cobertura.
        *
        * De esta forma evitamos consumir
-       * Google Routes para puntos que TukiTuki
-       * ni siquiera atiende.
+       * Google Routes para puntos que
+       * TukiTuki ni siquiera atiende.
        */
       const originZone = await this.findActiveZoneForPoint(
         manager,
@@ -81,15 +82,11 @@ export class FaresService {
       }
 
       /*
-       * IMPORTANTE:
+       * distanceMeters y durationSeconds
+       * provienen exclusivamente del backend.
        *
-       * Desde este punto distanceMeters y
-       * durationSeconds provienen exclusivamente
-       * del backend.
-       *
-       * Cualquier valor enviado por Passenger
-       * en dto.distanceMeters / dto.durationSeconds
-       * es ignorado.
+       * La polyline también viene de
+       * la misma ruta calculada por Google.
        */
       const routeMetrics = await this.googleRoutesService.computeRoute(
         dto.origin,
@@ -197,13 +194,17 @@ export class FaresService {
 
         originZone: {
           id: originZone.id,
+
           name: originZone.name,
+
           code: originZone.code,
         },
 
         destinationZone: {
           id: destinationZone.id,
+
           name: destinationZone.name,
+
           code: destinationZone.code,
         },
 
@@ -226,6 +227,20 @@ export class FaresService {
         distanceMeters: savedQuote.distanceMeters,
 
         durationSeconds: savedQuote.durationSeconds,
+
+        /*
+         * Solo agregamos el campo cuando
+         * Google realmente devolvió
+         * una geometría válida.
+         *
+         * Esto mantiene compatibilidad
+         * con mocks antiguos.
+         */
+        ...(routeMetrics.routePolyline
+          ? {
+              routePolyline: routeMetrics.routePolyline,
+            }
+          : {}),
 
         baseFare: savedQuote.baseFare,
 

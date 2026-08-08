@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 import { ServiceZoneSummaryDto } from '../../service-zones/dto/service-zone-response.dto';
 import { FareQuoteStatus } from '../enums/fare-quote-status.enum';
@@ -55,6 +55,14 @@ export class FareEstimateResponseDto {
 
   @ApiProperty()
   durationSeconds!: number;
+
+  @ApiPropertyOptional({
+    type: String,
+    description:
+      'Ruta codificada con Google Encoded Polyline Algorithm para dibujar el recorrido en el mapa.',
+    example: '}_il@~qswM...',
+  })
+  routePolyline?: string;
 
   @ApiProperty()
   baseFare!: string;

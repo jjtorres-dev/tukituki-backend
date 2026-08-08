@@ -16,12 +16,26 @@ type GoogleRouteResponse = {
   routes?: Array<{
     distanceMeters?: number;
     duration?: string;
+
+    polyline?: {
+      encodedPolyline?: string;
+    };
   }>;
 };
 
 export type RouteMetrics = {
   distanceMeters: number;
   durationSeconds: number;
+
+  /*
+   * Es opcional para mantener compatibilidad
+   * con tests/mocks existentes.
+   *
+   * En una respuesta real de Google Routes
+   * normalmente estará disponible porque
+   * la solicitamos en el FieldMask.
+   */
+  routePolyline?: string | null;
 };
 
 @Injectable()
@@ -52,18 +66,25 @@ export class GoogleRoutesService {
     try {
       const response = await fetch(GOOGLE_ROUTES_URL, {
         method: 'POST',
+
         headers: {
           'Content-Type': 'application/json',
 
           'X-Goog-Api-Key': apiKey,
 
-          'X-Goog-FieldMask': 'routes.distanceMeters,routes.duration',
+          'X-Goog-FieldMask': [
+            'routes.distanceMeters',
+            'routes.duration',
+            'routes.polyline.encodedPolyline',
+          ].join(','),
         },
+
         body: JSON.stringify({
           origin: {
             location: {
               latLng: {
                 latitude: origin.latitude,
+
                 longitude: origin.longitude,
               },
             },
@@ -73,22 +94,29 @@ export class GoogleRoutesService {
             location: {
               latLng: {
                 latitude: destination.latitude,
+
                 longitude: destination.longitude,
               },
             },
           },
 
-          // Mototaxi / motocicleta.
+          /*
+           * Mototaxi / motocicleta.
+           */
           travelMode: 'TWO_WHEELER',
 
-          // Por ahora priorizamos baja latencia
-          // y una tarifa más estable.
+          /*
+           * Por ahora priorizamos
+           * baja latencia y una
+           * tarifa más estable.
+           */
           routingPreference: 'TRAFFIC_UNAWARE',
 
           computeAlternativeRoutes: false,
 
           units: 'METRIC',
         }),
+
         signal: controller.signal,
       });
 
@@ -140,6 +168,24 @@ export class GoogleRoutesService {
         );
       }
 
+      const rawPolyline = route.polyline?.encodedPolyline?.trim();
+
+      const routePolyline =
+        rawPolyline && rawPolyline.length > 0 ? rawPolyline : null;
+
+      if (!routePolyline) {
+        /*
+         * La tarifa puede seguir funcionando
+         * aunque Google no devuelva la geometría.
+         *
+         * En ese caso Passenger simplemente
+         * mostrará marcadores sin línea.
+         */
+        this.logger.warn(
+          'Google Routes devolvió métricas pero no una polyline',
+        );
+      }
+
       this.logger.debug(
         `Ruta calculada: ${distanceMeters}m / ${durationSeconds}s`,
       );
@@ -147,6 +193,7 @@ export class GoogleRoutesService {
       return {
         distanceMeters,
         durationSeconds,
+        routePolyline,
       };
     } catch (error) {
       if (
@@ -166,6 +213,7 @@ export class GoogleRoutesService {
 
       this.logger.error(
         'Error inesperado consultando Google Routes',
+
         error instanceof Error ? error.stack : String(error),
       );
 
