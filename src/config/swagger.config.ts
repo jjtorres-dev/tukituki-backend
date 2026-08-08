@@ -18,6 +18,12 @@ export const SWAGGER_TAGS = [
   ['Driver locations', 'Ubicación en tiempo real del conductor.'],
   ['Service zones', 'Consulta pública de zonas de cobertura.'],
   ['Admin service zones', 'Administración de zonas de cobertura.'],
+
+  [
+    'Places',
+    'Búsqueda y resolución de destinos para pasajeros con Google Places.',
+  ],
+
   ['Fares', 'Cotización de tarifas para pasajeros.'],
   ['Admin fare rules', 'Administración de reglas tarifarias.'],
   ['Passenger rides', 'Solicitud y ciclo de vida de viajes del pasajero.'],
@@ -60,11 +66,13 @@ export function buildSwaggerConfiguration(
 ): Omit<OpenAPIObject, 'paths'> {
   const environment =
     options.environment ?? process.env.NODE_ENV ?? 'development';
+
   const publicApiOrigin = normalizeOrigin(
     options.publicApiOrigin ??
       process.env.PUBLIC_API_ORIGIN ??
       `http://localhost:${process.env.PORT ?? '3001'}`,
   );
+
   const builder = new DocumentBuilder()
     .setTitle('TukiTuki API')
     .setDescription(
@@ -90,6 +98,7 @@ export function buildSwaggerConfiguration(
   for (const [name, description] of SWAGGER_TAGS) {
     builder.addTag(name, description);
   }
+
   return builder.build();
 }
 
