@@ -49,7 +49,7 @@ import { RideStatus } from '../enums/ride-status.enum';
 })
 @Check(
   'CHK_rides_platform_commission_rate',
-  '"platform_commission_rate_bps" BETWEEN 300 AND 500',
+  '("platform_commission_rate_bps" = 0 OR "platform_commission_rate_bps" BETWEEN 300 AND 500)',
 )
 export class Ride {
   @PrimaryGeneratedColumn('uuid')
@@ -383,7 +383,7 @@ export class Ride {
   @Column({
     name: 'platform_commission_rate_bps',
     type: 'smallint',
-    default: 500,
+    default: 0,
   })
   platformCommissionRateBps!: number;
 
