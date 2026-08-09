@@ -9,6 +9,7 @@ import {
   MinLength,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+
 import { PaymentMethod } from '../../payments/enums/payment-method.enum';
 
 export class CreatePassengerRideDto {
@@ -18,7 +19,38 @@ export class CreatePassengerRideDto {
   @IsUUID()
   fareQuoteId!: string;
 
-  @ApiPropertyOptional({ enum: PaymentMethod, default: PaymentMethod.CASH })
+  /*
+   * Durante la transición hacia el nuevo
+   * sistema de negociación este campo
+   * permanece opcional.
+   *
+   * Si una versión antigua de Passenger
+   * no lo envía, backend utilizará
+   * estimatedFare como oferta inicial.
+   */
+  @ApiPropertyOptional({
+    example: '5.50',
+    description:
+      'Precio que el pasajero desea ofrecer por el viaje. ' +
+      'Si no se envía, se utiliza temporalmente ' +
+      'la tarifa sugerida por TukiTuki.',
+  })
+  @IsOptional()
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? value.trim() : value,
+  )
+  @IsString()
+  @Matches(/^(?=.*[1-9])\d{1,4}(?:\.\d{1,2})?$/, {
+    message:
+      'passengerOfferFare debe ser un monto positivo ' +
+      'con máximo 2 decimales',
+  })
+  passengerOfferFare?: string;
+
+  @ApiPropertyOptional({
+    enum: PaymentMethod,
+    default: PaymentMethod.CASH,
+  })
   @IsOptional()
   @IsEnum(PaymentMethod)
   paymentMethod: PaymentMethod = PaymentMethod.CASH;

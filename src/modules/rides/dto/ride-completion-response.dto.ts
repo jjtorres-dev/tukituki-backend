@@ -26,6 +26,13 @@ export class RideCompletionResponseDto {
   @ApiProperty({ example: '7.40' })
   estimatedFare!: string;
 
+  @ApiProperty({
+    nullable: true,
+    example: '6.00',
+    description: 'Precio negociado y aceptado entre pasajero y conductor',
+  })
+  agreedFare!: string | null;
+
   @ApiProperty({ example: '8.10' })
   finalFare!: string;
 

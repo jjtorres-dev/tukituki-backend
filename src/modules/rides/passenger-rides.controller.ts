@@ -55,6 +55,7 @@ import { RideRatingsService } from './ride-ratings.service';
 import { RideCancellationsService } from './ride-cancellations.service';
 import { PassengerCancellationReason } from './enums/passenger-cancellation-reason.enum';
 import { RideStartCodesService } from './ride-start-codes.service';
+import { PassengerRideOfferResponseDto } from './dto/passenger-ride-offer-response.dto';
 
 const HTTP_STATUS_LOCKED = 423;
 
@@ -113,6 +114,58 @@ export class PassengerRidesController {
     user: AuthenticatedUser,
   ): Promise<PassengerRideResponseDto> {
     return this.passengerRidesService.getActiveRide(user.id);
+  }
+
+  @Get(':rideId/offers')
+  @ApiOperation({
+    summary: 'Listar propuestas de conductores para un viaje en búsqueda',
+  })
+  @ApiOkResponse({
+    type: PassengerRideOfferResponseDto,
+    isArray: true,
+  })
+  @ApiConflictResponse({
+    description: 'El viaje ya no se encuentra recibiendo propuestas',
+  })
+  @ApiNotFoundResponse({
+    description: 'El viaje no existe o no pertenece al pasajero',
+  })
+  getRideOffers(
+    @CurrentUser()
+    user: AuthenticatedUser,
+
+    @Param('rideId', ParseUUIDPipe)
+    rideId: string,
+  ): Promise<PassengerRideOfferResponseDto[]> {
+    return this.passengerRidesService.getRideOffers(user.id, rideId);
+  }
+
+  @Post(':rideId/offers/:offerId/select')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Elegir una propuesta y asignar al conductor',
+  })
+  @ApiOkResponse({
+    type: PassengerRideResponseDto,
+  })
+  @ApiConflictResponse({
+    description:
+      'La propuesta venció, el conductor dejó de estar disponible o el viaje ya fue asignado',
+  })
+  @ApiNotFoundResponse({
+    description: 'El viaje o la propuesta no existen',
+  })
+  selectRideOffer(
+    @CurrentUser()
+    user: AuthenticatedUser,
+
+    @Param('rideId', ParseUUIDPipe)
+    rideId: string,
+
+    @Param('offerId', ParseUUIDPipe)
+    offerId: string,
+  ): Promise<PassengerRideResponseDto> {
+    return this.passengerRidesService.selectRideOffer(user.id, rideId, offerId);
   }
 
   @Get('history')

@@ -33,6 +33,7 @@ import { RidePaymentStatus } from './enums/ride-payment-status.enum';
 import { PAYMENT_GATEWAY } from './gateways/payment-gateway.interface';
 import type { PaymentGateway } from './gateways/payment-gateway.interface';
 import { verifyIzipaySignature } from './utils/izipay-signature.util';
+import { isCommissionEnforced } from '../commissions/commission-runtime-mode';
 
 interface IzipayOrderResult {
   payMethodAuthorization?: unknown;
@@ -247,11 +248,13 @@ export class DigitalPaymentsService {
         const savedPayment = await manager
           .getRepository(RidePayment)
           .save(payment);
-        await this.commissionsService.accrueWithinTransaction(
-          manager,
-          savedPayment,
-          now,
-        );
+        if (isCommissionEnforced(this.configService)) {
+          await this.commissionsService.accrueWithinTransaction(
+            manager,
+            savedPayment,
+            now,
+          );
+        }
 
         await this.enqueueDigitalEvent(
           manager,

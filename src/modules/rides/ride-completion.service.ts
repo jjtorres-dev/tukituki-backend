@@ -299,6 +299,7 @@ export class RideCompletionService {
       actualDistanceMeters: outcome.ride.actualDistanceMeters!,
       actualDurationSeconds: outcome.ride.actualDurationSeconds!,
       estimatedFare: outcome.ride.estimatedFare,
+      agreedFare: outcome.ride.agreedFare,
       finalFare: outcome.finalFare.finalFare,
       discountAmount: outcome.payment.discountAmount,
       passengerAmountDue: outcome.payment.amountDue,
@@ -348,11 +349,63 @@ export class RideCompletionService {
     const adjusted = applyMultiplierToCents(subtotal, multiplier);
     const calculated = adjusted > minimum ? adjusted : minimum;
     const estimated = parseScaledDecimal(ride.estimatedFare, 2);
+
     const cap = divideRoundHalfUp(
       estimated * BigInt(100 + this.maxIncreasePercent),
       100n,
     );
-    const final = calculated > cap ? cap : calculated;
+
+    /*
+     * Compatibilidad:
+     *
+     * Viajes antiguos, creados antes de la
+     * negociación, continúan usando la lógica
+     * tarifaria anterior.
+     */
+    const legacyFareWasCapped = calculated > cap;
+
+    const legacyFinal = legacyFareWasCapped ? cap : calculated;
+
+    /*
+     * En los viajes negociados agreedFare
+     * es el precio contractual entre pasajero
+     * y conductor.
+     *
+     * Distancia y tiempo reales se siguen
+     * calculando y almacenando para auditoría,
+     * métricas y detección de anomalías,
+     * pero ya NO modifican el cobro.
+     */
+    let final = legacyFinal;
+    let fareWasCapped = legacyFareWasCapped;
+    let fareCapAmount = cap;
+
+    if (ride.agreedFare != null) {
+      const agreed = parseScaledDecimal(ride.agreedFare, 2);
+
+      if (agreed <= 0n) {
+        throw new ConflictException(
+          'El viaje contiene un precio acordado inválido',
+        );
+      }
+
+      final = agreed;
+
+      /*
+       * Para un viaje negociado no existe
+       * un ajuste automático por cap:
+       * el precio ya fue aceptado por ambas partes.
+       */
+      fareWasCapped = false;
+
+      /*
+       * Conservamos la columna existente sin
+       * introducir otra migración. Para viajes
+       * negociados representa el importe máximo
+       * efectivamente autorizado: agreedFare.
+       */
+      fareCapAmount = agreed;
+    }
 
     return {
       baseFare: formatCents(base),
@@ -363,8 +416,8 @@ export class RideCompletionService {
       adjustmentMultiplier: ride.pricingAdjustmentMultiplier!,
       calculatedFinalFare: formatCents(calculated),
       finalFare: formatCents(final),
-      fareCapAmount: formatCents(cap),
-      fareWasCapped: calculated > cap,
+      fareCapAmount: formatCents(fareCapAmount),
+      fareWasCapped,
       currency: ride.pricingCurrency!,
       calculationVersion: ride.pricingCalculationVersion!,
     };

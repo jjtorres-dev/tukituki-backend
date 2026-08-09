@@ -99,6 +99,33 @@ export class RideOffer {
   })
   expiresAt!: Date;
 
+  /*
+   * Precio que este conductor presenta
+   * al pasajero.
+   *
+   * Puede ser exactamente passengerOfferFare
+   * o una contraoferta.
+   */
+  @Column({
+    name: 'proposed_fare',
+    type: 'numeric',
+    precision: 10,
+    scale: 2,
+    nullable: true,
+  })
+  proposedFare!: string | null;
+
+  /*
+   * Momento en que el conductor presentó
+   * su propuesta económica.
+   */
+  @Column({
+    name: 'proposed_at',
+    type: 'timestamptz',
+    nullable: true,
+  })
+  proposedAt!: Date | null;
+
   @Column({
     name: 'responded_at',
     type: 'timestamptz',

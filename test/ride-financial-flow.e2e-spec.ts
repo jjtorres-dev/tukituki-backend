@@ -139,6 +139,14 @@ describe('Flujo financiero real: cotización a liquidación', () => {
 
     const configService = new ConfigService({
       RIDE_FINAL_FARE_MAX_INCREASE_PERCENT: '20',
+
+      /*
+       * Este E2E prueba deliberadamente
+       * la infraestructura futura de comisión.
+       *
+       * NO representa la configuración del demo.
+       */
+      COMMISSION_MODE: 'ENFORCED',
     });
 
     const outboxService = new OutboxService(dataSource);
@@ -175,7 +183,10 @@ describe('Flujo financiero real: cotización a liquidación', () => {
       configService,
     );
 
-    const commissionPolicyService = new CommissionPolicyService(dataSource);
+    const commissionPolicyService = new CommissionPolicyService(
+      dataSource,
+      configService,
+    );
 
     const commissionsService = new CommissionsService(
       dataSource,
@@ -230,6 +241,7 @@ describe('Flujo financiero real: cotización a liquidación', () => {
       dataSource,
       outboxService,
       commissionsService,
+      configService,
     );
 
     settlementsService = new DriverSettlementsService(

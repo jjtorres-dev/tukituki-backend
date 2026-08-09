@@ -29,6 +29,12 @@ export class DriverActiveRideResponseDto {
   @ApiProperty()
   estimatedFare!: string;
 
+  @ApiPropertyOptional({
+    nullable: true,
+    example: '6.00',
+  })
+  agreedFare!: string | null;
+
   @ApiProperty({ example: 'PEN' })
   currency!: string;
 

@@ -13,6 +13,7 @@ import { CashPaymentResolution } from './enums/cash-payment-resolution.enum';
 import { PaymentMethod } from './enums/payment-method.enum';
 import { RidePaymentStatus } from './enums/ride-payment-status.enum';
 import { CashPaymentsService } from './cash-payments.service';
+import { ConfigService } from '@nestjs/config';
 
 const DRIVER_USER_ID = 'f544d52a-39e0-4da3-8861-6010355c5dba';
 const DRIVER_PROFILE_ID = '72b81eb5-c53f-4de2-bd9f-11f33d64da64';
@@ -26,6 +27,14 @@ function commissionsService(): CommissionsService {
     holdWithinTransaction: jest.fn(() => Promise.resolve()),
     resolveDisputeWithinTransaction: jest.fn(() => Promise.resolve()),
   } as unknown as CommissionsService;
+}
+
+function enforcedConfigService(): ConfigService {
+  return {
+    get: jest.fn((key: string) =>
+      key === 'COMMISSION_MODE' ? 'ENFORCED' : undefined,
+    ),
+  } as unknown as ConfigService;
 }
 
 function basePayment(status = RidePaymentStatus.PENDING): RidePayment {
@@ -113,7 +122,12 @@ function setup(payment: RidePayment) {
   } as unknown as OutboxService;
   const commissions = commissionsService();
   return {
-    service: new CashPaymentsService(dataSource, outbox, commissions),
+    service: new CashPaymentsService(
+      dataSource,
+      outbox,
+      commissions,
+      enforcedConfigService(),
+    ),
     commissions,
     saved,
     events,

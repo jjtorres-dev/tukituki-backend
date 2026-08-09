@@ -121,6 +121,18 @@ export const envValidationSchema = Joi.object({
     .max(100)
     .default(20),
 
+  /*
+   * Durante la etapa demo las comisiones
+   * quedan desactivadas de forma segura.
+   *
+   * ENFORCED se habilitará únicamente
+   * cuando TukiTuki decida comenzar
+   * a cobrar comisión a los conductores.
+   */
+  COMMISSION_MODE: Joi.string()
+    .valid('DISABLED', 'ENFORCED')
+    .default('DISABLED'),
+
   WORKERS_ENABLED: Joi.boolean().default(true),
 
   RIDE_DISPATCH_POLL_INTERVAL_MS: Joi.number()

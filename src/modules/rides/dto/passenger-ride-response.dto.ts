@@ -98,6 +98,18 @@ export class PassengerRideResponseDto {
   @ApiProperty()
   estimatedFare!: string;
 
+  @ApiPropertyOptional({
+    nullable: true,
+    example: '5.50',
+  })
+  passengerOfferFare!: string | null;
+
+  @ApiPropertyOptional({
+    nullable: true,
+    example: '6.00',
+  })
+  agreedFare!: string | null;
+
   @ApiPropertyOptional({ nullable: true })
   finalFare!: string | null;
 

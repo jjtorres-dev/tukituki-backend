@@ -4,9 +4,18 @@ import type { EntityManager } from 'typeorm';
 
 import { CommissionPolicyService } from './commission-policy.service';
 import { CommissionPolicy } from './entities/commission-policy.entity';
+import { ConfigService } from '@nestjs/config';
 
 const ADMIN_USER_ID = '9e14cab8-2714-4cf9-8024-c6c97c8729ca';
 const POLICY_ID = '730069ed-7c8f-4d95-892b-b6c7cd52c6ea';
+
+function enforcedConfigService(): ConfigService {
+  return {
+    get: jest.fn((key: string) =>
+      key === 'COMMISSION_MODE' ? 'ENFORCED' : undefined,
+    ),
+  } as unknown as ConfigService;
+}
 
 function policy(rateBps = 500): CommissionPolicy {
   return Object.assign(new CommissionPolicy(), {
@@ -50,7 +59,7 @@ function setup(current: CommissionPolicy | null) {
     ),
   } as unknown as DataSource;
   return {
-    service: new CommissionPolicyService(dataSource),
+    service: new CommissionPolicyService(dataSource, enforcedConfigService()),
     dataSource,
     manager,
     repository,

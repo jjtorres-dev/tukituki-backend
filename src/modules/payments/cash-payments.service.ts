@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import type { EntityManager } from 'typeorm';
@@ -29,6 +30,8 @@ import { RidePayment } from './entities/ride-payment.entity';
 import { CashPaymentResolution } from './enums/cash-payment-resolution.enum';
 import { PaymentMethod } from './enums/payment-method.enum';
 import { RidePaymentStatus } from './enums/ride-payment-status.enum';
+import { ConfigService } from '@nestjs/config';
+import { isCommissionEnforced } from '../commissions/commission-runtime-mode';
 
 @Injectable()
 export class CashPaymentsService {
@@ -36,6 +39,9 @@ export class CashPaymentsService {
     private readonly dataSource: DataSource,
     private readonly outboxService: OutboxService,
     private readonly commissionsService: CommissionsService,
+
+    @Optional()
+    private readonly configService?: ConfigService,
   ) {}
 
   async getPassengerPayment(
@@ -126,11 +132,13 @@ export class CashPaymentsService {
       payment.confirmationNotes = dto.notes?.trim() || null;
       const saved = await manager.getRepository(RidePayment).save(payment);
 
-      await this.commissionsService.accrueWithinTransaction(
-        manager,
-        saved,
-        now,
-      );
+      if (isCommissionEnforced(this.configService)) {
+        await this.commissionsService.accrueWithinTransaction(
+          manager,
+          saved,
+          now,
+        );
+      }
 
       await this.outboxService.enqueueWithinTransaction(manager, {
         aggregateType: 'RIDE',
@@ -191,11 +199,13 @@ export class CashPaymentsService {
       payment.disputeDetail = detail;
       payment.disputedAt = now;
       const saved = await manager.getRepository(RidePayment).save(payment);
-      await this.commissionsService.holdWithinTransaction(
-        manager,
-        payment.id,
-        now,
-      );
+      if (isCommissionEnforced(this.configService)) {
+        await this.commissionsService.holdWithinTransaction(
+          manager,
+          payment.id,
+          now,
+        );
+      }
       const driverUserId = await this.driverUserId(
         manager,
         payment.driverProfileId,
@@ -295,12 +305,14 @@ export class CashPaymentsService {
       payment.resolvedAt = now;
       payment.resolutionNotes = dto.notes.trim();
       const saved = await manager.getRepository(RidePayment).save(payment);
-      await this.commissionsService.resolveDisputeWithinTransaction(
-        manager,
-        saved,
-        dto.resolution === CashPaymentResolution.CONFIRM_PAID,
-        now,
-      );
+      if (isCommissionEnforced(this.configService)) {
+        await this.commissionsService.resolveDisputeWithinTransaction(
+          manager,
+          saved,
+          dto.resolution === CashPaymentResolution.CONFIRM_PAID,
+          now,
+        );
+      }
       const driverUserId = await this.driverUserId(
         manager,
         payment.driverProfileId,

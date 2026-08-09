@@ -7,7 +7,7 @@ import {
   NotFoundException,
   Optional,
 } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import { DataSource, In } from 'typeorm';
 import type { EntityManager } from 'typeorm';
 
 import { DriverAvailabilityRedisService } from '../../infrastructure/redis/driver-availability-redis.service';
@@ -305,7 +305,7 @@ export class RideTransitionsService {
         await manager.getRepository(RideOffer).update(
           {
             rideId: ride.id,
-            status: RideOfferStatus.OFFERED,
+            status: In([RideOfferStatus.OFFERED, RideOfferStatus.PROPOSED]),
           },
           {
             status: RideOfferStatus.CANCELLED,
@@ -356,7 +356,7 @@ export class RideTransitionsService {
       await manager.getRepository(RideOffer).update(
         {
           rideId: ride.id,
-          status: RideOfferStatus.OFFERED,
+          status: In([RideOfferStatus.OFFERED, RideOfferStatus.PROPOSED]),
         },
         {
           status: RideOfferStatus.EXPIRED,
@@ -396,6 +396,34 @@ export class RideTransitionsService {
         actorUserId: driverUserId,
         occurredAt,
         metadata: { offerId, driverProfileId },
+      },
+    );
+  }
+
+  async assignDriverSelectedByPassengerWithinTransaction(
+    manager: EntityManager,
+    ride: Ride,
+    driverProfileId: string,
+    passengerUserId: string,
+    offerId: string,
+    occurredAt: Date,
+  ): Promise<void> {
+    ride.driverProfileId = driverProfileId;
+    ride.driverAssignedAt = occurredAt;
+
+    await this.transitionWithinTransaction(
+      manager,
+      ride,
+      RideStatus.DRIVER_ASSIGNED,
+      {
+        actorType: RideStatusActor.PASSENGER,
+        actorUserId: passengerUserId,
+        occurredAt,
+        metadata: {
+          offerId,
+          driverProfileId,
+          agreedFare: ride.agreedFare,
+        },
       },
     );
   }

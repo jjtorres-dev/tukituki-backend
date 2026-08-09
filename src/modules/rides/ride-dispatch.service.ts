@@ -285,6 +285,8 @@ export class RideDispatchService {
           searchRadiusMeters: plan.radiusMeters,
           offeredAt: now,
           expiresAt,
+          proposedFare: null,
+          proposedAt: null,
           respondedAt: null,
           acceptedAt: null,
           rejectedAt: null,
@@ -454,7 +456,7 @@ export class RideDispatchService {
     const result = await repository.update(
       {
         rideId,
-        status: RideOfferStatus.OFFERED,
+        status: In([RideOfferStatus.OFFERED, RideOfferStatus.PROPOSED]),
       },
       {
         status: RideOfferStatus.EXPIRED,
@@ -473,7 +475,7 @@ export class RideDispatchService {
     const result = await repository.update(
       {
         rideId,
-        status: RideOfferStatus.OFFERED,
+        status: In([RideOfferStatus.OFFERED, RideOfferStatus.PROPOSED]),
         expiresAt: LessThanOrEqual(now),
       },
       {

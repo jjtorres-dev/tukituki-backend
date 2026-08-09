@@ -1,10 +1,13 @@
 import {
   BadRequestException,
   Injectable,
+  Optional,
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { DataSource, IsNull, LessThanOrEqual, MoreThan } from 'typeorm';
 import type { EntityManager } from 'typeorm';
+import { ConfigService } from '@nestjs/config';
+import { isCommissionEnforced } from './commission-runtime-mode';
 
 import { CommissionPolicyResponseDto } from './dto/commission-response.dto';
 import { UpdateCommissionPolicyDto } from './dto/update-commission-policy.dto';
@@ -13,12 +16,33 @@ import type { CommissionPolicySnapshot } from './interfaces/commission-policy-sn
 
 @Injectable()
 export class CommissionPolicyService {
-  constructor(private readonly dataSource: DataSource) {}
+  constructor(
+    private readonly dataSource: DataSource,
+
+    @Optional()
+    private readonly configService?: ConfigService,
+  ) {}
 
   async getActiveSnapshot(
     manager: EntityManager,
     at: Date,
   ): Promise<CommissionPolicySnapshot> {
+    /*
+     * Demo:
+     *
+     * El viaje conserva explícitamente una tasa
+     * de comisión 0 y ninguna política financiera
+     * vinculada.
+     *
+     * Así tampoco aparecerá accidentalmente
+     * un 5% en snapshots de viajes nuevos.
+     */
+    if (!isCommissionEnforced(this.configService)) {
+      return {
+        policyId: null,
+        rateBps: 0,
+      };
+    }
     const policy = await manager.getRepository(CommissionPolicy).findOne({
       where: [
         {

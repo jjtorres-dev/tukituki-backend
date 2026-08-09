@@ -25,6 +25,7 @@ import type { AuthenticatedUser } from '../auth/interfaces/authenticated-user.in
 import { Roles } from '../authorization/decorators/roles.decorator';
 import { RolesGuard } from '../authorization/guards/roles.guard';
 import { UserRole } from '../users/enums/user-role.enum';
+import { CounterRideOfferDto } from './dto/counter-ride-offer.dto';
 import { DriverRideOfferResponseDto } from './dto/driver-ride-offer-response.dto';
 import { RejectRideOfferDto } from './dto/reject-ride-offer.dto';
 import { DriverRideOffersService } from './driver-ride-offers.service';
@@ -41,7 +42,7 @@ export class DriverRideOffersController {
 
   @Get('active')
   @ApiOperation({
-    summary: 'Listar ofertas vigentes del conductor',
+    summary: 'Listar solicitudes de viaje pendientes para el conductor',
   })
   @ApiOkResponse({
     type: DriverRideOfferResponseDto,
@@ -57,7 +58,7 @@ export class DriverRideOffersController {
 
   @Get(':offerId')
   @ApiOperation({
-    summary: 'Consultar una oferta propia',
+    summary: 'Consultar una solicitud u oferta propia',
   })
   @ApiOkResponse({
     type: DriverRideOfferResponseDto,
@@ -67,34 +68,70 @@ export class DriverRideOffersController {
   })
   getOffer(
     @CurrentUser() user: AuthenticatedUser,
-    @Param('offerId', ParseUUIDPipe) offerId: string,
+    @Param('offerId', ParseUUIDPipe)
+    offerId: string,
   ): Promise<DriverRideOfferResponseDto> {
     return this.driverRideOffersService.getOffer(user.id, offerId);
   }
 
+  /*
+   * IMPORTANTE:
+   *
+   * "accept" ahora significa aceptar
+   * el PRECIO del pasajero.
+   *
+   * Todavía NO asigna el viaje.
+   */
   @Post(':offerId/accept')
   @ApiOperation({
-    summary: 'Aceptar una oferta de viaje',
+    summary: 'Aceptar el precio ofrecido por el pasajero',
   })
   @ApiOkResponse({
     type: DriverRideOfferResponseDto,
   })
   @ApiConflictResponse({
     description:
-      'La oferta venció, el viaje fue asignado o el conductor ya no está disponible',
+      'La oferta venció, el viaje ya no está disponible ' +
+      'o el conductor ya no está disponible',
   })
   @ApiBadRequestResponse()
   @ApiNotFoundResponse()
   acceptOffer(
     @CurrentUser() user: AuthenticatedUser,
-    @Param('offerId', ParseUUIDPipe) offerId: string,
+    @Param('offerId', ParseUUIDPipe)
+    offerId: string,
   ): Promise<DriverRideOfferResponseDto> {
     return this.driverRideOffersService.acceptOffer(user.id, offerId);
   }
 
+  @Post(':offerId/counter-offer')
+  @ApiOperation({
+    summary: 'Enviar una contraoferta de precio al pasajero',
+  })
+  @ApiOkResponse({
+    type: DriverRideOfferResponseDto,
+  })
+  @ApiBadRequestResponse({
+    description:
+      'El precio es inválido o no supera ' + 'la oferta del pasajero',
+  })
+  @ApiConflictResponse({
+    description: 'La oferta venció o ya fue respondida',
+  })
+  @ApiNotFoundResponse()
+  counterOffer(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('offerId', ParseUUIDPipe)
+    offerId: string,
+    @Body()
+    dto: CounterRideOfferDto,
+  ): Promise<DriverRideOfferResponseDto> {
+    return this.driverRideOffersService.counterOffer(user.id, offerId, dto);
+  }
+
   @Post(':offerId/reject')
   @ApiOperation({
-    summary: 'Rechazar una oferta de viaje',
+    summary: 'Rechazar una solicitud de viaje',
   })
   @ApiOkResponse({
     type: DriverRideOfferResponseDto,
@@ -105,8 +142,10 @@ export class DriverRideOffersController {
   @ApiNotFoundResponse()
   rejectOffer(
     @CurrentUser() user: AuthenticatedUser,
-    @Param('offerId', ParseUUIDPipe) offerId: string,
-    @Body() dto: RejectRideOfferDto,
+    @Param('offerId', ParseUUIDPipe)
+    offerId: string,
+    @Body()
+    dto: RejectRideOfferDto,
   ): Promise<DriverRideOfferResponseDto> {
     return this.driverRideOffersService.rejectOffer(user.id, offerId, dto);
   }

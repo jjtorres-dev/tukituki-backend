@@ -4480,6 +4480,109 @@
         ]
       }
     },
+    "/api/v1/places/autocomplete": {
+      "post": {
+        "operationId": "PlacesController_autocomplete",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlacesAutocompleteDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlacesAutocompleteResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": ""
+          },
+          "401": {
+            "description": ""
+          },
+          "503": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Buscar destinos mientras el pasajero escribe",
+        "tags": [
+          "Places"
+        ]
+      }
+    },
+    "/api/v1/places/{placeId}": {
+      "get": {
+        "operationId": "PlacesController_getDetails",
+        "parameters": [
+          {
+            "name": "placeId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sessionToken",
+            "required": false,
+            "in": "query",
+            "description": "Mismo token utilizado durante Autocomplete",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlaceDetailsResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": ""
+          },
+          "401": {
+            "description": ""
+          },
+          "404": {
+            "description": ""
+          },
+          "503": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Obtener coordenadas de un destino seleccionado",
+        "tags": [
+          "Places"
+        ]
+      }
+    },
     "/api/v1/admin/fare-rules": {
       "post": {
         "operationId": "AdminFareRulesController_create",
@@ -5433,6 +5536,101 @@
         ]
       }
     },
+    "/api/v1/passenger/rides/{rideId}/offers": {
+      "get": {
+        "operationId": "PassengerRidesController_getRideOffers",
+        "parameters": [
+          {
+            "name": "rideId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PassengerRideOfferResponseDto"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "El viaje no existe o no pertenece al pasajero"
+          },
+          "409": {
+            "description": "El viaje ya no se encuentra recibiendo propuestas"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Listar propuestas de conductores para un viaje en búsqueda",
+        "tags": [
+          "Passenger rides"
+        ]
+      }
+    },
+    "/api/v1/passenger/rides/{rideId}/offers/{offerId}/select": {
+      "post": {
+        "operationId": "PassengerRidesController_selectRideOffer",
+        "parameters": [
+          {
+            "name": "rideId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "offerId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PassengerRideResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "El viaje o la propuesta no existen"
+          },
+          "409": {
+            "description": "La propuesta venció, el conductor dejó de estar disponible o el viaje ya fue asignado"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Elegir una propuesta y asignar al conductor",
+        "tags": [
+          "Passenger rides"
+        ]
+      }
+    },
     "/api/v1/passenger/rides/history": {
       "get": {
         "operationId": "PassengerRidesController_getHistory",
@@ -5978,7 +6176,7 @@
             "bearer": []
           }
         ],
-        "summary": "Listar ofertas vigentes del conductor",
+        "summary": "Listar solicitudes de viaje pendientes para el conductor",
         "tags": [
           "Driver ride offers"
         ]
@@ -6017,7 +6215,7 @@
             "bearer": []
           }
         ],
-        "summary": "Consultar una oferta propia",
+        "summary": "Consultar una solicitud u oferta propia",
         "tags": [
           "Driver ride offers"
         ]
@@ -6054,7 +6252,7 @@
             "description": ""
           },
           "409": {
-            "description": "La oferta venció, el viaje fue asignado o el conductor ya no está disponible"
+            "description": "La oferta venció, el viaje ya no está disponible o el conductor ya no está disponible"
           }
         },
         "security": [
@@ -6062,7 +6260,62 @@
             "bearer": []
           }
         ],
-        "summary": "Aceptar una oferta de viaje",
+        "summary": "Aceptar el precio ofrecido por el pasajero",
+        "tags": [
+          "Driver ride offers"
+        ]
+      }
+    },
+    "/api/v1/drivers/me/ride-offers/{offerId}/counter-offer": {
+      "post": {
+        "operationId": "DriverRideOffersController_counterOffer",
+        "parameters": [
+          {
+            "name": "offerId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CounterRideOfferDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DriverRideOfferResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "El precio es inválido o no supera la oferta del pasajero"
+          },
+          "404": {
+            "description": ""
+          },
+          "409": {
+            "description": "La oferta venció o ya fue respondida"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Enviar una contraoferta de precio al pasajero",
         "tags": [
           "Driver ride offers"
         ]
@@ -6114,7 +6367,7 @@
             "bearer": []
           }
         ],
-        "summary": "Rechazar una oferta de viaje",
+        "summary": "Rechazar una solicitud de viaje",
         "tags": [
           "Driver ride offers"
         ]
@@ -7728,6 +7981,10 @@
       "description": "Administración de zonas de cobertura."
     },
     {
+      "name": "Places",
+      "description": "Búsqueda y resolución de destinos para pasajeros con Google Places."
+    },
+    {
       "name": "Fares",
       "description": "Cotización de tarifas para pasajeros."
     },
@@ -7847,7 +8104,7 @@
   "servers": [
     {
       "url": "http://localhost:3001",
-      "description": "development API"
+      "description": "test API"
     }
   ],
   "components": {
@@ -11272,6 +11529,7 @@
             "type": "string",
             "enum": [
               "OFFERED",
+              "PROPOSED",
               "ACCEPTED",
               "REJECTED",
               "EXPIRED",
@@ -12116,6 +12374,110 @@
           "covered"
         ]
       },
+      "PlacesAutocompleteDto": {
+        "type": "object",
+        "properties": {
+          "input": {
+            "type": "string",
+            "example": "GH Bus",
+            "minLength": 2,
+            "maxLength": 120
+          },
+          "latitude": {
+            "type": "number",
+            "example": -6.47205,
+            "minimum": -90,
+            "maximum": 90
+          },
+          "longitude": {
+            "type": "number",
+            "example": -76.39432,
+            "minimum": -180,
+            "maximum": 180
+          },
+          "sessionToken": {
+            "type": "string",
+            "description": "Token único de la sesión de autocompletado",
+            "example": "a1b2c3d4e5f60718293a4b5c6d7e8f90"
+          }
+        },
+        "required": [
+          "input",
+          "latitude",
+          "longitude"
+        ]
+      },
+      "PlaceAutocompleteItemDto": {
+        "type": "object",
+        "properties": {
+          "placeId": {
+            "type": "string"
+          },
+          "primaryText": {
+            "type": "string",
+            "example": "GH Bus"
+          },
+          "secondaryText": {
+            "type": "string",
+            "example": "Terminal de Buses Morales, Tarapoto"
+          },
+          "fullText": {
+            "type": "string",
+            "example": "GH Bus, Terminal de Buses Morales, Tarapoto"
+          },
+          "distanceMeters": {
+            "type": "object",
+            "example": 850,
+            "nullable": true
+          }
+        },
+        "required": [
+          "placeId",
+          "primaryText",
+          "secondaryText",
+          "fullText"
+        ]
+      },
+      "PlacesAutocompleteResponseDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlaceAutocompleteItemDto"
+            }
+          }
+        },
+        "required": [
+          "items"
+        ]
+      },
+      "PlaceDetailsResponseDto": {
+        "type": "object",
+        "properties": {
+          "placeId": {
+            "type": "string"
+          },
+          "formattedAddress": {
+            "type": "string",
+            "example": "Terminal de Buses Morales, Tarapoto 22201"
+          },
+          "latitude": {
+            "type": "number",
+            "example": -6.47543
+          },
+          "longitude": {
+            "type": "number",
+            "example": -76.39464
+          }
+        },
+        "required": [
+          "placeId",
+          "formattedAddress",
+          "latitude",
+          "longitude"
+        ]
+      },
       "CreateFareRuleDto": {
         "type": "object",
         "properties": {
@@ -12410,13 +12772,17 @@
             "type": "number",
             "example": 3200,
             "minimum": 1,
-            "maximum": 100000
+            "maximum": 100000,
+            "deprecated": true,
+            "description": "Obsoleto. El backend calcula la distancia usando Google Routes."
           },
           "durationSeconds": {
             "type": "number",
             "example": 720,
             "minimum": 1,
-            "maximum": 86400
+            "maximum": 86400,
+            "deprecated": true,
+            "description": "Obsoleto. El backend calcula la duración usando Google Routes."
           },
           "isNight": {
             "type": "boolean",
@@ -12429,9 +12795,7 @@
         },
         "required": [
           "origin",
-          "destination",
-          "distanceMeters",
-          "durationSeconds"
+          "destination"
         ]
       },
       "FareQuoteLocationResponseDto": {
@@ -12490,6 +12854,11 @@
           },
           "durationSeconds": {
             "type": "number"
+          },
+          "routePolyline": {
+            "type": "string",
+            "description": "Ruta codificada con Google Encoded Polyline Algorithm para dibujar el recorrido en el mapa.",
+            "example": "}_il@~qswM..."
           },
           "baseFare": {
             "type": "string"
@@ -13054,6 +13423,11 @@
             "type": "string",
             "format": "uuid"
           },
+          "passengerOfferFare": {
+            "type": "string",
+            "example": "5.50",
+            "description": "Precio que el pasajero desea ofrecer por el viaje. Si no se envía, se utiliza temporalmente la tarifa sugerida por TukiTuki."
+          },
           "paymentMethod": {
             "type": "string",
             "enum": [
@@ -13231,6 +13605,16 @@
           "estimatedFare": {
             "type": "string"
           },
+          "passengerOfferFare": {
+            "type": "object",
+            "nullable": true,
+            "example": "5.50"
+          },
+          "agreedFare": {
+            "type": "object",
+            "nullable": true,
+            "example": "6.00"
+          },
           "finalFare": {
             "type": "object",
             "nullable": true
@@ -13361,6 +13745,99 @@
           "searchExpiresAt",
           "createdAt",
           "updatedAt"
+        ]
+      },
+      "PassengerRideOfferDriverDto": {
+        "type": "object",
+        "properties": {
+          "profileId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "firstName": {
+            "type": "string",
+            "example": "Carlos"
+          },
+          "lastNameInitial": {
+            "type": "string",
+            "example": "M."
+          },
+          "photoUrl": {
+            "type": "object",
+            "nullable": true
+          },
+          "ratingAverage": {
+            "type": "string",
+            "example": "4.92"
+          },
+          "ratingCount": {
+            "type": "number",
+            "example": 128
+          }
+        },
+        "required": [
+          "profileId",
+          "firstName",
+          "lastNameInitial",
+          "ratingAverage",
+          "ratingCount"
+        ]
+      },
+      "PassengerRideOfferResponseDto": {
+        "type": "object",
+        "properties": {
+          "offerId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "rideId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "driver": {
+            "$ref": "#/components/schemas/PassengerRideOfferDriverDto"
+          },
+          "distanceToOriginMeters": {
+            "type": "number",
+            "example": 320,
+            "description": "Distancia aproximada en metros entre el conductor y el origen."
+          },
+          "passengerOfferFare": {
+            "type": "string",
+            "example": "5.50"
+          },
+          "proposedFare": {
+            "type": "string",
+            "example": "6.00"
+          },
+          "isCounterOffer": {
+            "type": "boolean",
+            "example": true
+          },
+          "currency": {
+            "type": "string",
+            "example": "PEN"
+          },
+          "proposedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "offerId",
+          "rideId",
+          "driver",
+          "distanceToOriginMeters",
+          "passengerOfferFare",
+          "proposedFare",
+          "isCounterOffer",
+          "currency",
+          "proposedAt",
+          "expiresAt"
         ]
       },
       "PassengerRideHistoryDriverDto": {
@@ -14263,7 +14740,12 @@
             "$ref": "#/components/schemas/DriverRideOfferLocationDto"
           },
           "estimatedFare": {
-            "type": "string"
+            "type": "string",
+            "example": "5.00"
+          },
+          "passengerOfferFare": {
+            "type": "string",
+            "example": "5.50"
           },
           "currency": {
             "type": "string",
@@ -14279,6 +14761,7 @@
           "origin",
           "destination",
           "estimatedFare",
+          "passengerOfferFare",
           "currency"
         ]
       },
@@ -14297,6 +14780,7 @@
             "type": "string",
             "enum": [
               "OFFERED",
+              "PROPOSED",
               "ACCEPTED",
               "REJECTED",
               "EXPIRED",
@@ -14312,6 +14796,11 @@
           "searchRadiusMeters": {
             "type": "number"
           },
+          "proposedFare": {
+            "type": "object",
+            "nullable": true,
+            "example": "6.00"
+          },
           "offeredAt": {
             "type": "string",
             "format": "date-time"
@@ -14319,6 +14808,11 @@
           "expiresAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "proposedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
           },
           "respondedAt": {
             "type": "string",
@@ -14343,6 +14837,19 @@
           "offeredAt",
           "expiresAt",
           "ride"
+        ]
+      },
+      "CounterRideOfferDto": {
+        "type": "object",
+        "properties": {
+          "proposedFare": {
+            "type": "string",
+            "example": "6.00",
+            "description": "Nuevo precio propuesto por el conductor. Debe ser mayor que el precio ofrecido por el pasajero."
+          }
+        },
+        "required": [
+          "proposedFare"
         ]
       },
       "RejectRideOfferDto": {
@@ -14392,6 +14899,11 @@
           },
           "estimatedFare": {
             "type": "string"
+          },
+          "agreedFare": {
+            "type": "object",
+            "nullable": true,
+            "example": "6.00"
           },
           "currency": {
             "type": "string",
@@ -14759,6 +15271,12 @@
             "type": "string",
             "example": "7.40"
           },
+          "agreedFare": {
+            "type": "object",
+            "nullable": true,
+            "example": "6.00",
+            "description": "Precio negociado y aceptado entre pasajero y conductor"
+          },
           "finalFare": {
             "type": "string",
             "example": "8.10"
@@ -14813,6 +15331,7 @@
           "actualDistanceMeters",
           "actualDurationSeconds",
           "estimatedFare",
+          "agreedFare",
           "finalFare",
           "discountAmount",
           "passengerAmountDue",

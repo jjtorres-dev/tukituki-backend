@@ -141,6 +141,7 @@ export class RideRealtimeService {
       actualDistanceMeters: ride.actualDistanceMeters,
       actualDurationSeconds: ride.actualDurationSeconds,
       estimatedFare: ride.estimatedFare,
+      agreedFare: ride.agreedFare,
       finalFare: fare.finalFare,
       currency: fare.currency,
       fareWasCapped: fare.fareWasCapped,

@@ -80,9 +80,17 @@ function attempt(
 
 function configService(): ConfigService {
   return {
-    get: jest.fn((key: string) =>
-      key === 'IZIPAY_KEY_HASH' ? KEY_HASH : undefined,
-    ),
+    get: jest.fn((key: string) => {
+      if (key === 'IZIPAY_KEY_HASH') {
+        return KEY_HASH;
+      }
+
+      if (key === 'COMMISSION_MODE') {
+        return 'ENFORCED';
+      }
+
+      return undefined;
+    }),
   } as unknown as ConfigService;
 }
 

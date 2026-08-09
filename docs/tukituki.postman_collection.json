@@ -3256,6 +3256,84 @@
       ]
     },
     {
+      "name": "Places",
+      "item": [
+        {
+          "name": "Buscar destinos mientras el pasajero escribe",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "description": "Buscar destinos mientras el pasajero escribe",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/places/autocomplete",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "places",
+                "autocomplete"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"input\": \"GH Bus\",\n  \"latitude\": -6.47205,\n  \"longitude\": -76.39432,\n  \"sessionToken\": \"a1b2c3d4e5f60718293a4b5c6d7e8f90\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Obtener coordenadas de un destino seleccionado",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "description": "Obtener coordenadas de un destino seleccionado",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/places/:placeId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "places",
+                ":placeId"
+              ],
+              "query": [
+                {
+                  "key": "sessionToken",
+                  "value": "{{sessionToken}}",
+                  "description": "Mismo token utilizado durante Autocomplete",
+                  "disabled": true
+                }
+              ],
+              "variable": [
+                {
+                  "key": "placeId",
+                  "value": "{{placeId}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
       "name": "Admin fare rules",
       "item": [
         {
@@ -3936,7 +4014,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"fareQuoteId\": \"00000000-0000-4000-8000-000000000000\",\n  \"paymentMethod\": \"CASH\",\n  \"couponCode\": \"BIENVENIDO20\",\n  \"passengerNotes\": \"Estoy frente a la puerta principal\"\n}",
+              "raw": "{\n  \"fareQuoteId\": \"00000000-0000-4000-8000-000000000000\",\n  \"passengerOfferFare\": \"5.50\",\n  \"paymentMethod\": \"CASH\",\n  \"couponCode\": \"BIENVENIDO20\",\n  \"passengerNotes\": \"Estoy frente a la puerta principal\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -3966,6 +4044,72 @@
               ],
               "query": [],
               "variable": []
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Listar propuestas de conductores para un viaje en búsqueda",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "description": "Listar propuestas de conductores para un viaje en búsqueda",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/passenger/rides/:rideId/offers",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "passenger",
+                "rides",
+                ":rideId",
+                "offers"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "rideId",
+                  "value": "{{rideId}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Elegir una propuesta y asignar al conductor",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "description": "Elegir una propuesta y asignar al conductor",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/passenger/rides/:rideId/offers/:offerId/select",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "passenger",
+                "rides",
+                ":rideId",
+                "offers",
+                ":offerId",
+                "select"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "rideId",
+                  "value": "{{rideId}}"
+                },
+                {
+                  "key": "offerId",
+                  "value": "{{offerId}}"
+                }
+              ]
             }
           },
           "response": []
@@ -4375,11 +4519,11 @@
       "name": "Driver ride offers",
       "item": [
         {
-          "name": "Listar ofertas vigentes del conductor",
+          "name": "Listar solicitudes de viaje pendientes para el conductor",
           "request": {
             "method": "GET",
             "header": [],
-            "description": "Listar ofertas vigentes del conductor",
+            "description": "Listar solicitudes de viaje pendientes para el conductor",
             "url": {
               "raw": "{{baseUrl}}/api/v1/drivers/me/ride-offers/active",
               "host": [
@@ -4400,11 +4544,11 @@
           "response": []
         },
         {
-          "name": "Consultar una oferta propia",
+          "name": "Consultar una solicitud u oferta propia",
           "request": {
             "method": "GET",
             "header": [],
-            "description": "Consultar una oferta propia",
+            "description": "Consultar una solicitud u oferta propia",
             "url": {
               "raw": "{{baseUrl}}/api/v1/drivers/me/ride-offers/:offerId",
               "host": [
@@ -4430,11 +4574,11 @@
           "response": []
         },
         {
-          "name": "Aceptar una oferta de viaje",
+          "name": "Aceptar el precio ofrecido por el pasajero",
           "request": {
             "method": "POST",
             "header": [],
-            "description": "Aceptar una oferta de viaje",
+            "description": "Aceptar el precio ofrecido por el pasajero",
             "url": {
               "raw": "{{baseUrl}}/api/v1/drivers/me/ride-offers/:offerId/accept",
               "host": [
@@ -4461,7 +4605,7 @@
           "response": []
         },
         {
-          "name": "Rechazar una oferta de viaje",
+          "name": "Enviar una contraoferta de precio al pasajero",
           "request": {
             "method": "POST",
             "header": [
@@ -4471,7 +4615,53 @@
                 "type": "text"
               }
             ],
-            "description": "Rechazar una oferta de viaje",
+            "description": "Enviar una contraoferta de precio al pasajero",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/drivers/me/ride-offers/:offerId/counter-offer",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "drivers",
+                "me",
+                "ride-offers",
+                ":offerId",
+                "counter-offer"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "offerId",
+                  "value": "{{offerId}}"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"proposedFare\": \"6.00\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Rechazar una solicitud de viaje",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "description": "Rechazar una solicitud de viaje",
             "url": {
               "raw": "{{baseUrl}}/api/v1/drivers/me/ride-offers/:offerId/reject",
               "host": [

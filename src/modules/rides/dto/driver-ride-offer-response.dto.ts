@@ -29,8 +29,23 @@ export class DriverRideOfferRideDto {
   })
   destination!: DriverRideOfferLocationDto;
 
-  @ApiProperty()
+  /*
+   * Precio sugerido por TukiTuki.
+   * Es informativo para el conductor.
+   */
+  @ApiProperty({
+    example: '5.00',
+  })
   estimatedFare!: string;
+
+  /*
+   * Precio que realmente está ofreciendo
+   * el pasajero.
+   */
+  @ApiProperty({
+    example: '5.50',
+  })
+  passengerOfferFare!: string;
 
   @ApiProperty({
     example: 'PEN',
@@ -68,6 +83,17 @@ export class DriverRideOfferResponseDto {
   @ApiProperty()
   searchRadiusMeters!: number;
 
+  /*
+   * Precio presentado por este conductor.
+   *
+   * NULL mientras todavía no responda.
+   */
+  @ApiPropertyOptional({
+    nullable: true,
+    example: '6.00',
+  })
+  proposedFare!: string | null;
+
   @ApiProperty({
     type: String,
     format: 'date-time',
@@ -79,6 +105,13 @@ export class DriverRideOfferResponseDto {
     format: 'date-time',
   })
   expiresAt!: Date;
+
+  @ApiPropertyOptional({
+    type: String,
+    format: 'date-time',
+    nullable: true,
+  })
+  proposedAt!: Date | null;
 
   @ApiPropertyOptional({
     type: String,

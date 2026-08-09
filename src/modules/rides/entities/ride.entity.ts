@@ -188,6 +188,43 @@ export class Ride {
   })
   estimatedFare!: string;
 
+  /*
+   * Precio propuesto inicialmente por el pasajero.
+   *
+   * Es independiente de estimatedFare:
+   *
+   * estimatedFare       -> recomendación TukiTuki
+   * passengerOfferFare  -> decisión del pasajero
+   *
+   * Nullable permite mantener viajes históricos
+   * creados antes de introducir negociación.
+   */
+  @Column({
+    name: 'passenger_offer_fare',
+    type: 'numeric',
+    precision: 10,
+    scale: 2,
+    nullable: true,
+  })
+  passengerOfferFare!: string | null;
+
+  /*
+   * Precio definitivo acordado entre pasajero
+   * y conductor.
+   *
+   * Queda NULL durante SEARCHING_DRIVER.
+   * Se congela cuando el pasajero selecciona
+   * una propuesta.
+   */
+  @Column({
+    name: 'agreed_fare',
+    type: 'numeric',
+    precision: 10,
+    scale: 2,
+    nullable: true,
+  })
+  agreedFare!: string | null;
+
   @Column({
     name: 'final_fare',
     type: 'numeric',

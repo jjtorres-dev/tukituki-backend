@@ -1,24 +1,23 @@
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import {
-  DataSource,
-  In,
-  LessThanOrEqual,
-  MoreThan,
-  QueryFailedError,
-} from 'typeorm';
+import { DataSource, In, LessThanOrEqual, MoreThan } from 'typeorm';
 import type { EntityManager } from 'typeorm';
 
-import { DriverAvailabilityRedisService } from '../../infrastructure/redis/driver-availability-redis.service';
+import {
+  formatCents,
+  parseScaledDecimal,
+} from '../fares/utils/fixed-decimal.util';
 import { DriverOperationalState } from '../driver-operations/entities/driver-operational-state.entity';
 import { DriverOperationalStatus } from '../driver-operations/enums/driver-operational-status.enum';
 import { DriverProfile } from '../drivers/entities/driver-profile.entity';
 import { DriverStatus } from '../drivers/enums/driver-status.enum';
+import { CounterRideOfferDto } from './dto/counter-ride-offer.dto';
 import { DriverRideOfferResponseDto } from './dto/driver-ride-offer-response.dto';
 import { RejectRideOfferDto } from './dto/reject-ride-offer.dto';
 import { RideOffer } from './entities/ride-offer.entity';
@@ -28,12 +27,11 @@ import { RideStatus } from './enums/ride-status.enum';
 import { ACTIVE_DRIVER_RIDE_STATUSES } from './ride-matching.constants';
 import { RideDispatchService } from './ride-dispatch.service';
 import { RideTransitionsService } from './ride-transitions.service';
-import { RideRealtimeService } from './realtime/ride-realtime.service';
 
-interface AcceptedOutcome {
-  kind: 'accepted';
+interface ProposedOutcome {
+  kind: 'proposed';
   offer: RideOffer;
-  driverProfileId: string;
+  rideId: string;
 }
 
 interface ExpiredOutcome {
@@ -44,7 +42,7 @@ interface UnavailableOutcome {
   kind: 'unavailable';
 }
 
-type AcceptOutcome = AcceptedOutcome | ExpiredOutcome | UnavailableOutcome;
+type ProposalOutcome = ProposedOutcome | ExpiredOutcome | UnavailableOutcome;
 
 type RejectOutcome =
   | {
@@ -61,22 +59,28 @@ export class DriverRideOffersService {
   constructor(
     private readonly dataSource: DataSource,
     private readonly rideDispatchService: RideDispatchService,
-    private readonly availabilityRedisService: DriverAvailabilityRedisService,
     private readonly transitionsService: RideTransitionsService,
-    private readonly realtimeService: RideRealtimeService,
   ) {}
 
   async getActiveOffers(userId: string): Promise<DriverRideOfferResponseDto[]> {
     const profile = await this.getApprovedProfile(userId);
+
     await this.assertDriverIsAvailable(profile.id);
 
     const now = new Date();
+
     const repository = this.dataSource.getRepository(RideOffer);
 
+    /*
+     * OFFERED y PROPOSED pueden expirar.
+     *
+     * Una propuesta ya enviada deja de ser
+     * válida cuando llega su expiresAt.
+     */
     await repository.update(
       {
         driverProfileId: profile.id,
-        status: RideOfferStatus.OFFERED,
+        status: In([RideOfferStatus.OFFERED, RideOfferStatus.PROPOSED]),
         expiresAt: LessThanOrEqual(now),
       },
       {
@@ -85,6 +89,13 @@ export class DriverRideOffersService {
       },
     );
 
+    /*
+     * Al conductor solamente le devolvemos
+     * como "activas" las solicitudes que
+     * todavía puede responder.
+     *
+     * Una PROPOSED ya fue respondida.
+     */
     const offers = await repository.find({
       where: {
         driverProfileId: profile.id,
@@ -108,6 +119,7 @@ export class DriverRideOffersService {
     offerId: string,
   ): Promise<DriverRideOfferResponseDto> {
     const profile = await this.getApprovedProfile(userId);
+
     const offer = await this.dataSource.getRepository(RideOffer).findOne({
       where: {
         id: offerId,
@@ -125,58 +137,46 @@ export class DriverRideOffersService {
     return this.mapOffer(offer);
   }
 
+  /*
+   * El conductor acepta exactamente
+   * el precio ofrecido por el pasajero.
+   *
+   * Esto genera PROPOSED.
+   *
+   * NO:
+   * - asigna el viaje;
+   * - pone al conductor BUSY;
+   * - cancela otras ofertas.
+   */
   async acceptOffer(
     userId: string,
     offerId: string,
   ): Promise<DriverRideOfferResponseDto> {
-    try {
-      const outcome = await this.dataSource.transaction((manager) =>
-        this.acceptWithinTransaction(manager, userId, offerId),
-      );
+    const outcome = await this.dataSource.transaction((manager) =>
+      this.proposeWithinTransaction(manager, userId, offerId, null),
+    );
 
-      if (outcome.kind === 'expired') {
-        throw new ConflictException('La oferta ya venció');
-      }
+    this.assertProposalOutcome(outcome);
 
-      if (outcome.kind === 'unavailable') {
-        throw new ConflictException(
-          'El viaje ya no está disponible para asignación',
-        );
-      }
+    return this.mapOffer(outcome.offer);
+  }
 
-      await this.availabilityRedisService
-        .registerBusyPresence(outcome.driverProfileId)
-        .catch((error: unknown) => {
-          this.logger.warn(
-            `El conductor ${outcome.driverProfileId} quedó BUSY ` +
-              'en PostgreSQL, pero Redis no pudo actualizarse: ' +
-              this.errorMessage(error),
-          );
-        });
+  /*
+   * El conductor propone un precio superior
+   * al ofrecido inicialmente por el pasajero.
+   */
+  async counterOffer(
+    userId: string,
+    offerId: string,
+    dto: CounterRideOfferDto,
+  ): Promise<DriverRideOfferResponseDto> {
+    const outcome = await this.dataSource.transaction((manager) =>
+      this.proposeWithinTransaction(manager, userId, offerId, dto.proposedFare),
+    );
 
-      try {
-        this.realtimeService.emitAssigned(outcome.offer.ride);
-        this.realtimeService.emitStatusChanged(
-          outcome.offer.ride,
-          RideStatus.SEARCHING_DRIVER,
-        );
-      } catch (error: unknown) {
-        this.logger.warn(
-          `El viaje ${outcome.offer.rideId} fue asignado, ` +
-            `pero no pudo emitirse por WebSocket: ${this.errorMessage(error)}`,
-        );
-      }
+    this.assertProposalOutcome(outcome);
 
-      return this.mapOffer(outcome.offer);
-    } catch (error: unknown) {
-      if (this.isUniqueViolation(error)) {
-        throw new ConflictException(
-          'La solicitud ya fue asignada a otro conductor',
-        );
-      }
-
-      throw error;
-    }
+    return this.mapOffer(outcome.offer);
   }
 
   async rejectOffer(
@@ -196,7 +196,8 @@ export class DriverRideOffersService {
       .dispatchRide(outcome.rideId)
       .catch((error: unknown) => {
         this.logger.warn(
-          `No pudo continuarse el matching del viaje ${outcome.rideId}: ` +
+          `No pudo continuarse el matching del viaje ` +
+            `${outcome.rideId}: ` +
             this.errorMessage(error),
         );
       });
@@ -204,13 +205,20 @@ export class DriverRideOffersService {
     return this.mapOffer(outcome.offer);
   }
 
-  private async acceptWithinTransaction(
+  private async proposeWithinTransaction(
     manager: EntityManager,
     userId: string,
     offerId: string,
-  ): Promise<AcceptOutcome> {
+    counterOfferFare: string | null,
+  ): Promise<ProposalOutcome> {
     const profile = await this.lockApprovedProfile(manager, userId);
+
     const offerRepository = manager.getRepository(RideOffer);
+
+    /*
+     * Primero obtenemos el rideId sin bloquear
+     * todavía el viaje completo.
+     */
     const offerSnapshot = await offerRepository.findOne({
       where: {
         id: offerId,
@@ -223,6 +231,12 @@ export class DriverRideOffersService {
     }
 
     const rideRepository = manager.getRepository(Ride);
+
+    /*
+     * Bloqueamos el viaje para evitar carreras
+     * con cancelación, expiración o futura
+     * selección del pasajero.
+     */
     const ride = await rideRepository.findOne({
       where: {
         id: offerSnapshot.rideId,
@@ -236,6 +250,9 @@ export class DriverRideOffersService {
       throw new NotFoundException('El viaje no existe');
     }
 
+    /*
+     * Bloqueamos también esta RideOffer.
+     */
     const offer = await offerRepository.findOne({
       where: {
         id: offerId,
@@ -255,9 +272,15 @@ export class DriverRideOffersService {
 
     const now = new Date();
 
+    /*
+     * La invitación original al conductor
+     * pudo vencer antes de responder.
+     */
     if (offer.expiresAt.getTime() <= now.getTime()) {
       offer.status = RideOfferStatus.EXPIRED;
+
       offer.respondedAt = now;
+
       await offerRepository.save(offer);
 
       return {
@@ -265,6 +288,11 @@ export class DriverRideOffersService {
       };
     }
 
+    /*
+     * Si el viaje completo dejó de estar
+     * disponible, tampoco permitimos presentar
+     * propuestas.
+     */
     if (
       ride.status !== RideStatus.SEARCHING_DRIVER ||
       ride.searchExpiresAt.getTime() <= now.getTime()
@@ -282,7 +310,7 @@ export class DriverRideOffersService {
         await offerRepository.update(
           {
             rideId: ride.id,
-            status: RideOfferStatus.OFFERED,
+            status: In([RideOfferStatus.OFFERED, RideOfferStatus.PROPOSED]),
           },
           {
             status: RideOfferStatus.EXPIRED,
@@ -291,8 +319,10 @@ export class DriverRideOffersService {
         );
       } else {
         offer.status = RideOfferStatus.CANCELLED;
+
         offer.respondedAt = now;
         offer.cancelledAt = now;
+
         await offerRepository.save(offer);
       }
 
@@ -301,6 +331,12 @@ export class DriverRideOffersService {
       };
     }
 
+    /*
+     * El conductor tiene que seguir AVAILABLE.
+     *
+     * Presentar una propuesta NO lo convierte
+     * en BUSY.
+     */
     const operationalState = await manager
       .getRepository(DriverOperationalState)
       .findOne({
@@ -319,6 +355,10 @@ export class DriverRideOffersService {
       throw new ConflictException('El conductor ya no se encuentra disponible');
     }
 
+    /*
+     * Segunda defensa: un conductor con otro
+     * viaje activo no puede ofertar.
+     */
     const activeRide = await rideRepository.findOne({
       where: {
         driverProfileId: profile.id,
@@ -333,58 +373,87 @@ export class DriverRideOffersService {
       throw new ConflictException('El conductor ya tiene un viaje activo');
     }
 
-    offer.status = RideOfferStatus.ACCEPTED;
+    /*
+     * Para viajes nuevos passengerOfferFare
+     * siempre existe.
+     *
+     * El fallback mantiene compatibilidad con
+     * registros históricos.
+     */
+    const passengerOfferFare = this.normalizeFare(
+      ride.passengerOfferFare ?? ride.estimatedFare,
+    );
+
+    let proposedFare = passengerOfferFare;
+
+    /*
+     * Si viene monto explícito, estamos ante
+     * una contraoferta.
+     */
+    if (counterOfferFare !== null) {
+      proposedFare = this.normalizeFare(counterOfferFare);
+
+      const passengerCents = parseScaledDecimal(passengerOfferFare, 2);
+
+      const proposedCents = parseScaledDecimal(proposedFare, 2);
+
+      if (proposedCents <= passengerCents) {
+        throw new BadRequestException(
+          'La contraoferta debe ser mayor ' +
+            'que el precio ofrecido por el pasajero',
+        );
+      }
+    }
+
+    offer.status = RideOfferStatus.PROPOSED;
+
+    offer.proposedFare = proposedFare;
+
+    offer.proposedAt = now;
+
     offer.respondedAt = now;
-    offer.acceptedAt = now;
-    offer.cancelledAt = null;
+
+    /*
+     * La invitación original podía durar
+     * solamente unos segundos.
+     *
+     * Una vez propuesta, la dejamos vigente
+     * hasta el final del período global
+     * de búsqueda del viaje.
+     */
+    offer.expiresAt = ride.searchExpiresAt;
+
+    offer.acceptedAt = null;
+
     offer.rejectedAt = null;
+
+    offer.cancelledAt = null;
+
     offer.rejectionReason = null;
 
-    operationalState.status = DriverOperationalStatus.BUSY;
-    operationalState.lastSeenAt = now;
-
     const savedOffer = await offerRepository.save(offer);
-    await this.transitionsService.assignDriverWithinTransaction(
-      manager,
-      ride,
-      profile.id,
-      userId,
-      offer.id,
-      now,
-    );
-    await manager.getRepository(DriverOperationalState).save(operationalState);
-
-    await offerRepository.update(
-      {
-        rideId: ride.id,
-        status: RideOfferStatus.OFFERED,
-      },
-      {
-        status: RideOfferStatus.CANCELLED,
-        respondedAt: now,
-        cancelledAt: now,
-      },
-    );
-
-    await offerRepository.update(
-      {
-        driverProfileId: profile.id,
-        status: RideOfferStatus.OFFERED,
-      },
-      {
-        status: RideOfferStatus.CANCELLED,
-        respondedAt: now,
-        cancelledAt: now,
-      },
-    );
 
     savedOffer.ride = ride;
 
     return {
-      kind: 'accepted',
+      kind: 'proposed',
       offer: savedOffer,
-      driverProfileId: profile.id,
+      rideId: ride.id,
     };
+  }
+
+  private assertProposalOutcome(
+    outcome: ProposalOutcome,
+  ): asserts outcome is ProposedOutcome {
+    if (outcome.kind === 'expired') {
+      throw new ConflictException('La oferta ya venció');
+    }
+
+    if (outcome.kind === 'unavailable') {
+      throw new ConflictException(
+        'El viaje ya no está disponible para recibir propuestas',
+      );
+    }
   }
 
   private async rejectWithinTransaction(
@@ -394,6 +463,7 @@ export class DriverRideOffersService {
     dto: RejectRideOfferDto,
   ): Promise<RejectOutcome> {
     const profile = await this.lockApprovedProfile(manager, userId);
+
     const operationalState = await manager
       .getRepository(DriverOperationalState)
       .findOne({
@@ -410,11 +480,12 @@ export class DriverRideOffersService {
       operationalState.status !== DriverOperationalStatus.AVAILABLE
     ) {
       throw new ForbiddenException(
-        'El conductor debe estar AVAILABLE para responder ofertas',
+        'El conductor debe estar AVAILABLE ' + 'para responder ofertas',
       );
     }
 
     const repository = manager.getRepository(RideOffer);
+
     const offer = await repository.findOne({
       where: {
         id: offerId,
@@ -436,7 +507,9 @@ export class DriverRideOffersService {
 
     if (offer.expiresAt.getTime() <= now.getTime()) {
       offer.status = RideOfferStatus.EXPIRED;
+
       offer.respondedAt = now;
+
       await repository.save(offer);
 
       return {
@@ -445,11 +518,15 @@ export class DriverRideOffersService {
     }
 
     offer.status = RideOfferStatus.REJECTED;
+
     offer.respondedAt = now;
+
     offer.rejectedAt = now;
+
     offer.rejectionReason = dto.reason?.trim() || null;
 
     const savedOffer = await repository.save(offer);
+
     const ride = await manager.getRepository(Ride).findOne({
       where: {
         id: offer.rideId,
@@ -524,8 +601,22 @@ export class DriverRideOffersService {
 
     if (!state || state.status !== DriverOperationalStatus.AVAILABLE) {
       throw new ForbiddenException(
-        'El conductor debe estar AVAILABLE para recibir ofertas',
+        'El conductor debe estar AVAILABLE ' + 'para recibir ofertas',
       );
+    }
+  }
+
+  private normalizeFare(value: string): string {
+    try {
+      const cents = parseScaledDecimal(value, 2);
+
+      if (cents <= 0n || cents > 999999n) {
+        throw new Error('Monto fuera de rango');
+      }
+
+      return formatCents(cents);
+    } catch {
+      throw new BadRequestException('El precio propuesto no es válido');
     }
   }
 
@@ -536,44 +627,53 @@ export class DriverRideOffersService {
       id: offer.id,
       rideId: offer.rideId,
       status: offer.status,
+
       distanceToOriginMeters: offer.distanceToOriginMeters,
+
       dispatchRound: offer.dispatchRound,
+
       searchRadiusMeters: offer.searchRadiusMeters,
+
+      proposedFare: offer.proposedFare,
+
       offeredAt: offer.offeredAt,
+
       expiresAt: offer.expiresAt,
+
+      proposedAt: offer.proposedAt,
+
       respondedAt: offer.respondedAt,
+
       rejectionReason: offer.rejectionReason,
+
       ride: {
         id: ride.id,
+
         origin: {
           latitude: ride.originPosition.coordinates[1],
+
           longitude: ride.originPosition.coordinates[0],
+
           address: ride.originAddress,
         },
+
         destination: {
           latitude: ride.destinationPosition.coordinates[1],
+
           longitude: ride.destinationPosition.coordinates[0],
+
           address: ride.destinationAddress,
         },
+
         estimatedFare: ride.estimatedFare,
+
+        passengerOfferFare: ride.passengerOfferFare ?? ride.estimatedFare,
+
         currency: ride.currency,
+
         passengerNotes: ride.passengerNotes,
       },
     };
-  }
-
-  private isUniqueViolation(error: unknown): boolean {
-    if (!(error instanceof QueryFailedError)) {
-      return false;
-    }
-
-    const queryError = error as QueryFailedError & {
-      driverError?: {
-        code?: string;
-      };
-    };
-
-    return queryError.driverError?.code === '23505';
   }
 
   private errorMessage(error: unknown): string {
