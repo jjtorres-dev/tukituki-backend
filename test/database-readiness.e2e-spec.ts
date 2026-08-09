@@ -132,7 +132,7 @@ describe('Database readiness smoke', () => {
        ORDER BY tablename`,
     );
 
-    expect(Number(migrationRows[0]?.count)).toBe(26);
+    expect(Number(migrationRows[0]?.count)).toBe(27);
     expect(extensions.map((row) => row.extensionName)).toEqual([
       'postgis',
       'uuid-ossp',
