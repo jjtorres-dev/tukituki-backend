@@ -1,9 +1,12 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { DataSource } from 'typeorm';
-import type { FindOneOptions } from 'typeorm';
+import type { EntityManager, FindOneOptions } from 'typeorm';
 
 import { DriverAvailabilityRedisService } from '../../infrastructure/redis/driver-availability-redis.service';
 import { OutboxService } from '../outbox/outbox.service';
+import { User } from '../users/entities/user.entity';
+import { UserRole } from '../users/enums/user-role.enum';
+import { UserStatus } from '../users/enums/user-status.enum';
 import { CancellationFeeCalculatorService } from './cancellation-fee-calculator.service';
 import { RideDispatchService } from './ride-dispatch.service';
 import { Ride } from './entities/ride.entity';
@@ -94,5 +97,30 @@ describe('RideCancellationsService', () => {
       }),
     ).rejects.toBeInstanceOf(BadRequestException);
     expect(transaction).not.toHaveBeenCalled();
+  });
+
+  it('habilita la cancelacion para Passenger ACTIVE no verificado', async () => {
+    const passenger = {
+      id: passengerUserId,
+      roles: [UserRole.PASSENGER],
+      status: UserStatus.ACTIVE,
+      isPhoneVerified: false,
+    } as User;
+    const manager = {
+      getRepository: jest.fn(() => ({
+        findOne: jest.fn(() => Promise.resolve(passenger)),
+      })),
+    } as unknown as EntityManager;
+    const service = createService({} as DataSource);
+    const passengerGuard = service as unknown as {
+      lockEnabledPassenger(
+        entityManager: EntityManager,
+        userId: string,
+      ): Promise<User>;
+    };
+
+    await expect(
+      passengerGuard.lockEnabledPassenger(manager, passengerUserId),
+    ).resolves.toBe(passenger);
   });
 });

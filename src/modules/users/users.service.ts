@@ -76,7 +76,6 @@ export class UsersService {
     }
 
     user.isPhoneVerified = true;
-    user.status = UserStatus.ACTIVE;
 
     return this.usersRepository.save(user);
   }

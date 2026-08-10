@@ -14,6 +14,7 @@ import {
 import { DataSource, IsNull, MoreThan, Repository } from 'typeorm';
 
 import { UserStatus } from '../users/enums/user-status.enum';
+import { isPassengerOnlyUser } from '../users/utils/user-auth-policy.util';
 import { AuthSession } from './entities/auth-session.entity';
 import type {
   CreateAuthSessionInput,
@@ -97,8 +98,8 @@ export class AuthSessionsService {
       }
 
       if (
-        !session.user.isPhoneVerified ||
-        session.user.status !== UserStatus.ACTIVE
+        session.user.status !== UserStatus.ACTIVE ||
+        (!session.user.isPhoneVerified && !isPassengerOnlyUser(session.user))
       ) {
         throw new UnauthorizedException(
           'La cuenta asociada no está habilitada',

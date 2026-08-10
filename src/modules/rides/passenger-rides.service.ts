@@ -965,7 +965,6 @@ export class PassengerRidesService {
   private assertPassengerEnabled(passenger: User): void {
     if (
       passenger.status !== UserStatus.ACTIVE ||
-      !passenger.isPhoneVerified ||
       !passenger.roles.includes(UserRole.PASSENGER)
     ) {
       throw new ForbiddenException('La cuenta del pasajero no está habilitada');

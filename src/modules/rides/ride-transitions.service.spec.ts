@@ -93,7 +93,7 @@ describe('RideTransitionsService', () => {
       id: passengerUserId,
       roles: [UserRole.PASSENGER],
       status: UserStatus.ACTIVE,
-      isPhoneVerified: true,
+      isPhoneVerified: false,
     } as User;
 
     const rideRepository = {

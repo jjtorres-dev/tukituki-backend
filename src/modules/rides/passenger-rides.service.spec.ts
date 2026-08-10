@@ -43,7 +43,7 @@ describe('PassengerRidesService', () => {
       id: passengerUserId,
       roles: [UserRole.PASSENGER],
       status: UserStatus.ACTIVE,
-      isPhoneVerified: true,
+      isPhoneVerified: false,
     } as User;
     const quote = {
       id: quoteId,
