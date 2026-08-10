@@ -863,7 +863,11 @@ export class RideCancellationsService {
     await manager.getRepository(RideOffer).update(
       {
         rideId: ride.id,
-        status: In([RideOfferStatus.OFFERED, RideOfferStatus.ACCEPTED]),
+        status: In([
+          RideOfferStatus.OFFERED,
+          RideOfferStatus.PROPOSED,
+          RideOfferStatus.ACCEPTED,
+        ]),
       },
       {
         status: RideOfferStatus.CANCELLED,
