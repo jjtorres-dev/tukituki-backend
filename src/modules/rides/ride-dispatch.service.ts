@@ -21,13 +21,11 @@ import { RideOfferStatus } from './enums/ride-offer-status.enum';
 import { RideStatus } from './enums/ride-status.enum';
 import {
   ACTIVE_DRIVER_RIDE_STATUSES,
-  DRIVER_ACTIONABLE_RIDE_OFFER_STATUSES,
+  calculateRideOfferExpiresAt,
   DRIVER_LOCATION_MAX_AGE_MS,
   DRIVER_PRESENCE_MAX_AGE_MS,
-  OPEN_RIDE_OFFER_STATUSES,
   RIDE_MATCHING_CANDIDATE_LIMIT,
   RIDE_OFFER_BATCH_SIZE,
-  RIDE_OFFER_TTL_MS,
   RIDE_SEARCH_RADII_METERS,
 } from './ride-matching.constants';
 import { RideTransitionsService } from './ride-transitions.service';
@@ -145,7 +143,7 @@ export class RideDispatchService {
       const activeOffers = await offerRepository.find({
         where: {
           rideId: ride.id,
-          status: In([...DRIVER_ACTIONABLE_RIDE_OFFER_STATUSES]),
+          status: RideOfferStatus.OFFERED,
           expiresAt: MoreThan(now),
         },
         order: {
@@ -215,7 +213,7 @@ export class RideDispatchService {
       const activeOffers = await offerRepository.find({
         where: {
           rideId: ride.id,
-          status: In([...DRIVER_ACTIONABLE_RIDE_OFFER_STATUSES]),
+          status: RideOfferStatus.OFFERED,
           expiresAt: MoreThan(now),
         },
         order: {
@@ -273,7 +271,7 @@ export class RideDispatchService {
         return [];
       }
 
-      const expiresAt = new Date(now.getTime() + RIDE_OFFER_TTL_MS);
+      const expiresAt = calculateRideOfferExpiresAt(now, ride.searchExpiresAt);
       const offers = selectedCandidates.map((candidate) =>
         offerRepository.create({
           rideId: ride.id,
@@ -289,8 +287,6 @@ export class RideDispatchService {
           expiresAt,
           proposedFare: null,
           proposedAt: null,
-          passengerProposedFare: null,
-          passengerProposedAt: null,
           respondedAt: null,
           acceptedAt: null,
           rejectedAt: null,
@@ -460,7 +456,7 @@ export class RideDispatchService {
     const result = await repository.update(
       {
         rideId,
-        status: In([...OPEN_RIDE_OFFER_STATUSES]),
+        status: In([RideOfferStatus.OFFERED, RideOfferStatus.PROPOSED]),
       },
       {
         status: RideOfferStatus.EXPIRED,
@@ -479,7 +475,7 @@ export class RideDispatchService {
     const result = await repository.update(
       {
         rideId,
-        status: In([...OPEN_RIDE_OFFER_STATUSES]),
+        status: In([RideOfferStatus.OFFERED, RideOfferStatus.PROPOSED]),
         expiresAt: LessThanOrEqual(now),
       },
       {

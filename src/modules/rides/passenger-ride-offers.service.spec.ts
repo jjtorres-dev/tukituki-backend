@@ -20,7 +20,7 @@ describe('PassengerRidesService - ride offers', () => {
 
   const driverProfileId = '72b81eb5-c53f-4de2-bd9f-11f33d64da64';
 
-  it('debe mostrar una contraoferta con datos públicos del conductor', async () => {
+  it('debe clasificar propuestas menores, iguales y mayores con exactitud', async () => {
     const now = new Date();
 
     const ride = {
@@ -28,9 +28,9 @@ describe('PassengerRidesService - ride offers', () => {
       passengerUserId,
       status: RideStatus.SEARCHING_DRIVER,
       estimatedFare: '5.00',
-      passengerOfferFare: '5.50',
+      passengerOfferFare: '7.00',
       currency: 'PEN',
-      searchExpiresAt: new Date(now.getTime() + 120_000),
+      searchExpiresAt: new Date(now.getTime() + 240_000),
     } as Ride;
 
     const driverProfile = {
@@ -45,19 +45,34 @@ describe('PassengerRidesService - ride offers', () => {
 
     const proposedAt = new Date(now.getTime() - 2_000);
 
-    const offer = {
-      id: offerId,
-      rideId,
-      driverProfileId,
-      status: RideOfferStatus.PROPOSED,
-      distanceToOriginMeters: 320,
-      proposedFare: '6.00',
-      proposedAt,
-      passengerProposedFare: null,
-      passengerProposedAt: null,
-      expiresAt: new Date(now.getTime() + 60_000),
-      driverProfile,
-    } as RideOffer;
+    const createOffer = (
+      id: string,
+      proposedFare: string,
+      profile: DriverProfile,
+    ): RideOffer =>
+      ({
+        id,
+        rideId,
+        driverProfileId: profile.id,
+        status: RideOfferStatus.PROPOSED,
+        distanceToOriginMeters: 320,
+        proposedFare,
+        proposedAt,
+        expiresAt: new Date(now.getTime() + 60_000),
+        driverProfile: profile,
+      }) as RideOffer;
+
+    const offers = [
+      createOffer('0847d580-6282-4a15-a967-95cb93650d35', '6.00', {
+        ...driverProfile,
+        id: '72b81eb5-c53f-4de2-bd9f-11f33d64da63',
+      }),
+      createOffer(offerId, '7.00', driverProfile),
+      createOffer('0847d580-6282-4a15-a967-95cb93650d37', '8.00', {
+        ...driverProfile,
+        id: '72b81eb5-c53f-4de2-bd9f-11f33d64da65',
+      }),
+    ];
 
     const rideRepository = {
       findOne: jest.fn(() => Promise.resolve(ride)),
@@ -70,7 +85,7 @@ describe('PassengerRidesService - ride offers', () => {
         }),
       ),
 
-      find: jest.fn(() => Promise.resolve([offer])),
+      find: jest.fn(() => Promise.resolve(offers)),
     };
 
     const dataSourceMock = {
@@ -108,9 +123,9 @@ describe('PassengerRidesService - ride offers', () => {
 
     const result = await service.getRideOffers(passengerUserId, rideId);
 
-    expect(result).toHaveLength(1);
+    expect(result).toHaveLength(3);
 
-    expect(result[0]).toMatchObject({
+    expect(result[1]).toMatchObject({
       offerId,
       rideId,
 
@@ -123,12 +138,30 @@ describe('PassengerRidesService - ride offers', () => {
       },
 
       distanceToOriginMeters: 320,
-      status: RideOfferStatus.PROPOSED,
-      initialPassengerOfferFare: '5.50',
-      passengerOfferFare: '5.50',
-      proposedFare: '6.00',
-      isCounterOffer: true,
+      passengerOfferFare: '7.00',
+      proposedFare: '7.00',
+      isCounterOffer: false,
       currency: 'PEN',
     });
+
+    expect(
+      result.map(({ proposedFare, isCounterOffer }) => ({
+        proposedFare,
+        isCounterOffer,
+      })),
+    ).toEqual([
+      {
+        proposedFare: '6.00',
+        isCounterOffer: true,
+      },
+      {
+        proposedFare: '7.00',
+        isCounterOffer: false,
+      },
+      {
+        proposedFare: '8.00',
+        isCounterOffer: true,
+      },
+    ]);
   });
 });

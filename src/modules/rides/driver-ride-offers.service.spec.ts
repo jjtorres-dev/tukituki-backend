@@ -1,4 +1,3 @@
-import { BadRequestException } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import type { EntityManager } from 'typeorm';
 
@@ -71,13 +70,13 @@ describe('DriverRideOffersService', () => {
       destinationAddress: 'Plaza de Armas de Morales',
 
       estimatedFare: '5.00',
-      passengerOfferFare: '5.50',
+      passengerOfferFare: '7.00',
       agreedFare: null,
 
       currency: 'PEN',
       passengerNotes: null,
 
-      searchExpiresAt: new Date(Date.now() + 120_000),
+      searchExpiresAt: new Date(Date.now() + 240_000),
 
       driverAssignedAt: null,
     } as Ride;
@@ -95,12 +94,10 @@ describe('DriverRideOffersService', () => {
 
       offeredAt: new Date(),
 
-      expiresAt: new Date(Date.now() + 15_000),
+      expiresAt: new Date(Date.now() + 60_000),
 
       proposedFare: null,
       proposedAt: null,
-      passengerProposedFare: null,
-      passengerProposedAt: null,
 
       respondedAt: null,
       acceptedAt: null,
@@ -198,7 +195,7 @@ describe('DriverRideOffersService', () => {
 
     expect(result.status).toBe(RideOfferStatus.PROPOSED);
 
-    expect(result.proposedFare).toBe('5.50');
+    expect(result.proposedFare).toBe('7.00');
 
     expect(context.offer.proposedAt).toBeInstanceOf(Date);
 
@@ -207,64 +204,43 @@ describe('DriverRideOffersService', () => {
     expect(context.ride.status).toBe(RideStatus.SEARCHING_DRIVER);
 
     expect(context.ride.driverProfileId).toBeNull();
+
+    expect(context.offer.expiresAt).toBe(context.ride.searchExpiresAt);
   });
 
-  it('debe registrar una contraoferta sin asignar todavía el viaje', async () => {
-    const context = createContext();
+  it.each(['6.00', '7.00', '8.00'])(
+    'debe aceptar la contraoferta bidireccional %s sin asignar el viaje',
+    async (proposedFare) => {
+      const context = createContext();
 
-    const result = await context.service.counterOffer(userId, offerId, {
-      proposedFare: '6.00',
-    });
+      const result = await context.service.counterOffer(userId, offerId, {
+        proposedFare,
+      });
 
-    expect(result.status).toBe(RideOfferStatus.PROPOSED);
+      expect(result.status).toBe(RideOfferStatus.PROPOSED);
+      expect(result.proposedFare).toBe(proposedFare);
+      expect(context.state.status).toBe(DriverOperationalStatus.AVAILABLE);
+      expect(context.ride.status).toBe(RideStatus.SEARCHING_DRIVER);
+      expect(context.ride.driverProfileId).toBeNull();
+      expect(context.ride.agreedFare).toBeNull();
+      expect(context.offer.expiresAt).toBe(context.ride.searchExpiresAt);
+    },
+  );
 
-    expect(result.proposedFare).toBe('6.00');
+  it.each(['0', '10000', '7.000', 'NaN', 'Infinity'])(
+    'debe mantener el rechazo del monto inválido %s',
+    async (proposedFare) => {
+      const context = createContext();
 
-    expect(context.state.status).toBe(DriverOperationalStatus.AVAILABLE);
+      await expect(
+        context.service.counterOffer(userId, offerId, {
+          proposedFare,
+        }),
+      ).rejects.toThrow('El precio propuesto no es válido');
 
-    expect(context.ride.status).toBe(RideStatus.SEARCHING_DRIVER);
-
-    expect(context.ride.agreedFare).toBeNull();
-  });
-
-  it('debe aceptar la última contraoferta del pasajero, no la oferta inicial', async () => {
-    const context = createContext();
-
-    context.offer.status = RideOfferStatus.PASSENGER_COUNTERED;
-    context.offer.proposedFare = '6.00';
-    context.offer.proposedAt = new Date(Date.now() - 2_000);
-    context.offer.passengerProposedFare = '5.75';
-    context.offer.passengerProposedAt = new Date(Date.now() - 1_000);
-
-    const result = await context.service.acceptOffer(userId, offerId);
-
-    expect(result.status).toBe(RideOfferStatus.PROPOSED);
-    expect(result.proposedFare).toBe('5.75');
-    expect(result.ride.initialPassengerOfferFare).toBe('5.50');
-    expect(result.ride.passengerOfferFare).toBe('5.75');
-    expect(context.ride.passengerOfferFare).toBe('5.50');
-  });
-
-  it('debe comparar la nueva propuesta con el último precio del pasajero', async () => {
-    const context = createContext();
-
-    context.offer.status = RideOfferStatus.PASSENGER_COUNTERED;
-    context.offer.proposedFare = '6.00';
-    context.offer.proposedAt = new Date(Date.now() - 2_000);
-    context.offer.passengerProposedFare = '5.75';
-    context.offer.passengerProposedAt = new Date(Date.now() - 1_000);
-
-    await expect(
-      context.service.counterOffer(userId, offerId, {
-        /*
-         * Es mayor que la oferta inicial 5.50,
-         * pero no supera la vigente 5.75.
-         */
-        proposedFare: '5.60',
-      }),
-    ).rejects.toBeInstanceOf(BadRequestException);
-
-    expect(context.offer.status).toBe(RideOfferStatus.PASSENGER_COUNTERED);
-    expect(context.offer.proposedFare).toBe('6.00');
-  });
+      expect(context.offer.status).toBe(RideOfferStatus.OFFERED);
+      expect(context.ride.driverProfileId).toBeNull();
+      expect(context.state.status).toBe(DriverOperationalStatus.AVAILABLE);
+    },
+  );
 });

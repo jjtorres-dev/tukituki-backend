@@ -54,14 +54,13 @@ import {
   DRIVER_LOCATION_MAX_ACCURACY_METERS,
   DRIVER_LOCATION_MAX_AGE_MS,
 } from './ride-lifecycle.constants';
+import { calculateRideSearchExpiresAt } from './ride-matching.constants';
 import { CancellationFeeCalculatorService } from './cancellation-fee-calculator.service';
 import { RideDispatchService } from './ride-dispatch.service';
 import { RideRealtimeService } from './realtime/ride-realtime.service';
-import { OPEN_RIDE_OFFER_STATUSES } from './ride-matching.constants';
 import { RideStartCodesService } from './ride-start-codes.service';
 import { RideTransitionsService } from './ride-transitions.service';
 
-const REMATCH_SEARCH_TTL_MS = 2 * 60 * 1000;
 const CANCELLABLE_STATUSES: readonly RideStatus[] = [
   RideStatus.SEARCHING_DRIVER,
   RideStatus.DRIVER_ASSIGNED,
@@ -592,7 +591,7 @@ export class RideCancellationsService {
       await manager.getRepository(RideOffer).update(
         {
           rideId: ride.id,
-          status: In([...OPEN_RIDE_OFFER_STATUSES, RideOfferStatus.ACCEPTED]),
+          status: In([RideOfferStatus.OFFERED, RideOfferStatus.ACCEPTED]),
         },
         {
           status: RideOfferStatus.CANCELLED,
@@ -610,7 +609,7 @@ export class RideCancellationsService {
         ride.arrivalDistanceMeters = null;
         ride.dispatchRound = 0;
         ride.lastDispatchAt = null;
-        ride.searchExpiresAt = new Date(now.getTime() + REMATCH_SEARCH_TTL_MS);
+        ride.searchExpiresAt = calculateRideSearchExpiresAt(now);
         await this.transitionsService.transitionWithinTransaction(
           manager,
           ride,
@@ -864,7 +863,7 @@ export class RideCancellationsService {
     await manager.getRepository(RideOffer).update(
       {
         rideId: ride.id,
-        status: In([...OPEN_RIDE_OFFER_STATUSES, RideOfferStatus.ACCEPTED]),
+        status: In([RideOfferStatus.OFFERED, RideOfferStatus.ACCEPTED]),
       },
       {
         status: RideOfferStatus.CANCELLED,

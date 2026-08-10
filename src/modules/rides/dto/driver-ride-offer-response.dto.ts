@@ -39,20 +39,11 @@ export class DriverRideOfferRideDto {
   estimatedFare!: string;
 
   /*
-   * Precio inicial con el que el pasajero
-   * creó la solicitud de viaje.
+   * Precio que realmente está ofreciendo
+   * el pasajero.
    */
   @ApiProperty({
     example: '5.50',
-  })
-  initialPassengerOfferFare!: string;
-
-  /*
-   * Precio vigente que el pasajero ofrece
-   * a este conductor.
-   */
-  @ApiProperty({
-    example: '5.75',
   })
   passengerOfferFare!: string;
 
@@ -93,9 +84,9 @@ export class DriverRideOfferResponseDto {
   searchRadiusMeters!: number;
 
   /*
-   * Último precio presentado por este conductor.
+   * Precio presentado por este conductor.
    *
-   * NULL mientras todavía no responda por primera vez.
+   * NULL mientras todavía no responda.
    */
   @ApiPropertyOptional({
     nullable: true,
@@ -121,13 +112,6 @@ export class DriverRideOfferResponseDto {
     nullable: true,
   })
   proposedAt!: Date | null;
-
-  @ApiPropertyOptional({
-    type: String,
-    format: 'date-time',
-    nullable: true,
-  })
-  passengerProposedAt!: Date | null;
 
   @ApiPropertyOptional({
     type: String,

@@ -12,6 +12,7 @@ import { Ride } from './entities/ride.entity';
 import { RideOfferStatus } from './enums/ride-offer-status.enum';
 import { RideStatus } from './enums/ride-status.enum';
 import { RideDispatchService } from './ride-dispatch.service';
+import { RIDE_OFFER_TTL_MS } from './ride-matching.constants';
 import { RideTransitionsService } from './ride-transitions.service';
 
 function createQueryBuilderMock<T>(rows: T[]) {
@@ -66,7 +67,7 @@ describe('RideDispatchService', () => {
         type: 'Point',
         coordinates: [-76.3599, -6.4877],
       },
-      searchExpiresAt: new Date(Date.now() + 120_000),
+      searchExpiresAt: new Date(Date.now() + 240_000),
       dispatchRound: 0,
       lastDispatchAt: null,
     } as Ride;
@@ -178,7 +179,19 @@ describe('RideDispatchService', () => {
     expect(result[0]?.driverProfileId).toBe(driverProfileId);
     expect(result[0]?.distanceToOriginMeters).toBe(420);
     expect(result[0]?.status).toBe(RideOfferStatus.OFFERED);
+    expect(result[0].expiresAt.getTime() - result[0].offeredAt.getTime()).toBe(
+      RIDE_OFFER_TTL_MS,
+    );
     expect(ride.dispatchRound).toBe(1);
+  });
+
+  it('debe limitar expiresAt de la oferta al deadline global', async () => {
+    ride.searchExpiresAt = new Date(Date.now() + 10_000);
+
+    const result = await service.dispatchRide(rideId);
+
+    expect(result).toHaveLength(1);
+    expect(result[0]?.expiresAt).toEqual(ride.searchExpiresAt);
   });
 
   it('debe reutilizar ofertas vigentes sin volver a consultar Redis', async () => {

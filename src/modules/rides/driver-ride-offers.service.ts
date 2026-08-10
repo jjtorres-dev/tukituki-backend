@@ -24,11 +24,7 @@ import { RideOffer } from './entities/ride-offer.entity';
 import { Ride } from './entities/ride.entity';
 import { RideOfferStatus } from './enums/ride-offer-status.enum';
 import { RideStatus } from './enums/ride-status.enum';
-import {
-  ACTIVE_DRIVER_RIDE_STATUSES,
-  DRIVER_ACTIONABLE_RIDE_OFFER_STATUSES,
-  OPEN_RIDE_OFFER_STATUSES,
-} from './ride-matching.constants';
+import { ACTIVE_DRIVER_RIDE_STATUSES } from './ride-matching.constants';
 import { RideDispatchService } from './ride-dispatch.service';
 import { RideTransitionsService } from './ride-transitions.service';
 
@@ -76,7 +72,7 @@ export class DriverRideOffersService {
     const repository = this.dataSource.getRepository(RideOffer);
 
     /*
-     * Toda negociación abierta puede expirar.
+     * OFFERED y PROPOSED pueden expirar.
      *
      * Una propuesta ya enviada deja de ser
      * válida cuando llega su expiresAt.
@@ -84,7 +80,7 @@ export class DriverRideOffersService {
     await repository.update(
       {
         driverProfileId: profile.id,
-        status: In([...OPEN_RIDE_OFFER_STATUSES]),
+        status: In([RideOfferStatus.OFFERED, RideOfferStatus.PROPOSED]),
         expiresAt: LessThanOrEqual(now),
       },
       {
@@ -98,12 +94,12 @@ export class DriverRideOffersService {
      * como "activas" las solicitudes que
      * todavía puede responder.
      *
-     * Una PROPOSED espera al pasajero.
+     * Una PROPOSED ya fue respondida.
      */
     const offers = await repository.find({
       where: {
         driverProfileId: profile.id,
-        status: In([...DRIVER_ACTIONABLE_RIDE_OFFER_STATUSES]),
+        status: RideOfferStatus.OFFERED,
         expiresAt: MoreThan(now),
       },
       relations: {
@@ -142,8 +138,8 @@ export class DriverRideOffersService {
   }
 
   /*
-   * El conductor acepta exactamente el precio
-   * vigente ofrecido por el pasajero.
+   * El conductor acepta exactamente
+   * el precio ofrecido por el pasajero.
    *
    * Esto genera PROPOSED.
    *
@@ -166,8 +162,9 @@ export class DriverRideOffersService {
   }
 
   /*
-   * El conductor propone un precio superior
-   * al precio vigente ofrecido por el pasajero.
+   * El conductor propone un precio válido.
+   * Puede ser menor, igual o mayor que el
+   * ofrecido inicialmente por el pasajero.
    */
   async counterOffer(
     userId: string,
@@ -270,7 +267,7 @@ export class DriverRideOffersService {
       throw new NotFoundException('La oferta no existe');
     }
 
-    if (!DRIVER_ACTIONABLE_RIDE_OFFER_STATUSES.includes(offer.status)) {
+    if (offer.status !== RideOfferStatus.OFFERED) {
       throw new ConflictException('La oferta ya fue respondida o cancelada');
     }
 
@@ -314,7 +311,7 @@ export class DriverRideOffersService {
         await offerRepository.update(
           {
             rideId: ride.id,
-            status: In([...OPEN_RIDE_OFFER_STATUSES]),
+            status: In([RideOfferStatus.OFFERED, RideOfferStatus.PROPOSED]),
           },
           {
             status: RideOfferStatus.EXPIRED,
@@ -378,13 +375,14 @@ export class DriverRideOffersService {
     }
 
     /*
-     * La negociación es individual por conductor.
-     * Si el pasajero ya contraofertó en esta fila,
-     * ese importe reemplaza solamente aquí a la
-     * oferta inicial del viaje.
+     * Para viajes nuevos passengerOfferFare
+     * siempre existe.
+     *
+     * El fallback mantiene compatibilidad con
+     * registros históricos.
      */
     const passengerOfferFare = this.normalizeFare(
-      this.currentPassengerFare(ride, offer),
+      ride.passengerOfferFare ?? ride.estimatedFare,
     );
 
     let proposedFare = passengerOfferFare;
@@ -395,17 +393,6 @@ export class DriverRideOffersService {
      */
     if (counterOfferFare !== null) {
       proposedFare = this.normalizeFare(counterOfferFare);
-
-      const passengerCents = parseScaledDecimal(passengerOfferFare, 2);
-
-      const proposedCents = parseScaledDecimal(proposedFare, 2);
-
-      if (proposedCents <= passengerCents) {
-        throw new BadRequestException(
-          'La contraoferta debe ser mayor ' +
-            'que el precio ofrecido por el pasajero',
-        );
-      }
     }
 
     offer.status = RideOfferStatus.PROPOSED;
@@ -502,7 +489,7 @@ export class DriverRideOffersService {
       throw new NotFoundException('La oferta no existe');
     }
 
-    if (!DRIVER_ACTIONABLE_RIDE_OFFER_STATUSES.includes(offer.status)) {
+    if (offer.status !== RideOfferStatus.OFFERED) {
       throw new ConflictException('La oferta ya fue respondida o cancelada');
     }
 
@@ -639,8 +626,6 @@ export class DriverRideOffersService {
 
       proposedFare: offer.proposedFare,
 
-      passengerProposedAt: offer.passengerProposedAt,
-
       offeredAt: offer.offeredAt,
 
       expiresAt: offer.expiresAt,
@@ -672,24 +657,13 @@ export class DriverRideOffersService {
 
         estimatedFare: ride.estimatedFare,
 
-        initialPassengerOfferFare:
-          ride.passengerOfferFare ?? ride.estimatedFare,
-
-        passengerOfferFare: this.currentPassengerFare(ride, offer),
+        passengerOfferFare: ride.passengerOfferFare ?? ride.estimatedFare,
 
         currency: ride.currency,
 
         passengerNotes: ride.passengerNotes,
       },
     };
-  }
-
-  private currentPassengerFare(ride: Ride, offer: RideOffer): string {
-    return (
-      offer.passengerProposedFare ??
-      ride.passengerOfferFare ??
-      ride.estimatedFare
-    );
   }
 
   private errorMessage(error: unknown): string {

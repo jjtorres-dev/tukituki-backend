@@ -7,13 +7,13 @@ export class CounterRideOfferDto {
     example: '6.00',
     description:
       'Nuevo precio propuesto por el conductor. ' +
-      'Debe ser mayor que el precio vigente ofrecido por el pasajero.',
+      'Puede ser menor, igual o mayor que el precio ofrecido por el pasajero.',
   })
   @Transform(({ value }: { value: unknown }) =>
     typeof value === 'string' ? value.trim() : value,
   )
   @IsString()
-  @Matches(/^(?=.*[1-9])(?:0|[1-9]\d{0,3})(?:\.\d{1,2})?$/, {
+  @Matches(/^(?=.*[1-9])\d{1,4}(?:\.\d{1,2})?$/, {
     message:
       'proposedFare debe ser un monto positivo ' + 'con máximo 2 decimales',
   })

@@ -5581,69 +5581,6 @@
         ]
       }
     },
-    "/api/v1/passenger/rides/{rideId}/offers/{offerId}/counter-offer": {
-      "post": {
-        "operationId": "PassengerRidesController_counterRideOffer",
-        "parameters": [
-          {
-            "name": "rideId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "offerId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CounterDriverRideOfferDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PassengerRideOfferResponseDto"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "El precio es inválido o no es menor que la propuesta del conductor"
-          },
-          "404": {
-            "description": "El viaje o la propuesta no existen"
-          },
-          "409": {
-            "description": "La propuesta venció, ya fue respondida o el viaje dejó de negociar"
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Proponer otro precio al conductor",
-        "tags": [
-          "Passenger rides"
-        ]
-      }
-    },
     "/api/v1/passenger/rides/{rideId}/offers/{offerId}/select": {
       "post": {
         "operationId": "PassengerRidesController_selectRideOffer",
@@ -6323,7 +6260,7 @@
             "bearer": []
           }
         ],
-        "summary": "Aceptar el precio vigente ofrecido por el pasajero",
+        "summary": "Aceptar el precio ofrecido por el pasajero",
         "tags": [
           "Driver ride offers"
         ]
@@ -6364,7 +6301,7 @@
             }
           },
           "400": {
-            "description": "El precio es inválido o no supera la oferta vigente del pasajero"
+            "description": "El precio es inválido o no supera la oferta del pasajero"
           },
           "404": {
             "description": ""
@@ -13857,18 +13794,6 @@
             "type": "string",
             "format": "uuid"
           },
-          "status": {
-            "type": "string",
-            "enum": [
-              "OFFERED",
-              "PROPOSED",
-              "PASSENGER_COUNTERED",
-              "ACCEPTED",
-              "REJECTED",
-              "EXPIRED",
-              "CANCELLED"
-            ]
-          },
           "driver": {
             "$ref": "#/components/schemas/PassengerRideOfferDriverDto"
           },
@@ -13877,13 +13802,9 @@
             "example": 320,
             "description": "Distancia aproximada en metros entre el conductor y el origen."
           },
-          "initialPassengerOfferFare": {
-            "type": "string",
-            "example": "5.50"
-          },
           "passengerOfferFare": {
             "type": "string",
-            "example": "5.75"
+            "example": "5.50"
           },
           "proposedFare": {
             "type": "string",
@@ -13901,11 +13822,6 @@
             "type": "string",
             "format": "date-time"
           },
-          "passengerProposedAt": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
-          },
           "expiresAt": {
             "type": "string",
             "format": "date-time"
@@ -13914,10 +13830,8 @@
         "required": [
           "offerId",
           "rideId",
-          "status",
           "driver",
           "distanceToOriginMeters",
-          "initialPassengerOfferFare",
           "passengerOfferFare",
           "proposedFare",
           "isCounterOffer",
@@ -14829,13 +14743,9 @@
             "type": "string",
             "example": "5.00"
           },
-          "initialPassengerOfferFare": {
-            "type": "string",
-            "example": "5.50"
-          },
           "passengerOfferFare": {
             "type": "string",
-            "example": "5.75"
+            "example": "5.50"
           },
           "currency": {
             "type": "string",
@@ -14851,7 +14761,6 @@
           "origin",
           "destination",
           "estimatedFare",
-          "initialPassengerOfferFare",
           "passengerOfferFare",
           "currency"
         ]
@@ -14872,7 +14781,6 @@
             "enum": [
               "OFFERED",
               "PROPOSED",
-              "PASSENGER_COUNTERED",
               "ACCEPTED",
               "REJECTED",
               "EXPIRED",
@@ -14902,11 +14810,6 @@
             "format": "date-time"
           },
           "proposedAt": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
-          },
-          "passengerProposedAt": {
             "type": "string",
             "format": "date-time",
             "nullable": true
@@ -14942,20 +14845,7 @@
           "proposedFare": {
             "type": "string",
             "example": "6.00",
-            "description": "Nuevo precio propuesto por el conductor. Debe ser mayor que el precio vigente ofrecido por el pasajero."
-          }
-        },
-        "required": [
-          "proposedFare"
-        ]
-      },
-      "CounterDriverRideOfferDto": {
-        "type": "object",
-        "properties": {
-          "proposedFare": {
-            "type": "string",
-            "example": "5.75",
-            "description": "Nuevo precio propuesto por el pasajero a este conductor. Debe ser menor que la propuesta vigente del conductor."
+            "description": "Nuevo precio propuesto por el conductor. Debe ser mayor que el precio ofrecido por el pasajero."
           }
         },
         "required": [

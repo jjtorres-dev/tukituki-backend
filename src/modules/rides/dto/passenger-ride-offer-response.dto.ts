@@ -1,7 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
-import { RideOfferStatus } from '../enums/ride-offer-status.enum';
-
 export class PassengerRideOfferDriverDto {
   @ApiProperty({
     format: 'uuid',
@@ -53,11 +51,6 @@ export class PassengerRideOfferResponseDto {
   rideId!: string;
 
   @ApiProperty({
-    enum: RideOfferStatus,
-  })
-  status!: RideOfferStatus;
-
-  @ApiProperty({
     type: PassengerRideOfferDriverDto,
   })
   driver!: PassengerRideOfferDriverDto;
@@ -70,20 +63,11 @@ export class PassengerRideOfferResponseDto {
   distanceToOriginMeters!: number;
 
   /*
-   * Precio inicial con el que el pasajero
-   * creó la solicitud de viaje.
+   * Precio inicial que había ofrecido
+   * el pasajero.
    */
   @ApiProperty({
     example: '5.50',
-  })
-  initialPassengerOfferFare!: string;
-
-  /*
-   * Precio vigente que el pasajero ofrece
-   * específicamente a este conductor.
-   */
-  @ApiProperty({
-    example: '5.75',
   })
   passengerOfferFare!: string;
 
@@ -97,7 +81,7 @@ export class PassengerRideOfferResponseDto {
 
   /*
    * true:
-   * el conductor pidió más dinero.
+   * el conductor propuso un precio distinto.
    *
    * false:
    * aceptó exactamente el precio
@@ -118,13 +102,6 @@ export class PassengerRideOfferResponseDto {
     format: 'date-time',
   })
   proposedAt!: Date;
-
-  @ApiPropertyOptional({
-    type: String,
-    format: 'date-time',
-    nullable: true,
-  })
-  passengerProposedAt!: Date | null;
 
   @ApiProperty({
     type: String,
