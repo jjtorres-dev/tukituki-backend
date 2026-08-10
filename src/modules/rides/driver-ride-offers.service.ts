@@ -162,8 +162,9 @@ export class DriverRideOffersService {
   }
 
   /*
-   * El conductor propone un precio superior
-   * al ofrecido inicialmente por el pasajero.
+   * El conductor propone un precio válido.
+   * Puede ser menor, igual o mayor que el
+   * ofrecido inicialmente por el pasajero.
    */
   async counterOffer(
     userId: string,
@@ -392,17 +393,6 @@ export class DriverRideOffersService {
      */
     if (counterOfferFare !== null) {
       proposedFare = this.normalizeFare(counterOfferFare);
-
-      const passengerCents = parseScaledDecimal(passengerOfferFare, 2);
-
-      const proposedCents = parseScaledDecimal(proposedFare, 2);
-
-      if (proposedCents <= passengerCents) {
-        throw new BadRequestException(
-          'La contraoferta debe ser mayor ' +
-            'que el precio ofrecido por el pasajero',
-        );
-      }
     }
 
     offer.status = RideOfferStatus.PROPOSED;

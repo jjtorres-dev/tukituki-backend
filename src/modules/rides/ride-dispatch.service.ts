@@ -21,11 +21,11 @@ import { RideOfferStatus } from './enums/ride-offer-status.enum';
 import { RideStatus } from './enums/ride-status.enum';
 import {
   ACTIVE_DRIVER_RIDE_STATUSES,
+  calculateRideOfferExpiresAt,
   DRIVER_LOCATION_MAX_AGE_MS,
   DRIVER_PRESENCE_MAX_AGE_MS,
   RIDE_MATCHING_CANDIDATE_LIMIT,
   RIDE_OFFER_BATCH_SIZE,
-  RIDE_OFFER_TTL_MS,
   RIDE_SEARCH_RADII_METERS,
 } from './ride-matching.constants';
 import { RideTransitionsService } from './ride-transitions.service';
@@ -271,7 +271,7 @@ export class RideDispatchService {
         return [];
       }
 
-      const expiresAt = new Date(now.getTime() + RIDE_OFFER_TTL_MS);
+      const expiresAt = calculateRideOfferExpiresAt(now, ride.searchExpiresAt);
       const offers = selectedCandidates.map((candidate) =>
         offerRepository.create({
           rideId: ride.id,

@@ -2,6 +2,8 @@ import {
   Body,
   Controller,
   Get,
+  HttpCode,
+  HttpStatus,
   Param,
   ParseUUIDPipe,
   Post,
@@ -83,6 +85,7 @@ export class DriverRideOffersController {
    * Todavía NO asigna el viaje.
    */
   @Post(':offerId/accept')
+  @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Aceptar el precio ofrecido por el pasajero',
   })
@@ -105,6 +108,7 @@ export class DriverRideOffersController {
   }
 
   @Post(':offerId/counter-offer')
+  @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Enviar una contraoferta de precio al pasajero',
   })
@@ -112,8 +116,7 @@ export class DriverRideOffersController {
     type: DriverRideOfferResponseDto,
   })
   @ApiBadRequestResponse({
-    description:
-      'El precio es inválido o no supera ' + 'la oferta del pasajero',
+    description: 'El precio propuesto es inválido',
   })
   @ApiConflictResponse({
     description: 'La oferta venció o ya fue respondida',
@@ -130,6 +133,7 @@ export class DriverRideOffersController {
   }
 
   @Post(':offerId/reject')
+  @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Rechazar una solicitud de viaje',
   })

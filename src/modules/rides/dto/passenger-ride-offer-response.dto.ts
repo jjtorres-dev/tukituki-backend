@@ -81,7 +81,7 @@ export class PassengerRideOfferResponseDto {
 
   /*
    * true:
-   * el conductor pidió más dinero.
+   * el conductor propuso un precio distinto.
    *
    * false:
    * aceptó exactamente el precio

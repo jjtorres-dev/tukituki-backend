@@ -7,7 +7,7 @@ export class CounterRideOfferDto {
     example: '6.00',
     description:
       'Nuevo precio propuesto por el conductor. ' +
-      'Debe ser mayor que el precio ofrecido por el pasajero.',
+      'Puede ser menor, igual o mayor que el precio ofrecido por el pasajero.',
   })
   @Transform(({ value }: { value: unknown }) =>
     typeof value === 'string' ? value.trim() : value,

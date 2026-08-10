@@ -16,6 +16,7 @@ import { Ride } from './entities/ride.entity';
 import { RideStatus } from './enums/ride-status.enum';
 import { PassengerRidesService } from './passenger-rides.service';
 import { RideDispatchService } from './ride-dispatch.service';
+import { RIDE_SEARCH_TTL_MS } from './ride-matching.constants';
 import { RideTransitionsService } from './ride-transitions.service';
 import { RideViewService } from './ride-view.service';
 
@@ -164,6 +165,9 @@ describe('PassengerRidesService', () => {
     expect(savedRide?.status).toBe(RideStatus.SEARCHING_DRIVER);
     expect(savedRide?.stateVersion).toBe(0);
     expect(savedRide?.driverArrivingAt).toBeNull();
+    expect(
+      savedRide!.searchExpiresAt.getTime() - savedRide!.requestedAt.getTime(),
+    ).toBe(RIDE_SEARCH_TTL_MS);
     expect(savedHistory?.previousStatus).toBeNull();
     expect(savedHistory?.newStatus).toBe(RideStatus.SEARCHING_DRIVER);
     expect(dispatchService.dispatchRide).toHaveBeenCalledWith(rideId);

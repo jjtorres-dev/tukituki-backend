@@ -55,9 +55,10 @@ import { DriverOperationalStatus } from '../driver-operations/enums/driver-opera
 import { DriverProfile } from '../drivers/entities/driver-profile.entity';
 import { DriverStatus } from '../drivers/enums/driver-status.enum';
 import { RideRealtimeService } from './realtime/ride-realtime.service';
-import { ACTIVE_DRIVER_RIDE_STATUSES } from './ride-matching.constants';
-
-const RIDE_SEARCH_TTL_MS = 2 * 60 * 1000;
+import {
+  ACTIVE_DRIVER_RIDE_STATUSES,
+  calculateRideSearchExpiresAt,
+} from './ride-matching.constants';
 
 export const ACTIVE_RIDE_STATUSES: readonly RideStatus[] = [
   RideStatus.SEARCHING_DRIVER,
@@ -238,7 +239,7 @@ export class PassengerRidesService {
             status: RideStatus.SEARCHING_DRIVER,
             passengerNotes: dto.passengerNotes?.trim() || null,
             requestedAt: now,
-            searchExpiresAt: new Date(now.getTime() + RIDE_SEARCH_TTL_MS),
+            searchExpiresAt: calculateRideSearchExpiresAt(now),
             dispatchRound: 0,
             lastDispatchAt: null,
             driverAssignedAt: null,
@@ -534,7 +535,7 @@ export class PassengerRidesService {
 
         proposedFare: offer.proposedFare,
 
-        isCounterOffer: proposedCents > passengerOfferCents,
+        isCounterOffer: proposedCents !== passengerOfferCents,
 
         currency: ride.currency,
 
