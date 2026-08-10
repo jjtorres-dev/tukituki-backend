@@ -77,14 +77,14 @@ export class DriverRideOffersController {
   /*
    * IMPORTANTE:
    *
-   * "accept" ahora significa aceptar
-   * el PRECIO del pasajero.
+   * "accept" significa aceptar el PRECIO
+   * vigente del pasajero.
    *
    * Todavía NO asigna el viaje.
    */
   @Post(':offerId/accept')
   @ApiOperation({
-    summary: 'Aceptar el precio ofrecido por el pasajero',
+    summary: 'Aceptar el precio vigente ofrecido por el pasajero',
   })
   @ApiOkResponse({
     type: DriverRideOfferResponseDto,
@@ -113,7 +113,7 @@ export class DriverRideOffersController {
   })
   @ApiBadRequestResponse({
     description:
-      'El precio es inválido o no supera ' + 'la oferta del pasajero',
+      'El precio es inválido o no supera ' + 'la oferta vigente del pasajero',
   })
   @ApiConflictResponse({
     description: 'La oferta venció o ya fue respondida',

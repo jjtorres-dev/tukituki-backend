@@ -2,12 +2,12 @@ import { Transform } from 'class-transformer';
 import { IsString, Matches } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
-export class CounterRideOfferDto {
+export class CounterDriverRideOfferDto {
   @ApiProperty({
-    example: '6.00',
+    example: '5.75',
     description:
-      'Nuevo precio propuesto por el conductor. ' +
-      'Debe ser mayor que el precio vigente ofrecido por el pasajero.',
+      'Nuevo precio propuesto por el pasajero a este conductor. ' +
+      'Debe ser menor que la propuesta vigente del conductor.',
   })
   @Transform(({ value }: { value: unknown }) =>
     typeof value === 'string' ? value.trim() : value,

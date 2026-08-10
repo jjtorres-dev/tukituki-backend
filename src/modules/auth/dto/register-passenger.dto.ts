@@ -13,7 +13,7 @@ export class RegisterPassengerDto {
   phoneE164!: string;
 
   @ApiProperty({
-    example: 'TukiTuki2026',
+    example: 'TukiTuki2026!',
     minLength: 8,
     maxLength: 64,
   })
@@ -32,6 +32,9 @@ export class RegisterPassengerDto {
   })
   @Matches(/\d/, {
     message: 'La contraseña debe incluir un número',
+  })
+  @Matches(/[^A-Za-z0-9\s]/, {
+    message: 'La contraseña debe incluir un carácter especial',
   })
   password!: string;
 }

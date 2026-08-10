@@ -53,6 +53,8 @@ describe('PassengerRidesService - ride offers', () => {
       distanceToOriginMeters: 320,
       proposedFare: '6.00',
       proposedAt,
+      passengerProposedFare: null,
+      passengerProposedAt: null,
       expiresAt: new Date(now.getTime() + 60_000),
       driverProfile,
     } as RideOffer;
@@ -121,6 +123,8 @@ describe('PassengerRidesService - ride offers', () => {
       },
 
       distanceToOriginMeters: 320,
+      status: RideOfferStatus.PROPOSED,
+      initialPassengerOfferFare: '5.50',
       passengerOfferFare: '5.50',
       proposedFare: '6.00',
       isCounterOffer: true,

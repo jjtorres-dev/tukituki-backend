@@ -57,6 +57,7 @@ import {
 import { CancellationFeeCalculatorService } from './cancellation-fee-calculator.service';
 import { RideDispatchService } from './ride-dispatch.service';
 import { RideRealtimeService } from './realtime/ride-realtime.service';
+import { OPEN_RIDE_OFFER_STATUSES } from './ride-matching.constants';
 import { RideStartCodesService } from './ride-start-codes.service';
 import { RideTransitionsService } from './ride-transitions.service';
 
@@ -591,7 +592,7 @@ export class RideCancellationsService {
       await manager.getRepository(RideOffer).update(
         {
           rideId: ride.id,
-          status: In([RideOfferStatus.OFFERED, RideOfferStatus.ACCEPTED]),
+          status: In([...OPEN_RIDE_OFFER_STATUSES, RideOfferStatus.ACCEPTED]),
         },
         {
           status: RideOfferStatus.CANCELLED,
@@ -863,7 +864,7 @@ export class RideCancellationsService {
     await manager.getRepository(RideOffer).update(
       {
         rideId: ride.id,
-        status: In([RideOfferStatus.OFFERED, RideOfferStatus.ACCEPTED]),
+        status: In([...OPEN_RIDE_OFFER_STATUSES, RideOfferStatus.ACCEPTED]),
       },
       {
         status: RideOfferStatus.CANCELLED,

@@ -144,7 +144,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"phoneE164\": \"+51987654321\",\n  \"password\": \"TukiTuki2026\"\n}",
+              "raw": "{\n  \"phoneE164\": \"+51987654321\",\n  \"password\": \"TukiTuki2026!\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -4079,6 +4079,57 @@
           "response": []
         },
         {
+          "name": "Proponer otro precio al conductor",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "description": "Proponer otro precio al conductor",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/passenger/rides/:rideId/offers/:offerId/counter-offer",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "passenger",
+                "rides",
+                ":rideId",
+                "offers",
+                ":offerId",
+                "counter-offer"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "rideId",
+                  "value": "{{rideId}}"
+                },
+                {
+                  "key": "offerId",
+                  "value": "{{offerId}}"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"proposedFare\": \"5.75\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
           "name": "Elegir una propuesta y asignar al conductor",
           "request": {
             "method": "POST",
@@ -4574,11 +4625,11 @@
           "response": []
         },
         {
-          "name": "Aceptar el precio ofrecido por el pasajero",
+          "name": "Aceptar el precio vigente ofrecido por el pasajero",
           "request": {
             "method": "POST",
             "header": [],
-            "description": "Aceptar el precio ofrecido por el pasajero",
+            "description": "Aceptar el precio vigente ofrecido por el pasajero",
             "url": {
               "raw": "{{baseUrl}}/api/v1/drivers/me/ride-offers/:offerId/accept",
               "host": [

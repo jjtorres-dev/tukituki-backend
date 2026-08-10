@@ -126,6 +126,29 @@ export class RideOffer {
   })
   proposedAt!: Date | null;
 
+  /*
+   * Último precio que el pasajero propuso
+   * específicamente a este conductor.
+   *
+   * NULL significa que continúa vigente la
+   * oferta inicial almacenada en Ride.
+   */
+  @Column({
+    name: 'passenger_proposed_fare',
+    type: 'numeric',
+    precision: 10,
+    scale: 2,
+    nullable: true,
+  })
+  passengerProposedFare!: string | null;
+
+  @Column({
+    name: 'passenger_proposed_at',
+    type: 'timestamptz',
+    nullable: true,
+  })
+  passengerProposedAt!: Date | null;
+
   @Column({
     name: 'responded_at',
     type: 'timestamptz',

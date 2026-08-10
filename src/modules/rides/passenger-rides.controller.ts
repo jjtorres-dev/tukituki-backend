@@ -41,6 +41,7 @@ import {
   RideCancellationResponseDto,
 } from './dto/ride-cancellation-response.dto';
 import { CreatePassengerRideDto } from './dto/create-passenger-ride.dto';
+import { CounterDriverRideOfferDto } from './dto/counter-driver-ride-offer.dto';
 import { PassengerRideHistoryResponseDto } from './dto/passenger-ride-history-response.dto';
 import { RideHistoryQueryDto } from './dto/ride-history-query.dto';
 import { RideRatingResponseDto } from './dto/ride-rating-response.dto';
@@ -138,6 +139,46 @@ export class PassengerRidesController {
     rideId: string,
   ): Promise<PassengerRideOfferResponseDto[]> {
     return this.passengerRidesService.getRideOffers(user.id, rideId);
+  }
+
+  @Post(':rideId/offers/:offerId/counter-offer')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Proponer otro precio al conductor',
+  })
+  @ApiOkResponse({
+    type: PassengerRideOfferResponseDto,
+  })
+  @ApiBadRequestResponse({
+    description:
+      'El precio es inválido o no es menor que la propuesta del conductor',
+  })
+  @ApiConflictResponse({
+    description:
+      'La propuesta venció, ya fue respondida o el viaje dejó de negociar',
+  })
+  @ApiNotFoundResponse({
+    description: 'El viaje o la propuesta no existen',
+  })
+  counterRideOffer(
+    @CurrentUser()
+    user: AuthenticatedUser,
+
+    @Param('rideId', ParseUUIDPipe)
+    rideId: string,
+
+    @Param('offerId', ParseUUIDPipe)
+    offerId: string,
+
+    @Body()
+    dto: CounterDriverRideOfferDto,
+  ): Promise<PassengerRideOfferResponseDto> {
+    return this.passengerRidesService.counterRideOffer(
+      user.id,
+      rideId,
+      offerId,
+      dto,
+    );
   }
 
   @Post(':rideId/offers/:offerId/select')

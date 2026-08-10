@@ -35,6 +35,7 @@ import { PromotionsService } from '../promotions/promotions.service';
 import { CancelPassengerRideDto } from './dto/cancel-passenger-ride.dto';
 import { PaymentMethod } from '../payments/enums/payment-method.enum';
 import { CreatePassengerRideDto } from './dto/create-passenger-ride.dto';
+import { CounterDriverRideOfferDto } from './dto/counter-driver-ride-offer.dto';
 import { PassengerRideResponseDto } from './dto/passenger-ride-response.dto';
 import { RideOffer } from './entities/ride-offer.entity';
 import { Ride } from './entities/ride.entity';
@@ -47,7 +48,10 @@ import { CancellationPolicyService } from './cancellation-policy.service';
 import type { CancellationPolicySnapshot } from './interfaces/cancellation-policy-snapshot.interface';
 import { RideTransitionsService } from './ride-transitions.service';
 import { RideViewService } from './ride-view.service';
-import { parseScaledDecimal } from '../fares/utils/fixed-decimal.util';
+import {
+  formatCents,
+  parseScaledDecimal,
+} from '../fares/utils/fixed-decimal.util';
 import { PassengerRideOfferResponseDto } from './dto/passenger-ride-offer-response.dto';
 import { DriverAvailabilityRedisService } from '../../infrastructure/redis/driver-availability-redis.service';
 import { DriverOperationalState } from '../driver-operations/entities/driver-operational-state.entity';
@@ -55,7 +59,11 @@ import { DriverOperationalStatus } from '../driver-operations/enums/driver-opera
 import { DriverProfile } from '../drivers/entities/driver-profile.entity';
 import { DriverStatus } from '../drivers/enums/driver-status.enum';
 import { RideRealtimeService } from './realtime/ride-realtime.service';
-import { ACTIVE_DRIVER_RIDE_STATUSES } from './ride-matching.constants';
+import {
+  ACTIVE_DRIVER_RIDE_STATUSES,
+  OPEN_RIDE_OFFER_STATUSES,
+  PASSENGER_VISIBLE_RIDE_OFFER_STATUSES,
+} from './ride-matching.constants';
 
 const RIDE_SEARCH_TTL_MS = 2 * 60 * 1000;
 
@@ -166,10 +174,7 @@ export class PassengerRidesService {
               await manager.getRepository(RideOffer).update(
                 {
                   rideId: activeRide.id,
-                  status: In([
-                    RideOfferStatus.OFFERED,
-                    RideOfferStatus.PROPOSED,
-                  ]),
+                  status: In([...OPEN_RIDE_OFFER_STATUSES]),
                 },
                 {
                   status: RideOfferStatus.EXPIRED,
@@ -451,7 +456,7 @@ export class PassengerRidesService {
     await offerRepository.update(
       {
         rideId: ride.id,
-        status: RideOfferStatus.PROPOSED,
+        status: In([...PASSENGER_VISIBLE_RIDE_OFFER_STATUSES]),
         expiresAt: LessThanOrEqual(now),
       },
       {
@@ -473,7 +478,7 @@ export class PassengerRidesService {
     const offers = await offerRepository.find({
       where: {
         rideId: ride.id,
-        status: RideOfferStatus.PROPOSED,
+        status: In([...PASSENGER_VISIBLE_RIDE_OFFER_STATUSES]),
         expiresAt: MoreThan(now),
       },
       relations: {
@@ -486,63 +491,171 @@ export class PassengerRidesService {
       },
     });
 
-    const passengerOfferFare = ride.passengerOfferFare ?? ride.estimatedFare;
+    return offers.map((offer) => this.mapPassengerOffer(ride, offer));
+  }
 
-    const passengerOfferCents = parseScaledDecimal(passengerOfferFare, 2);
+  async counterRideOffer(
+    passengerUserId: string,
+    rideId: string,
+    offerId: string,
+    dto: CounterDriverRideOfferDto,
+  ): Promise<PassengerRideOfferResponseDto> {
+    type CounterOutcome =
+      | {
+          kind: 'countered';
+          ride: Ride;
+          offer: RideOffer;
+        }
+      | {
+          kind: 'ride-expired';
+        }
+      | {
+          kind: 'offer-expired';
+        };
 
-    return offers.map((offer) => {
-      /*
-       * Una fila PROPOSED creada por nuestro
-       * flujo siempre debe tener precio,
-       * fecha y perfil.
-       */
-      if (!offer.proposedFare || !offer.proposedAt || !offer.driverProfile) {
-        throw new ConflictException(
-          'Existe una propuesta de conductor incompleta',
+    const outcome = await this.dataSource.transaction(
+      async (manager): Promise<CounterOutcome> => {
+        const rideRepository = manager.getRepository(Ride);
+
+        /*
+         * Bloquear primero el viaje conserva el mismo
+         * orden de bloqueos usado durante la selección
+         * y evita carreras entre ambas acciones.
+         */
+        const ride = await rideRepository.findOne({
+          where: {
+            id: rideId,
+          },
+          lock: {
+            mode: 'pessimistic_write',
+          },
+        });
+
+        if (!ride || ride.passengerUserId !== passengerUserId) {
+          throw new NotFoundException('El viaje no existe');
+        }
+
+        if (ride.status !== RideStatus.SEARCHING_DRIVER) {
+          throw new ConflictException(
+            'El viaje ya no se encuentra recibiendo propuestas',
+          );
+        }
+
+        const now = new Date();
+
+        if (ride.searchExpiresAt.getTime() <= now.getTime()) {
+          await this.transitionsService.expireWithinTransaction(
+            manager,
+            ride,
+            now,
+          );
+
+          await manager.getRepository(RideOffer).update(
+            {
+              rideId: ride.id,
+              status: In([...OPEN_RIDE_OFFER_STATUSES]),
+            },
+            {
+              status: RideOfferStatus.EXPIRED,
+              respondedAt: now,
+            },
+          );
+
+          return {
+            kind: 'ride-expired',
+          };
+        }
+
+        const offerRepository = manager.getRepository(RideOffer);
+
+        const offer = await offerRepository.findOne({
+          where: {
+            id: offerId,
+            rideId: ride.id,
+          },
+          lock: {
+            mode: 'pessimistic_write',
+          },
+        });
+
+        if (!offer) {
+          throw new NotFoundException('La propuesta no existe');
+        }
+
+        if (offer.status !== RideOfferStatus.PROPOSED) {
+          throw new ConflictException(
+            'La propuesta ya fue respondida o dejó de estar disponible',
+          );
+        }
+
+        if (!offer.proposedFare || !offer.proposedAt) {
+          throw new ConflictException('La propuesta está incompleta');
+        }
+
+        if (offer.expiresAt.getTime() <= now.getTime()) {
+          offer.status = RideOfferStatus.EXPIRED;
+          offer.respondedAt = now;
+
+          await offerRepository.save(offer);
+
+          return {
+            kind: 'offer-expired',
+          };
+        }
+
+        const passengerProposedFare = this.normalizePassengerOfferFare(
+          dto.proposedFare,
         );
-      }
+        const passengerCents = parseScaledDecimal(passengerProposedFare, 2);
+        const driverCents = parseScaledDecimal(offer.proposedFare, 2);
 
-      const proposedCents = parseScaledDecimal(offer.proposedFare, 2);
+        if (passengerCents >= driverCents) {
+          throw new BadRequestException(
+            'La contraoferta del pasajero debe ser menor ' +
+              'que el precio propuesto por el conductor; ' +
+              'para aceptar ese precio debe seleccionar la propuesta',
+          );
+        }
 
-      const lastName = offer.driverProfile.lastName.trim();
+        offer.status = RideOfferStatus.PASSENGER_COUNTERED;
+        offer.passengerProposedFare = passengerProposedFare;
+        offer.passengerProposedAt = now;
+        offer.respondedAt = now;
 
-      const lastNameInitial =
-        lastName.length > 0 ? `${lastName.charAt(0).toUpperCase()}.` : '';
+        const savedOffer = await offerRepository.save(offer);
+        const driverProfile = await manager
+          .getRepository(DriverProfile)
+          .findOne({
+            where: {
+              id: offer.driverProfileId,
+            },
+          });
 
-      return {
-        offerId: offer.id,
+        if (!driverProfile) {
+          throw new ConflictException(
+            'El conductor de la propuesta ya no existe',
+          );
+        }
 
-        rideId: ride.id,
+        savedOffer.driverProfile = driverProfile;
 
-        driver: {
-          profileId: offer.driverProfile.id,
+        return {
+          kind: 'countered',
+          ride,
+          offer: savedOffer,
+        };
+      },
+    );
 
-          firstName: offer.driverProfile.firstName,
+    if (outcome.kind === 'ride-expired') {
+      throw new ConflictException('El tiempo para negociar terminó');
+    }
 
-          lastNameInitial,
+    if (outcome.kind === 'offer-expired') {
+      throw new ConflictException('La propuesta ya venció');
+    }
 
-          photoUrl: offer.driverProfile.photoUrl,
-
-          ratingAverage: offer.driverProfile.ratingAverage,
-
-          ratingCount: offer.driverProfile.ratingCount,
-        },
-
-        distanceToOriginMeters: offer.distanceToOriginMeters,
-
-        passengerOfferFare,
-
-        proposedFare: offer.proposedFare,
-
-        isCounterOffer: proposedCents > passengerOfferCents,
-
-        currency: ride.currency,
-
-        proposedAt: offer.proposedAt,
-
-        expiresAt: offer.expiresAt,
-      };
-    });
+    return this.mapPassengerOffer(outcome.ride, outcome.offer);
   }
 
   async selectRideOffer(
@@ -611,7 +724,7 @@ export class PassengerRidesService {
             await manager.getRepository(RideOffer).update(
               {
                 rideId: ride.id,
-                status: In([RideOfferStatus.OFFERED, RideOfferStatus.PROPOSED]),
+                status: In([...OPEN_RIDE_OFFER_STATUSES]),
               },
               {
                 status: RideOfferStatus.EXPIRED,
@@ -800,7 +913,7 @@ export class PassengerRidesService {
 
               id: Not(offer.id),
 
-              status: In([RideOfferStatus.OFFERED, RideOfferStatus.PROPOSED]),
+              status: In([...OPEN_RIDE_OFFER_STATUSES]),
             },
             {
               status: RideOfferStatus.CANCELLED,
@@ -822,7 +935,7 @@ export class PassengerRidesService {
 
               id: Not(offer.id),
 
-              status: In([RideOfferStatus.OFFERED, RideOfferStatus.PROPOSED]),
+              status: In([...OPEN_RIDE_OFFER_STATUSES]),
             },
             {
               status: RideOfferStatus.CANCELLED,
@@ -1061,15 +1174,67 @@ export class PassengerRidesService {
   }
 
   private normalizePassengerOfferFare(value: string): string {
-    const amount = Number(value);
+    try {
+      const cents = parseScaledDecimal(value, 2);
 
-    if (!Number.isFinite(amount) || amount <= 0 || amount > 9999.99) {
+      if (cents <= 0n || cents > 999999n) {
+        throw new Error('Monto fuera de rango');
+      }
+
+      return formatCents(cents);
+    } catch {
       throw new BadRequestException(
         'El precio ofrecido por el pasajero no es válido',
       );
     }
+  }
 
-    return amount.toFixed(2);
+  private mapPassengerOffer(
+    ride: Ride,
+    offer: RideOffer,
+  ): PassengerRideOfferResponseDto {
+    /*
+     * Una fila que ya pasó por el conductor
+     * siempre debe conservar precio, fecha y perfil.
+     */
+    if (!offer.proposedFare || !offer.proposedAt || !offer.driverProfile) {
+      throw new ConflictException(
+        'Existe una propuesta de conductor incompleta',
+      );
+    }
+
+    const initialPassengerOfferFare =
+      ride.passengerOfferFare ?? ride.estimatedFare;
+    const passengerOfferFare =
+      offer.passengerProposedFare ?? initialPassengerOfferFare;
+    const passengerOfferCents = parseScaledDecimal(passengerOfferFare, 2);
+    const proposedCents = parseScaledDecimal(offer.proposedFare, 2);
+    const lastName = offer.driverProfile.lastName.trim();
+    const lastNameInitial =
+      lastName.length > 0 ? `${lastName.charAt(0).toUpperCase()}.` : '';
+
+    return {
+      offerId: offer.id,
+      rideId: ride.id,
+      status: offer.status,
+      driver: {
+        profileId: offer.driverProfile.id,
+        firstName: offer.driverProfile.firstName,
+        lastNameInitial,
+        photoUrl: offer.driverProfile.photoUrl,
+        ratingAverage: offer.driverProfile.ratingAverage,
+        ratingCount: offer.driverProfile.ratingCount,
+      },
+      distanceToOriginMeters: offer.distanceToOriginMeters,
+      initialPassengerOfferFare,
+      passengerOfferFare,
+      proposedFare: offer.proposedFare,
+      isCounterOffer: proposedCents > passengerOfferCents,
+      currency: ride.currency,
+      proposedAt: offer.proposedAt,
+      passengerProposedAt: offer.passengerProposedAt,
+      expiresAt: offer.expiresAt,
+    };
   }
 
   private errorMessage(error: unknown): string {

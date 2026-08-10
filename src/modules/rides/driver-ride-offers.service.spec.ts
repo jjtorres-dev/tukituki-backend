@@ -1,3 +1,4 @@
+import { BadRequestException } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import type { EntityManager } from 'typeorm';
 
@@ -98,6 +99,8 @@ describe('DriverRideOffersService', () => {
 
       proposedFare: null,
       proposedAt: null,
+      passengerProposedFare: null,
+      passengerProposedAt: null,
 
       respondedAt: null,
       acceptedAt: null,
@@ -222,5 +225,46 @@ describe('DriverRideOffersService', () => {
     expect(context.ride.status).toBe(RideStatus.SEARCHING_DRIVER);
 
     expect(context.ride.agreedFare).toBeNull();
+  });
+
+  it('debe aceptar la última contraoferta del pasajero, no la oferta inicial', async () => {
+    const context = createContext();
+
+    context.offer.status = RideOfferStatus.PASSENGER_COUNTERED;
+    context.offer.proposedFare = '6.00';
+    context.offer.proposedAt = new Date(Date.now() - 2_000);
+    context.offer.passengerProposedFare = '5.75';
+    context.offer.passengerProposedAt = new Date(Date.now() - 1_000);
+
+    const result = await context.service.acceptOffer(userId, offerId);
+
+    expect(result.status).toBe(RideOfferStatus.PROPOSED);
+    expect(result.proposedFare).toBe('5.75');
+    expect(result.ride.initialPassengerOfferFare).toBe('5.50');
+    expect(result.ride.passengerOfferFare).toBe('5.75');
+    expect(context.ride.passengerOfferFare).toBe('5.50');
+  });
+
+  it('debe comparar la nueva propuesta con el último precio del pasajero', async () => {
+    const context = createContext();
+
+    context.offer.status = RideOfferStatus.PASSENGER_COUNTERED;
+    context.offer.proposedFare = '6.00';
+    context.offer.proposedAt = new Date(Date.now() - 2_000);
+    context.offer.passengerProposedFare = '5.75';
+    context.offer.passengerProposedAt = new Date(Date.now() - 1_000);
+
+    await expect(
+      context.service.counterOffer(userId, offerId, {
+        /*
+         * Es mayor que la oferta inicial 5.50,
+         * pero no supera la vigente 5.75.
+         */
+        proposedFare: '5.60',
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+
+    expect(context.offer.status).toBe(RideOfferStatus.PASSENGER_COUNTERED);
+    expect(context.offer.proposedFare).toBe('6.00');
   });
 });

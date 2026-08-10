@@ -20,6 +20,17 @@ npm run start:dev
 
 El seed solo acepta `NODE_ENV=development` o `test`; nunca se ejecuta en producción.
 
+Para buscar destinos y calcular recorridos configura una clave de servidor de
+Google Cloud con acceso a Places API (New) y Routes API:
+
+```dotenv
+GOOGLE_PLACES_API_KEY=...
+GOOGLE_ROUTES_API_KEY=...
+```
+
+Las claves pueden ser distintas. Si reutilizas una sola, sus restricciones de
+API deben permitir expresamente ambos servicios.
+
 ## Verificación
 
 ```bash

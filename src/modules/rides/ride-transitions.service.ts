@@ -40,6 +40,7 @@ import {
   DRIVER_LOCATION_MAX_AGE_MS,
 } from './ride-lifecycle.constants';
 import { RideRealtimeService } from './realtime/ride-realtime.service';
+import { OPEN_RIDE_OFFER_STATUSES } from './ride-matching.constants';
 import { RideStartCodesService } from './ride-start-codes.service';
 
 const ALLOWED_TRANSITIONS: Readonly<Record<RideStatus, readonly RideStatus[]>> =
@@ -305,7 +306,7 @@ export class RideTransitionsService {
         await manager.getRepository(RideOffer).update(
           {
             rideId: ride.id,
-            status: In([RideOfferStatus.OFFERED, RideOfferStatus.PROPOSED]),
+            status: In([...OPEN_RIDE_OFFER_STATUSES]),
           },
           {
             status: RideOfferStatus.CANCELLED,
@@ -356,7 +357,7 @@ export class RideTransitionsService {
       await manager.getRepository(RideOffer).update(
         {
           rideId: ride.id,
-          status: In([RideOfferStatus.OFFERED, RideOfferStatus.PROPOSED]),
+          status: In([...OPEN_RIDE_OFFER_STATUSES]),
         },
         {
           status: RideOfferStatus.EXPIRED,

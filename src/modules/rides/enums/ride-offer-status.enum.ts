@@ -17,6 +17,15 @@ export enum RideOfferStatus {
   PROPOSED = 'PROPOSED',
 
   /*
+   * El pasajero respondió a la propuesta
+   * del conductor con un nuevo precio.
+   *
+   * El turno vuelve al conductor, que puede
+   * aceptar, contraofertar o rechazar.
+   */
+  PASSENGER_COUNTERED = 'PASSENGER_COUNTERED',
+
+  /*
    * El pasajero eligió finalmente
    * esta propuesta y este conductor.
    */
