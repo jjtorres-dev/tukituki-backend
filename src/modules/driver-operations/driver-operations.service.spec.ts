@@ -1,4 +1,8 @@
-import { BadRequestException, ForbiddenException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { DataSource } from 'typeorm';
 import type { EntityManager } from 'typeorm';
@@ -13,6 +17,8 @@ import { DriverStatus } from '../drivers/enums/driver-status.enum';
 import { IdentityDocumentType } from '../drivers/enums/identity-document-type.enum';
 import { VehicleStatus } from '../drivers/enums/vehicle-status.enum';
 import { VehicleType } from '../drivers/enums/vehicle-type.enum';
+import { Ride } from '../rides/entities/ride.entity';
+import { RideStatus } from '../rides/enums/ride-status.enum';
 import { DriverOperationsService } from './driver-operations.service';
 import { DriverOperationalState } from './entities/driver-operational-state.entity';
 import { DriverOperationalStatus } from './enums/driver-operational-status.enum';
@@ -54,6 +60,8 @@ describe('DriverOperationsService', () => {
 
   let stateQueryBuilder: QueryBuilderMock<DriverOperationalState>;
 
+  let activeRideQueryBuilder: QueryBuilderMock<Ride>;
+
   let stateRepository: {
     createQueryBuilder: jest.Mock;
     create: jest.Mock;
@@ -63,6 +71,7 @@ describe('DriverOperationsService', () => {
   let availabilityRedisService: {
     removeDriverAvailability: jest.Mock<Promise<void>, [string]>;
     renewPresenceIfExists: jest.Mock<Promise<boolean>, [string]>;
+    registerAvailablePresence: jest.Mock<Promise<void>, [string]>;
   };
 
   const userId = 'f544d52a-39e0-4da3-8861-6010355c5dba';
@@ -149,6 +158,8 @@ describe('DriverOperationsService', () => {
 
     stateQueryBuilder = createQueryBuilderMock<DriverOperationalState>();
 
+    activeRideQueryBuilder = createQueryBuilderMock<Ride>();
+
     const profileRepository = {
       createQueryBuilder: jest.fn(() => profileQueryBuilder),
     };
@@ -182,6 +193,9 @@ describe('DriverOperationsService', () => {
       renewPresenceIfExists: jest.fn<Promise<boolean>, [string]>(() =>
         Promise.resolve(true),
       ),
+      registerAvailablePresence: jest.fn<Promise<void>, [string]>(() =>
+        Promise.resolve(),
+      ),
     };
 
     const managerMock = {
@@ -200,6 +214,12 @@ describe('DriverOperationsService', () => {
 
         if (entity === DriverOperationalState) {
           return stateRepository;
+        }
+
+        if (entity === Ride) {
+          return {
+            createQueryBuilder: jest.fn(() => activeRideQueryBuilder),
+          };
         }
 
         throw new Error('Repositorio inesperado');
@@ -247,6 +267,8 @@ describe('DriverOperationsService', () => {
     ]);
 
     stateQueryBuilder.getOne.mockResolvedValue(null);
+
+    activeRideQueryBuilder.getOne.mockResolvedValue(null);
   });
 
   it('debe estar definido', () => {
@@ -259,6 +281,46 @@ describe('DriverOperationsService', () => {
     expect(result.status).toBe(DriverOperationalStatus.OFFLINE);
 
     expect(stateRepository.save).toHaveBeenCalledTimes(1);
+  });
+
+  it('debe reconciliar a OFFLINE un AVAILABLE con actividad vencida', async () => {
+    stateQueryBuilder.getOne.mockResolvedValue({
+      ...offlineState,
+      status: DriverOperationalStatus.AVAILABLE,
+      connectedAt: new Date('2026-08-10T10:00:00.000Z'),
+      lastSeenAt: new Date('2020-01-01T00:00:00.000Z'),
+    });
+
+    const result = await service.getMyStatus(userId);
+
+    expect(result.status).toBe(DriverOperationalStatus.OFFLINE);
+
+    expect(result.disconnectedAt).toBeInstanceOf(Date);
+
+    expect(
+      availabilityRedisService.removeDriverAvailability,
+    ).toHaveBeenCalledWith(profile.id);
+  });
+
+  it('no debe degradar BUSY aunque lastSeenAt esté vencido', async () => {
+    const connectedAt = new Date('2026-08-10T10:00:00.000Z');
+
+    stateQueryBuilder.getOne.mockResolvedValue({
+      ...offlineState,
+      status: DriverOperationalStatus.BUSY,
+      connectedAt,
+      lastSeenAt: new Date('2020-01-01T00:00:00.000Z'),
+    });
+
+    const result = await service.getMyStatus(userId);
+
+    expect(result.status).toBe(DriverOperationalStatus.BUSY);
+
+    expect(result.connectedAt).toBe(connectedAt);
+
+    expect(
+      availabilityRedisService.removeDriverAvailability,
+    ).not.toHaveBeenCalled();
   });
 
   it('debe conectar al conductor como AVAILABLE', async () => {
@@ -341,9 +403,13 @@ describe('DriverOperationsService', () => {
   });
 
   it('debe registrar heartbeat cuando está disponible', async () => {
+    const connectedAt = new Date('2026-08-10T10:00:00.000Z');
+
     stateQueryBuilder.getOne.mockResolvedValue({
       ...offlineState,
       status: DriverOperationalStatus.AVAILABLE,
+      connectedAt,
+      lastSeenAt: new Date(),
     });
 
     const result = await service.heartbeat(userId);
@@ -355,6 +421,172 @@ describe('DriverOperationsService', () => {
     expect(availabilityRedisService.renewPresenceIfExists).toHaveBeenCalledWith(
       profile.id,
     );
+
+    expect(result.connectedAt).toBe(connectedAt);
+
+    expect(
+      availabilityRedisService.registerAvailablePresence,
+    ).not.toHaveBeenCalled();
+  });
+
+  it('debe recrear presence y reiniciar connectedAt tras vencer el TTL', async () => {
+    const connectedAt = new Date('2026-08-10T10:00:00.000Z');
+
+    availabilityRedisService.renewPresenceIfExists.mockResolvedValue(false);
+
+    stateQueryBuilder.getOne.mockResolvedValue({
+      ...offlineState,
+      status: DriverOperationalStatus.AVAILABLE,
+      connectedAt,
+      lastSeenAt: new Date('2020-01-01T00:00:00.000Z'),
+    });
+
+    const result = await service.heartbeat(userId);
+
+    expect(result.connectedAt).toBeInstanceOf(Date);
+
+    expect(result.connectedAt).not.toBe(connectedAt);
+
+    expect(result.lastSeenAt).toBeInstanceOf(Date);
+
+    expect(vehicleQueryBuilder.getOne).toHaveBeenCalledTimes(1);
+
+    expect(documentQueryBuilder.getMany).toHaveBeenCalledTimes(1);
+
+    expect(
+      availabilityRedisService.registerAvailablePresence,
+    ).toHaveBeenCalledWith(profile.id);
+  });
+
+  it('debe conservar connectedAt si Redis perdió la key antes del TTL', async () => {
+    const connectedAt = new Date('2026-08-10T10:00:00.000Z');
+
+    availabilityRedisService.renewPresenceIfExists.mockResolvedValue(false);
+
+    stateQueryBuilder.getOne.mockResolvedValue({
+      ...offlineState,
+      status: DriverOperationalStatus.AVAILABLE,
+      connectedAt,
+      lastSeenAt: new Date(),
+    });
+
+    const result = await service.heartbeat(userId);
+
+    expect(result.connectedAt).toBe(connectedAt);
+
+    expect(
+      availabilityRedisService.registerAvailablePresence,
+    ).toHaveBeenCalledWith(profile.id);
+  });
+
+  it('no debe recrear presence si los requisitos dejaron de ser válidos', async () => {
+    availabilityRedisService.renewPresenceIfExists.mockResolvedValue(false);
+
+    documentQueryBuilder.getMany.mockResolvedValue([
+      {
+        ...license,
+      },
+      {
+        ...soat,
+        expiresAt: '2020-01-01',
+      },
+    ]);
+
+    stateQueryBuilder.getOne.mockResolvedValue({
+      ...offlineState,
+      status: DriverOperationalStatus.AVAILABLE,
+      connectedAt: new Date('2026-08-10T10:00:00.000Z'),
+      lastSeenAt: new Date('2020-01-01T00:00:00.000Z'),
+    });
+
+    await expect(service.heartbeat(userId)).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+
+    expect(
+      availabilityRedisService.registerAvailablePresence,
+    ).not.toHaveBeenCalled();
+  });
+
+  it('no debe recrear presence si AVAILABLE conserva un Ride activo', async () => {
+    availabilityRedisService.renewPresenceIfExists.mockResolvedValue(false);
+
+    activeRideQueryBuilder.getOne.mockResolvedValue({
+      id: 'ef8cddab-f4a2-41f0-a5a8-e3d3a466480e',
+      driverProfileId: profile.id,
+      status: RideStatus.DRIVER_ASSIGNED,
+    } as Ride);
+
+    stateQueryBuilder.getOne.mockResolvedValue({
+      ...offlineState,
+      status: DriverOperationalStatus.AVAILABLE,
+      connectedAt: new Date('2026-08-10T10:00:00.000Z'),
+      lastSeenAt: new Date('2020-01-01T00:00:00.000Z'),
+    });
+
+    await expect(service.heartbeat(userId)).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+
+    expect(
+      availabilityRedisService.registerAvailablePresence,
+    ).not.toHaveBeenCalled();
+  });
+
+  it('debe compensar a OFFLINE si Redis falla al reconstruir presence', async () => {
+    const recoveringState = {
+      ...offlineState,
+      status: DriverOperationalStatus.AVAILABLE,
+      connectedAt: new Date('2026-08-10T10:00:00.000Z'),
+      lastSeenAt: new Date('2020-01-01T00:00:00.000Z'),
+    };
+
+    availabilityRedisService.renewPresenceIfExists.mockResolvedValue(false);
+
+    availabilityRedisService.registerAvailablePresence.mockRejectedValue(
+      new Error('Redis no disponible'),
+    );
+
+    stateQueryBuilder.getOne.mockResolvedValue(recoveringState);
+
+    await expect(service.heartbeat(userId)).rejects.toBeInstanceOf(
+      ServiceUnavailableException,
+    );
+
+    expect(recoveringState.status).toBe(DriverOperationalStatus.OFFLINE);
+
+    expect(recoveringState.disconnectedAt).toBeInstanceOf(Date);
+
+    expect(
+      availabilityRedisService.removeDriverAvailability,
+    ).toHaveBeenCalledWith(profile.id);
+  });
+
+  it('debe actualizar lastSeenAt de BUSY sin reconciliar su presence', async () => {
+    const connectedAt = new Date('2026-08-10T10:00:00.000Z');
+
+    stateQueryBuilder.getOne.mockResolvedValue({
+      ...offlineState,
+      status: DriverOperationalStatus.BUSY,
+      connectedAt,
+      lastSeenAt: new Date('2020-01-01T00:00:00.000Z'),
+    });
+
+    const result = await service.heartbeat(userId);
+
+    expect(result.status).toBe(DriverOperationalStatus.BUSY);
+
+    expect(result.connectedAt).toBe(connectedAt);
+
+    expect(result.lastSeenAt).toBeInstanceOf(Date);
+
+    expect(
+      availabilityRedisService.renewPresenceIfExists,
+    ).not.toHaveBeenCalled();
+
+    expect(
+      availabilityRedisService.registerAvailablePresence,
+    ).not.toHaveBeenCalled();
   });
 
   it('debe rechazar heartbeat cuando está OFFLINE', async () => {

@@ -88,6 +88,24 @@ describe('DriverAvailabilityRedisService', () => {
     );
   });
 
+  it('debe recrear solamente la presencia AVAILABLE desde heartbeat', async () => {
+    await service.registerAvailablePresence('driver-1');
+
+    expect(redisService.setWithTtl).toHaveBeenCalledWith(
+      'drivers:presence:driver-1',
+      expect.any(String),
+      90,
+    );
+
+    expect(redisService.geoAdd).not.toHaveBeenCalled();
+
+    expect(redisService.setWithTtl).not.toHaveBeenCalledWith(
+      'drivers:location-fresh:driver-1',
+      expect.any(String),
+      expect.any(Number),
+    );
+  });
+
   it('debe eliminar GEO y presencia al desconectar', async () => {
     await service.removeDriverAvailability('driver-1');
 

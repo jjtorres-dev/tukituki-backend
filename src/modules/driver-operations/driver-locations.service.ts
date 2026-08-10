@@ -9,7 +9,10 @@ import {
 import { DataSource } from 'typeorm';
 import type { EntityManager, Repository } from 'typeorm';
 
-import { DriverAvailabilityRedisService } from '../../infrastructure/redis/driver-availability-redis.service';
+import {
+  DRIVER_PRESENCE_TTL_SECONDS,
+  DriverAvailabilityRedisService,
+} from '../../infrastructure/redis/driver-availability-redis.service';
 import { DriverDocument } from '../drivers/entities/driver-document.entity';
 import { DriverProfile } from '../drivers/entities/driver-profile.entity';
 import { DriverVehicle } from '../drivers/entities/driver-vehicle.entity';
@@ -18,6 +21,12 @@ import { DriverDocumentType } from '../drivers/enums/driver-document-type.enum';
 import { DriverStatus } from '../drivers/enums/driver-status.enum';
 import { VehicleStatus } from '../drivers/enums/vehicle-status.enum';
 import { RideRealtimeService } from '../rides/realtime/ride-realtime.service';
+import { Ride } from '../rides/entities/ride.entity';
+import { ACTIVE_DRIVER_RIDE_STATUSES } from '../rides/ride-matching.constants';
+import {
+  assertDriverOperationalRequirements,
+  REQUIRED_OPERATIONAL_DOCUMENTS,
+} from './driver-operational-requirements.util';
 import { DriverLocationResponseDto } from './dto/driver-location-response.dto';
 import { UpdateDriverLocationDto } from './dto/update-driver-location.dto';
 import { DriverLocation } from './entities/driver-location.entity';
@@ -31,6 +40,7 @@ import type { RideProgressUpdate } from './ride-progress-tracking.service';
 interface SavedLocationResult {
   location: DriverLocation;
   operationalStatus: DriverOperationalStatus;
+  operationalLastSeenAt: Date;
   progress: RideProgressUpdate | null;
 }
 
@@ -68,6 +78,13 @@ export class DriverLocationsService {
         );
       }
     } catch {
+      if (result.operationalStatus === DriverOperationalStatus.AVAILABLE) {
+        await this.compensateFailedAvailablePresence(
+          result.location.driverProfileId,
+          result.operationalLastSeenAt,
+        );
+      }
+
       throw new ServiceUnavailableException(
         'La ubicación fue guardada, pero no pudo publicarse para disponibilidad. Intenta nuevamente',
       );
@@ -251,14 +268,40 @@ export class DriverLocationsService {
       );
     }
 
+    const now = new Date();
+
+    if (state.status === DriverOperationalStatus.AVAILABLE) {
+      const presenceRenewed =
+        await this.availabilityRedisService.renewPresenceIfExists(profile.id);
+
+      if (!presenceRenewed) {
+        const vehicle = await this.lockVehicle(manager, profile.id);
+
+        const documents = await this.lockOperationalDocuments(
+          manager,
+          profile.id,
+        );
+
+        assertDriverOperationalRequirements(
+          vehicle,
+          documents,
+          this.getTodayIsoDate(),
+        );
+
+        await this.assertNoActiveRide(manager, profile.id);
+
+        if (this.isPresenceExpired(state.lastSeenAt, now)) {
+          state.connectedAt = now;
+        }
+      }
+    }
+
     const locationRepository = manager.getRepository(DriverLocation);
 
     const location = await this.getOrCreateLocation(
       locationRepository,
       profile.id,
     );
-
-    const now = new Date();
 
     const point: DriverLocationPoint = {
       type: 'Point',
@@ -292,6 +335,7 @@ export class DriverLocationsService {
     return {
       location: savedLocation,
       operationalStatus: state.status,
+      operationalLastSeenAt: now,
       progress,
     };
   }
@@ -355,6 +399,94 @@ export class DriverLocationsService {
       .getOne();
   }
 
+  private lockVehicle(
+    manager: EntityManager,
+    driverProfileId: string,
+  ): Promise<DriverVehicle | null> {
+    return manager
+      .getRepository(DriverVehicle)
+      .createQueryBuilder('vehicle')
+      .where('vehicle.driver_profile_id = :driverProfileId', {
+        driverProfileId,
+      })
+      .setLock('pessimistic_write')
+      .getOne();
+  }
+
+  private lockOperationalDocuments(
+    manager: EntityManager,
+    driverProfileId: string,
+  ): Promise<DriverDocument[]> {
+    return manager
+      .getRepository(DriverDocument)
+      .createQueryBuilder('document')
+      .where('document.driver_profile_id = :driverProfileId', {
+        driverProfileId,
+      })
+      .andWhere('document.type IN (:...types)', {
+        types: REQUIRED_OPERATIONAL_DOCUMENTS,
+      })
+      .setLock('pessimistic_write')
+      .getMany();
+  }
+
+  private async assertNoActiveRide(
+    manager: EntityManager,
+    driverProfileId: string,
+  ): Promise<void> {
+    const activeRide = await manager
+      .getRepository(Ride)
+      .createQueryBuilder('ride')
+      .where('ride.driver_profile_id = :driverProfileId', {
+        driverProfileId,
+      })
+      .andWhere('ride.status IN (:...statuses)', {
+        statuses: ACTIVE_DRIVER_RIDE_STATUSES,
+      })
+      .getOne();
+
+    if (activeRide) {
+      throw new BadRequestException(
+        'El conductor tiene un viaje activo incompatible con AVAILABLE',
+      );
+    }
+  }
+
+  private async compensateFailedAvailablePresence(
+    driverProfileId: string,
+    recoveredLastSeenAt: Date,
+  ): Promise<void> {
+    try {
+      await this.dataSource.transaction(async (manager) => {
+        const stateRepository = manager.getRepository(DriverOperationalState);
+
+        const state = await this.lockOperationalState(manager, driverProfileId);
+
+        if (
+          !state ||
+          state.status !== DriverOperationalStatus.AVAILABLE ||
+          state.lastSeenAt?.getTime() !== recoveredLastSeenAt.getTime()
+        ) {
+          return;
+        }
+
+        state.status = DriverOperationalStatus.OFFLINE;
+        state.disconnectedAt = new Date();
+
+        await stateRepository.save(state);
+      });
+
+      await this.availabilityRedisService
+        .removeDriverAvailability(driverProfileId)
+        .catch(() => undefined);
+    } catch (error: unknown) {
+      this.logger.error(
+        `No se pudo compensar la presencia fallida del conductor ${driverProfileId}`,
+        error,
+      );
+    }
+  }
+
   private async getOrCreateLocation(
     repository: Repository<DriverLocation>,
     driverProfileId: string,
@@ -403,6 +535,16 @@ export class DriverLocationsService {
 
   private getTodayIsoDate(): string {
     return new Date().toISOString().slice(0, 10);
+  }
+
+  private isPresenceExpired(lastSeenAt: Date | null, now: Date): boolean {
+    if (!lastSeenAt) {
+      return true;
+    }
+
+    return (
+      now.getTime() - lastSeenAt.getTime() >= DRIVER_PRESENCE_TTL_SECONDS * 1000
+    );
   }
 
   private assertCoordinatesAreNotNullIsland(

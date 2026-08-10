@@ -1,4 +1,8 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  NotFoundException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { DataSource } from 'typeorm';
 import type { EntityManager, FindOneOptions } from 'typeorm';
@@ -6,9 +10,17 @@ import type { EntityManager, FindOneOptions } from 'typeorm';
 import { DriverAvailabilityRedisService } from '../../infrastructure/redis/driver-availability-redis.service';
 import type { RedisGeoSearchResult } from '../../infrastructure/redis/redis.service';
 import { RideRealtimeService } from '../rides/realtime/ride-realtime.service';
+import { DriverDocument } from '../drivers/entities/driver-document.entity';
 import { DriverProfile } from '../drivers/entities/driver-profile.entity';
+import { DriverVehicle } from '../drivers/entities/driver-vehicle.entity';
+import { DriverDocumentStatus } from '../drivers/enums/driver-document-status.enum';
+import { DriverDocumentType } from '../drivers/enums/driver-document-type.enum';
 import { DriverStatus } from '../drivers/enums/driver-status.enum';
 import { IdentityDocumentType } from '../drivers/enums/identity-document-type.enum';
+import { VehicleStatus } from '../drivers/enums/vehicle-status.enum';
+import { VehicleType } from '../drivers/enums/vehicle-type.enum';
+import { Ride } from '../rides/entities/ride.entity';
+import { RideStatus } from '../rides/enums/ride-status.enum';
 import { DriverLocationsService } from './driver-locations.service';
 import { RideProgressTrackingService } from './ride-progress-tracking.service';
 import { DriverLocation } from './entities/driver-location.entity';
@@ -53,6 +65,12 @@ describe('DriverLocationsService', () => {
 
   let locationQueryBuilder: QueryBuilderMock<DriverLocation>;
 
+  let vehicleQueryBuilder: QueryBuilderMock<DriverVehicle>;
+
+  let documentQueryBuilder: QueryBuilderMock<DriverDocument>;
+
+  let activeRideQueryBuilder: QueryBuilderMock<Ride>;
+
   let eligibleStateQueryBuilder: QueryBuilderMock<DriverOperationalState>;
 
   let profileRepository: {
@@ -81,6 +99,7 @@ describe('DriverLocationsService', () => {
   let availabilityRedisService: {
     publishAvailableDriver: jest.Mock<Promise<void>, [string, number, number]>;
     registerBusyPresence: jest.Mock<Promise<void>, [string]>;
+    renewPresenceIfExists: jest.Mock<Promise<boolean>, [string]>;
     findNearbyAvailableDrivers: jest.Mock<
       Promise<RedisGeoSearchResult[]>,
       [number, number, number, number]
@@ -123,6 +142,46 @@ describe('DriverLocationsService', () => {
     updatedAt: new Date(),
   } as DriverOperationalState;
 
+  const vehicle: DriverVehicle = {
+    id: '6a083c8e-37aa-46cb-82bb-6fd482072c73',
+    driverProfileId: profile.id,
+    plate: '1234-AB',
+    brand: 'Bajaj',
+    model: 'RE 4S',
+    year: 2025,
+    color: 'Rojo',
+    engineNumber: 'ENG123456789',
+    chassisNumber: 'CHS123456789',
+    vehicleType: VehicleType.MOTOTAXI,
+    status: VehicleStatus.APPROVED,
+    rejectionReason: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  } as DriverVehicle;
+
+  const license: DriverDocument = {
+    id: '4a54fd37-89b6-43c8-bde3-4af9847cc8d0',
+    driverProfileId: profile.id,
+    type: DriverDocumentType.DRIVER_LICENSE,
+    fileUrl: 'https://cdn.tukituki.pe/license.jpg',
+    documentNumber: 'Q12345678',
+    issuedAt: '2025-01-01',
+    expiresAt: '2030-01-01',
+    status: DriverDocumentStatus.APPROVED,
+    rejectionReason: null,
+    reviewedAt: new Date(),
+    reviewedByUserId: '97e761e2-ce3d-49cc-b0ed-c0ff3c313444',
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  } as DriverDocument;
+
+  const soat: DriverDocument = {
+    ...license,
+    id: 'bf368a55-7102-4522-9998-a3159fcd356d',
+    type: DriverDocumentType.SOAT,
+    documentNumber: 'SOAT123456',
+  };
+
   const location: DriverLocation = {
     id: '066948cb-00b3-4805-bce6-954319b8e058',
     driverProfileId: profile.id,
@@ -146,6 +205,12 @@ describe('DriverLocationsService', () => {
     stateQueryBuilder = createQueryBuilderMock<DriverOperationalState>();
 
     locationQueryBuilder = createQueryBuilderMock<DriverLocation>();
+
+    vehicleQueryBuilder = createQueryBuilderMock<DriverVehicle>();
+
+    documentQueryBuilder = createQueryBuilderMock<DriverDocument>();
+
+    activeRideQueryBuilder = createQueryBuilderMock<Ride>();
 
     eligibleStateQueryBuilder =
       createQueryBuilderMock<DriverOperationalState>();
@@ -195,6 +260,10 @@ describe('DriverLocationsService', () => {
         Promise.resolve(),
       ),
 
+      renewPresenceIfExists: jest.fn<Promise<boolean>, [string]>(() =>
+        Promise.resolve(true),
+      ),
+
       findNearbyAvailableDrivers: jest.fn<
         Promise<RedisGeoSearchResult[]>,
         [number, number, number, number]
@@ -217,6 +286,24 @@ describe('DriverLocationsService', () => {
 
         if (entity === DriverLocation) {
           return locationRepository;
+        }
+
+        if (entity === DriverVehicle) {
+          return {
+            createQueryBuilder: jest.fn(() => vehicleQueryBuilder),
+          };
+        }
+
+        if (entity === DriverDocument) {
+          return {
+            createQueryBuilder: jest.fn(() => documentQueryBuilder),
+          };
+        }
+
+        if (entity === Ride) {
+          return {
+            createQueryBuilder: jest.fn(() => activeRideQueryBuilder),
+          };
         }
 
         throw new Error('Repositorio transaccional inesperado');
@@ -284,6 +371,21 @@ describe('DriverLocationsService', () => {
     });
 
     locationQueryBuilder.getOne.mockResolvedValue(null);
+
+    vehicleQueryBuilder.getOne.mockResolvedValue({
+      ...vehicle,
+    });
+
+    documentQueryBuilder.getMany.mockResolvedValue([
+      {
+        ...license,
+      },
+      {
+        ...soat,
+      },
+    ]);
+
+    activeRideQueryBuilder.getOne.mockResolvedValue(null);
   });
 
   it('debe estar definido', () => {
@@ -327,6 +429,142 @@ describe('DriverLocationsService', () => {
     expect(result.longitude).toBe(-76.36);
 
     expect(locationRepository.create).not.toHaveBeenCalled();
+  });
+
+  it('debe reconstruir presence desde ubicación y reiniciar connectedAt tras el TTL', async () => {
+    const previousConnectedAt = new Date('2026-08-10T10:00:00.000Z');
+
+    availabilityRedisService.renewPresenceIfExists.mockResolvedValue(false);
+
+    stateQueryBuilder.getOne.mockResolvedValue({
+      ...availableState,
+      connectedAt: previousConnectedAt,
+      lastSeenAt: new Date('2020-01-01T00:00:00.000Z'),
+    });
+
+    await service.updateMyLocation(userId, {
+      latitude: -6.4877,
+      longitude: -76.3599,
+    });
+
+    const savedState = stateRepository.save.mock.calls[0][0];
+
+    expect(savedState.connectedAt).toBeInstanceOf(Date);
+
+    expect(savedState.connectedAt).not.toBe(previousConnectedAt);
+
+    expect(savedState.lastSeenAt).toBeInstanceOf(Date);
+
+    expect(
+      availabilityRedisService.publishAvailableDriver,
+    ).toHaveBeenCalledWith(profile.id, -76.3599, -6.4877);
+  });
+
+  it('no debe reconstruir presence desde ubicación con documentos vencidos', async () => {
+    availabilityRedisService.renewPresenceIfExists.mockResolvedValue(false);
+
+    documentQueryBuilder.getMany.mockResolvedValue([
+      {
+        ...license,
+      },
+      {
+        ...soat,
+        expiresAt: '2020-01-01',
+      },
+    ]);
+
+    await expect(
+      service.updateMyLocation(userId, {
+        latitude: -6.4877,
+        longitude: -76.3599,
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+
+    expect(locationRepository.save).not.toHaveBeenCalled();
+
+    expect(
+      availabilityRedisService.publishAvailableDriver,
+    ).not.toHaveBeenCalled();
+  });
+
+  it('no debe reconstruir presence desde ubicación si existe Ride activo', async () => {
+    availabilityRedisService.renewPresenceIfExists.mockResolvedValue(false);
+
+    activeRideQueryBuilder.getOne.mockResolvedValue({
+      id: 'ef8cddab-f4a2-41f0-a5a8-e3d3a466480e',
+      driverProfileId: profile.id,
+      status: RideStatus.DRIVER_ASSIGNED,
+    } as Ride);
+
+    await expect(
+      service.updateMyLocation(userId, {
+        latitude: -6.4877,
+        longitude: -76.3599,
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+
+    expect(
+      availabilityRedisService.publishAvailableDriver,
+    ).not.toHaveBeenCalled();
+  });
+
+  it('debe mantener BUSY y publicar solo presencia BUSY tras el TTL', async () => {
+    const connectedAt = new Date('2026-08-10T10:00:00.000Z');
+
+    stateQueryBuilder.getOne.mockResolvedValue({
+      ...availableState,
+      status: DriverOperationalStatus.BUSY,
+      connectedAt,
+      lastSeenAt: new Date('2020-01-01T00:00:00.000Z'),
+    });
+
+    await service.updateMyLocation(userId, {
+      latitude: -6.4877,
+      longitude: -76.3599,
+    });
+
+    const savedState = stateRepository.save.mock.calls[0][0];
+
+    expect(savedState.status).toBe(DriverOperationalStatus.BUSY);
+
+    expect(savedState.connectedAt).toBe(connectedAt);
+
+    expect(
+      availabilityRedisService.renewPresenceIfExists,
+    ).not.toHaveBeenCalled();
+
+    expect(availabilityRedisService.registerBusyPresence).toHaveBeenCalledWith(
+      profile.id,
+    );
+  });
+
+  it('debe compensar a OFFLINE si Redis falla al publicar AVAILABLE', async () => {
+    const recoveringState = {
+      ...availableState,
+      connectedAt: new Date('2026-08-10T10:00:00.000Z'),
+      lastSeenAt: new Date(),
+    };
+
+    stateQueryBuilder.getOne.mockResolvedValue(recoveringState);
+
+    availabilityRedisService.publishAvailableDriver.mockRejectedValue(
+      new Error('Redis no disponible'),
+    );
+
+    await expect(
+      service.updateMyLocation(userId, {
+        latitude: -6.4877,
+        longitude: -76.3599,
+      }),
+    ).rejects.toBeInstanceOf(ServiceUnavailableException);
+
+    expect(recoveringState.status).toBe(DriverOperationalStatus.OFFLINE);
+
+    expect(recoveringState.disconnectedAt).toBeInstanceOf(Date);
+
+    expect(
+      availabilityRedisService.removeDriverAvailability,
+    ).toHaveBeenCalledWith(profile.id);
   });
 
   it('debe rechazar actualización cuando está OFFLINE', async () => {
@@ -401,5 +639,20 @@ describe('DriverLocationsService', () => {
     expect(
       availabilityRedisService.removeDriverAvailability,
     ).toHaveBeenCalledWith(otherDriverId);
+  });
+
+  it('no debe consultar PostgreSQL si Redis excluye presence vencida', async () => {
+    availabilityRedisService.findNearbyAvailableDrivers.mockResolvedValue([]);
+
+    const result = await service.findNearbyAvailableDrivers(
+      -6.4877,
+      -76.3599,
+      3000,
+      20,
+    );
+
+    expect(result).toEqual([]);
+
+    expect(eligibleStateQueryBuilder.getMany).not.toHaveBeenCalled();
   });
 });
