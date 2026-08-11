@@ -4,7 +4,11 @@ import { DataSource } from 'typeorm';
 import { DriverLocation } from '../driver-operations/entities/driver-location.entity';
 import { DriverProfile } from '../drivers/entities/driver-profile.entity';
 import { DriverVehicle } from '../drivers/entities/driver-vehicle.entity';
-import { DriverActiveRideResponseDto } from './dto/driver-active-ride-response.dto';
+import { PassengerProfile } from '../passengers/entities/passenger-profile.entity';
+import {
+  DriverActiveRideResponseDto,
+  RideAssignedPassengerResponseDto,
+} from './dto/driver-active-ride-response.dto';
 import { PassengerRideResponseDto } from './dto/passenger-ride-response.dto';
 import { Ride } from './entities/ride.entity';
 
@@ -65,10 +69,14 @@ export class RideViewService {
     };
   }
 
-  toDriverResponse(
+  async toDriverResponse(
     ride: Ride,
     distanceToOriginMeters: number | null,
-  ): DriverActiveRideResponseDto {
+  ): Promise<DriverActiveRideResponseDto> {
+    const passengerProfile = await this.dataSource
+      .getRepository(PassengerProfile)
+      .findOne({ where: { userId: ride.passengerUserId } });
+
     return {
       id: ride.id,
       status: ride.status,
@@ -85,12 +93,34 @@ export class RideViewService {
       currency: ride.currency,
       paymentMethod: ride.paymentMethod,
       passengerNotes: ride.passengerNotes,
+      passenger: this.passengerSummary(passengerProfile),
       requestedAt: ride.requestedAt,
       driverAssignedAt: ride.driverAssignedAt,
       driverArrivingAt: ride.driverArrivingAt,
       driverArrivedAt: ride.driverArrivedAt,
       arrivalDistanceMeters: ride.arrivalDistanceMeters,
       distanceToOriginMeters,
+    };
+  }
+
+  /**
+   * Resumen mínimo del Passenger, sin apellido/teléfono/email/documento.
+   * Degrada a null si el perfil no existe (nunca inventa "Pasajero" ni
+   * un rating por defecto que no venga del propio perfil).
+   */
+  private passengerSummary(
+    profile: PassengerProfile | null,
+  ): RideAssignedPassengerResponseDto | null {
+    if (!profile) {
+      return null;
+    }
+
+    return {
+      profileId: profile.id,
+      firstName: profile.firstName,
+      photoUrl: profile.photoUrl,
+      ratingAverage: profile.ratingAverage,
+      ratingCount: profile.ratingCount,
     };
   }
 

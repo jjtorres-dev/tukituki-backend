@@ -8,7 +8,11 @@ import { DataSource, In } from 'typeorm';
 import { DriverLocation } from '../driver-operations/entities/driver-location.entity';
 import { DriverProfile } from '../drivers/entities/driver-profile.entity';
 import { DriverStatus } from '../drivers/enums/driver-status.enum';
+import { RidePaymentResponseDto } from '../payments/dto/ride-payment-response.dto';
+import { RidePayment } from '../payments/entities/ride-payment.entity';
+import { RidePaymentStatus } from '../payments/enums/ride-payment-status.enum';
 import { DriverActiveRideResponseDto } from './dto/driver-active-ride-response.dto';
+import { DriverPendingCashPaymentResponseDto } from './dto/driver-pending-cash-payment-response.dto';
 import { Ride } from './entities/ride.entity';
 import { RideStatus } from './enums/ride-status.enum';
 import { RideViewService } from './ride-view.service';
@@ -63,6 +67,90 @@ export class DriverRidesService {
     }
 
     return this.mapRide(profile.id, ride);
+  }
+
+  /**
+   * Rides COMPLETED del conductor autenticado cuyo RidePayment sigue
+   * PENDING. Restore server-side para el caso en que el Driver cierre
+   * la app entre `complete` y confirmar el cobro: `getActiveRide()`
+   * ya no encuentra el ride (COMPLETED no es un status "activo") y
+   * el operational status ya volvió a AVAILABLE, así que este es el
+   * único camino para recuperar el `rideId` pendiente de cobro.
+   *
+   * No filtra por `method`: si algún día aparece un ride PENDING con
+   * un método distinto de CASH, también se lista aquí (la pantalla de
+   * cobro en efectivo es responsabilidad del cliente, no de esta
+   * consulta). Orden determinista: más reciente primero por
+   * `completedAt`, y por `payment.id` como desempate.
+   */
+  async listPendingCashPayments(
+    userId: string,
+  ): Promise<DriverPendingCashPaymentResponseDto[]> {
+    const profile = await this.getApprovedProfile(userId);
+
+    const payments = await this.dataSource
+      .getRepository(RidePayment)
+      .createQueryBuilder('payment')
+      .innerJoinAndSelect('payment.ride', 'ride')
+      .where('payment.driver_profile_id = :driverProfileId', {
+        driverProfileId: profile.id,
+      })
+      .andWhere('payment.status = :paymentStatus', {
+        paymentStatus: RidePaymentStatus.PENDING,
+      })
+      .andWhere('ride.status = :rideStatus', {
+        rideStatus: RideStatus.COMPLETED,
+      })
+      .orderBy('ride.completed_at', 'DESC')
+      .addOrderBy('payment.id', 'DESC')
+      .getMany();
+
+    return payments.map((payment) => this.mapPendingCashPayment(payment));
+  }
+
+  private mapPendingCashPayment(
+    payment: RidePayment,
+  ): DriverPendingCashPaymentResponseDto {
+    const ride = payment.ride;
+
+    return {
+      rideId: ride.id,
+      rideStatus: ride.status,
+      originAddress: ride.originAddress,
+      destinationAddress: ride.destinationAddress,
+      completedAt: ride.completedAt,
+      finalFare: ride.finalFare,
+      currency: ride.currency,
+      payment: this.mapPayment(payment),
+    };
+  }
+
+  private mapPayment(payment: RidePayment): RidePaymentResponseDto {
+    return {
+      id: payment.id,
+      rideId: payment.rideId,
+      passengerUserId: payment.passengerUserId,
+      driverProfileId: payment.driverProfileId,
+      method: payment.method,
+      status: payment.status,
+      amountDue: payment.amountDue,
+      grossAmount: payment.grossAmount,
+      discountAmount: payment.discountAmount,
+      cashReceived: payment.cashReceived,
+      changeGiven: payment.changeGiven,
+      currency: payment.currency,
+      confirmedByDriverUserId: payment.confirmedByDriverUserId,
+      confirmedAt: payment.confirmedAt,
+      confirmationNotes: payment.confirmationNotes,
+      disputeReason: payment.disputeReason,
+      disputeDetail: payment.disputeDetail,
+      disputedAt: payment.disputedAt,
+      resolvedByAdminUserId: payment.resolvedByAdminUserId,
+      resolvedAt: payment.resolvedAt,
+      resolutionNotes: payment.resolutionNotes,
+      createdAt: payment.createdAt,
+      updatedAt: payment.updatedAt,
+    };
   }
 
   private async getApprovedProfile(userId: string): Promise<DriverProfile> {

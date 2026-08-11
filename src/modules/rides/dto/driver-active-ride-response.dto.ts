@@ -4,6 +4,28 @@ import { PaymentMethod } from '../../payments/enums/payment-method.enum';
 import { RideStatus } from '../enums/ride-status.enum';
 import { RideLocationResponseDto } from './passenger-ride-response.dto';
 
+/**
+ * Resumen mínimo del Passenger para identificarlo durante el Ride.
+ * Excluye deliberadamente apellido, teléfono, email, documento y
+ * cualquier otro dato sensible del perfil.
+ */
+export class RideAssignedPassengerResponseDto {
+  @ApiProperty({ format: 'uuid' })
+  profileId!: string;
+
+  @ApiProperty()
+  firstName!: string;
+
+  @ApiPropertyOptional({ nullable: true })
+  photoUrl!: string | null;
+
+  @ApiProperty({ example: '4.90' })
+  ratingAverage!: string;
+
+  @ApiProperty({ example: 32 })
+  ratingCount!: number;
+}
+
 export class DriverActiveRideResponseDto {
   @ApiProperty({ format: 'uuid' })
   id!: string;
@@ -43,6 +65,12 @@ export class DriverActiveRideResponseDto {
 
   @ApiPropertyOptional({ nullable: true })
   passengerNotes!: string | null;
+
+  @ApiPropertyOptional({
+    type: RideAssignedPassengerResponseDto,
+    nullable: true,
+  })
+  passenger!: RideAssignedPassengerResponseDto | null;
 
   @ApiProperty({ type: String, format: 'date-time' })
   requestedAt!: Date;
