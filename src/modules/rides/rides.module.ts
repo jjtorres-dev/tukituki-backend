@@ -21,6 +21,8 @@ import { DriverRideOffersController } from './driver-ride-offers.controller';
 import { AdminRideCancellationsController } from './admin-ride-cancellations.controller';
 import { RidePayment } from '../payments/entities/ride-payment.entity';
 import { FinancialObligationsController } from './financial-obligations.controller';
+import { DriverDailyStatsController } from './driver-daily-stats.controller';
+import { DriverDailyStatsService } from './driver-daily-stats.service';
 import { DriverRideOffersService } from './driver-ride-offers.service';
 import { DriverRidesController } from './driver-rides.controller';
 import { DriverRidesService } from './driver-rides.service';
@@ -93,6 +95,7 @@ import { RideViewService } from './ride-view.service';
     PassengerRidesController,
     DriverRideOffersController,
     DriverRidesController,
+    DriverDailyStatsController,
     FinancialObligationsController,
     AdminRideCancellationsController,
   ],
@@ -102,6 +105,7 @@ import { RideViewService } from './ride-view.service';
     RideDispatchWorker,
     DriverRideOffersService,
     DriverRidesService,
+    DriverDailyStatsService,
     RideTransitionsService,
     RideViewService,
     RideStartCodesService,
@@ -120,6 +124,7 @@ import { RideViewService } from './ride-view.service';
     RideDispatchService,
     DriverRideOffersService,
     DriverRidesService,
+    DriverDailyStatsService,
     RideTransitionsService,
     RideViewService,
     RideStartCodesService,
