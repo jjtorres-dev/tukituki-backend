@@ -18,6 +18,7 @@ import { DriverOperationalStatus } from '../driver-operations/enums/driver-opera
 import { DriverProfile } from '../drivers/entities/driver-profile.entity';
 import { DriverStatus } from '../drivers/enums/driver-status.enum';
 import { CounterRideOfferDto } from './dto/counter-ride-offer.dto';
+import { DriverPendingProposalResponseDto } from './dto/driver-pending-proposal-response.dto';
 import { DriverRideOfferResponseDto } from './dto/driver-ride-offer-response.dto';
 import { RejectRideOfferDto } from './dto/reject-ride-offer.dto';
 import { RideOffer } from './entities/ride-offer.entity';
@@ -71,23 +72,7 @@ export class DriverRideOffersService {
 
     const repository = this.dataSource.getRepository(RideOffer);
 
-    /*
-     * OFFERED y PROPOSED pueden expirar.
-     *
-     * Una propuesta ya enviada deja de ser
-     * válida cuando llega su expiresAt.
-     */
-    await repository.update(
-      {
-        driverProfileId: profile.id,
-        status: In([RideOfferStatus.OFFERED, RideOfferStatus.PROPOSED]),
-        expiresAt: LessThanOrEqual(now),
-      },
-      {
-        status: RideOfferStatus.EXPIRED,
-        respondedAt: now,
-      },
-    );
+    await this.expireStaleOffers(profile.id, now);
 
     /*
      * Al conductor solamente le devolvemos
@@ -135,6 +120,63 @@ export class DriverRideOffersService {
     }
 
     return this.mapOffer(offer);
+  }
+
+  /*
+   * Recuperación autoritativa de propuestas PROPOSED
+   * vigentes del conductor autenticado.
+   *
+   * Existe para que Flutter pueda reconstruir la
+   * negociación tras un restart, cierre de app u otro
+   * dispositivo, sin depender de _pendingOfferId local.
+   *
+   * Es independiente de "active": nunca devuelve OFFERED
+   * y "active" nunca devuelve PROPOSED.
+   */
+  async getPendingProposals(
+    userId: string,
+  ): Promise<DriverPendingProposalResponseDto[]> {
+    const profile = await this.getApprovedProfile(userId);
+
+    const now = new Date();
+
+    await this.expireStaleOffers(profile.id, now);
+
+    const offers = await this.dataSource.getRepository(RideOffer).find({
+      where: {
+        driverProfileId: profile.id,
+        status: RideOfferStatus.PROPOSED,
+        expiresAt: MoreThan(now),
+      },
+      relations: {
+        ride: true,
+      },
+      /*
+       * La propuesta más próxima a expirar aparece
+       * primero. Como desempate, la más antigua.
+       */
+      order: {
+        expiresAt: 'ASC',
+        createdAt: 'ASC',
+      },
+    });
+
+    /*
+     * Defensa adicional: una PROPOSED solo tiene sentido
+     * si su viaje sigue en negociación activa. La misma
+     * condición que ya usa proposeWithinTransaction.
+     *
+     * En la práctica siempre se cumple, porque cada
+     * transición que saca al viaje de SEARCHING_DRIVER
+     * también cierra sus ofertas OFFERED/PROPOSED.
+     */
+    const validOffers = offers.filter(
+      (offer) =>
+        offer.ride.status === RideStatus.SEARCHING_DRIVER &&
+        offer.ride.searchExpiresAt.getTime() > now.getTime(),
+    );
+
+    return validOffers.map((offer) => this.mapPendingProposal(offer));
   }
 
   /*
@@ -608,6 +650,75 @@ export class DriverRideOffersService {
     } catch {
       throw new BadRequestException('El precio propuesto no es válido');
     }
+  }
+
+  /*
+   * OFFERED y PROPOSED pueden expirar.
+   *
+   * Una invitación u propuesta ya enviada deja de ser
+   * válida cuando llega su expiresAt. Se reutiliza tanto
+   * para "active" como para "proposals/pending".
+   */
+  private async expireStaleOffers(
+    driverProfileId: string,
+    now: Date,
+  ): Promise<void> {
+    await this.dataSource.getRepository(RideOffer).update(
+      {
+        driverProfileId,
+        status: In([RideOfferStatus.OFFERED, RideOfferStatus.PROPOSED]),
+        expiresAt: LessThanOrEqual(now),
+      },
+      {
+        status: RideOfferStatus.EXPIRED,
+        respondedAt: now,
+      },
+    );
+  }
+
+  private mapPendingProposal(
+    offer: RideOffer,
+  ): DriverPendingProposalResponseDto {
+    const ride = offer.ride;
+
+    return {
+      offerId: offer.id,
+      rideId: offer.rideId,
+      status: RideOfferStatus.PROPOSED,
+
+      /*
+       * proposedFare siempre está presente en una
+       * PROPOSED: proposeWithinTransaction lo asigna en
+       * el mismo momento en que fija ese estado.
+       */
+      proposedFare: offer.proposedFare as string,
+
+      passengerOfferFare: ride.passengerOfferFare ?? ride.estimatedFare,
+
+      estimatedFare: ride.estimatedFare,
+
+      currency: ride.currency,
+
+      expiresAt: offer.expiresAt,
+
+      distanceToOriginMeters: offer.distanceToOriginMeters,
+
+      origin: {
+        latitude: ride.originPosition.coordinates[1],
+
+        longitude: ride.originPosition.coordinates[0],
+
+        address: ride.originAddress,
+      },
+
+      destination: {
+        latitude: ride.destinationPosition.coordinates[1],
+
+        longitude: ride.destinationPosition.coordinates[0],
+
+        address: ride.destinationAddress,
+      },
+    };
   }
 
   private mapOffer(offer: RideOffer): DriverRideOfferResponseDto {
