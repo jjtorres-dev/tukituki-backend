@@ -34,6 +34,8 @@ export class RideViewService {
           profileId: profile.id,
           firstName: profile.firstName,
           photoUrl: profile.photoUrl,
+          ratingAverage: profile.ratingAverage,
+          ratingCount: profile.ratingCount,
           vehicle: {
             plate: vehicle.plate,
             brand: vehicle.brand,

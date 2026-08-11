@@ -51,6 +51,8 @@ describe('RideViewService', () => {
       id: driverProfileId,
       firstName: 'Carlos',
       photoUrl: 'https://cdn.tukituki.pe/carlos.jpg',
+      ratingAverage: '4.92',
+      ratingCount: 128,
     } as DriverProfile;
     const vehicle = {
       driverProfileId,
@@ -86,9 +88,54 @@ describe('RideViewService', () => {
 
     const result = await service.toPassengerResponse(ride);
 
+    expect(result.driver?.profileId).toBe(driverProfileId);
     expect(result.driver?.firstName).toBe('Carlos');
+    expect(result.driver?.photoUrl).toBe('https://cdn.tukituki.pe/carlos.jpg');
+    expect(result.driver?.ratingAverage).toBe('4.92');
+    expect(result.driver?.ratingCount).toBe(128);
     expect(result.driver?.vehicle.plate).toBe('1234-AB');
+    expect(result.driver?.vehicle.brand).toBe('Bajaj');
+    expect(result.driver?.vehicle.model).toBe('RE 4S');
+    expect(result.driver?.vehicle.color).toBe('Rojo');
+    expect(result.driver?.vehicle.vehicleType).toBe(VehicleType.MOTOTAXI);
     expect(result.driverLocation?.latitude).toBe(-6.4879);
+  });
+
+  it('debe respetar el rating real del conductor sin historial', async () => {
+    const profile = {
+      id: driverProfileId,
+      firstName: 'Carlos',
+      photoUrl: null,
+      ratingAverage: '0.00',
+      ratingCount: 0,
+    } as DriverProfile;
+    const vehicle = {
+      driverProfileId,
+      plate: '1234-AB',
+      brand: 'Bajaj',
+      model: 'RE 4S',
+      color: 'Rojo',
+      vehicleType: VehicleType.MOTOTAXI,
+    } as DriverVehicle;
+
+    const dataSourceMock = {
+      getRepository: jest.fn((entity: unknown): unknown => ({
+        findOne: jest.fn(() => {
+          if (entity === DriverProfile) return Promise.resolve(profile);
+          if (entity === DriverVehicle) return Promise.resolve(vehicle);
+          if (entity === DriverLocation) return Promise.resolve(null);
+          return Promise.resolve(null);
+        }),
+      })),
+    };
+    const service = new RideViewService(
+      dataSourceMock as unknown as DataSource,
+    );
+
+    const result = await service.toPassengerResponse(ride);
+
+    expect(result.driver?.ratingAverage).toBe('0.00');
+    expect(result.driver?.ratingCount).toBe(0);
   });
 
   it('no debe exponer conductor antes de la asignación', async () => {
