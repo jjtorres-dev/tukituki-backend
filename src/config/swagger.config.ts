@@ -29,6 +29,7 @@ export const SWAGGER_TAGS = [
   ['Passenger rides', 'Solicitud y ciclo de vida de viajes del pasajero.'],
   ['Driver ride offers', 'Ofertas de viaje enviadas a conductores.'],
   ['Driver rides', 'Ciclo de vida de viajes del conductor.'],
+  ['Driver stats', 'Estadísticas diarias del conductor para su Home.'],
   ['Admin rides', 'Consulta y seguimiento operativo de viajes.'],
   [
     'Admin ride cancellations',

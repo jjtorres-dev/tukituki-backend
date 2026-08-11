@@ -1,3 +1,8 @@
+import { Test } from '@nestjs/testing';
+import { SwaggerModule } from '@nestjs/swagger';
+
+import { DriverDailyStatsController } from '../modules/rides/driver-daily-stats.controller';
+import { DriverDailyStatsService } from '../modules/rides/driver-daily-stats.service';
 import { buildSwaggerConfiguration, SWAGGER_TAGS } from './swagger.config';
 
 describe('buildSwaggerConfiguration', () => {
@@ -38,5 +43,58 @@ describe('buildSwaggerConfiguration', () => {
         'Ride safety',
       ]),
     );
+  });
+});
+
+/*
+ * Regresión del error de CI:
+ *
+ *   GET /api/v1/drivers/me/stats/daily uses undeclared tag
+ *   "Driver stats"
+ *
+ * `npm run openapi:export` necesita levantar toda la app
+ * (Postgres/Redis reales), así que no puede correr en este
+ * suite, y `scripts/export-openapi.ts` no es importable en
+ * tests: su top-level `void exportApiContracts()` arranca
+ * la app real en cuanto se importa el módulo. Por eso esta
+ * prueba arma un documento OpenAPI solo con el controller
+ * nuevo (sin DB/Redis) y repite, inline, la misma regla que
+ * aplica `validateOpenApiDocument` en scripts/export-openapi.ts:
+ * todo tag usado por una operación debe estar en
+ * document.tags.
+ */
+describe('validateOpenApiDocument - Driver stats', () => {
+  it('declara el tag "Driver stats" usado por GET /drivers/me/stats/daily', async () => {
+    const moduleRef = await Test.createTestingModule({
+      controllers: [DriverDailyStatsController],
+      providers: [
+        {
+          provide: DriverDailyStatsService,
+          useValue: {},
+        },
+      ],
+    }).compile();
+
+    const app = moduleRef.createNestApplication();
+
+    try {
+      await app.init();
+
+      const document = SwaggerModule.createDocument(
+        app,
+        buildSwaggerConfiguration(),
+      );
+
+      const operation = document.paths['/drivers/me/stats/daily']?.get;
+      const declaredTags = new Set(document.tags?.map((tag) => tag.name) ?? []);
+
+      expect(operation?.tags).toEqual(['Driver stats']);
+
+      for (const tag of operation?.tags ?? []) {
+        expect(declaredTags.has(tag)).toBe(true);
+      }
+    } finally {
+      await app.close();
+    }
   });
 });
