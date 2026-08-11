@@ -863,7 +863,11 @@ export class RideCancellationsService {
     await manager.getRepository(RideOffer).update(
       {
         rideId: ride.id,
-        status: In([RideOfferStatus.OFFERED, RideOfferStatus.ACCEPTED]),
+        status: In([
+          RideOfferStatus.OFFERED,
+          RideOfferStatus.PROPOSED,
+          RideOfferStatus.ACCEPTED,
+        ]),
       },
       {
         status: RideOfferStatus.CANCELLED,
@@ -1129,7 +1133,6 @@ export class RideCancellationsService {
     if (!user) throw new NotFoundException('El pasajero no existe');
     if (
       user.status !== UserStatus.ACTIVE ||
-      !user.isPhoneVerified ||
       !user.roles.includes(UserRole.PASSENGER)
     ) {
       throw new ForbiddenException('La cuenta del pasajero no está habilitada');

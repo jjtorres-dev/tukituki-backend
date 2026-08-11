@@ -4,25 +4,27 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import type { EntityManager, Repository } from 'typeorm';
 
-import { DriverAvailabilityRedisService } from '../../infrastructure/redis/driver-availability-redis.service';
+import {
+  DRIVER_PRESENCE_TTL_SECONDS,
+  DriverAvailabilityRedisService,
+} from '../../infrastructure/redis/driver-availability-redis.service';
 import { DriverDocument } from '../drivers/entities/driver-document.entity';
 import { DriverProfile } from '../drivers/entities/driver-profile.entity';
 import { DriverVehicle } from '../drivers/entities/driver-vehicle.entity';
-import { DriverDocumentStatus } from '../drivers/enums/driver-document-status.enum';
-import { DriverDocumentType } from '../drivers/enums/driver-document-type.enum';
 import { DriverStatus } from '../drivers/enums/driver-status.enum';
-import { VehicleStatus } from '../drivers/enums/vehicle-status.enum';
+import { Ride } from '../rides/entities/ride.entity';
+import { ACTIVE_DRIVER_RIDE_STATUSES } from '../rides/ride-matching.constants';
+import {
+  assertDriverOperationalRequirements,
+  REQUIRED_OPERATIONAL_DOCUMENTS,
+} from './driver-operational-requirements.util';
 import { DriverOperationalState } from './entities/driver-operational-state.entity';
 import { DriverOperationalStatus } from './enums/driver-operational-status.enum';
-
-const REQUIRED_OPERATIONAL_DOCUMENTS: readonly DriverDocumentType[] = [
-  DriverDocumentType.DRIVER_LICENSE,
-  DriverDocumentType.SOAT,
-];
 
 @Injectable()
 export class DriverOperationsService {
@@ -33,14 +35,37 @@ export class DriverOperationsService {
     private readonly availabilityRedisService: DriverAvailabilityRedisService,
   ) {}
 
-  getMyStatus(userId: string): Promise<DriverOperationalState> {
-    return this.dataSource.transaction(async (manager) => {
+  async getMyStatus(userId: string): Promise<DriverOperationalState> {
+    const state = await this.dataSource.transaction(async (manager) => {
       const profile = await this.lockApprovedProfile(manager, userId);
 
       const stateRepository = manager.getRepository(DriverOperationalState);
 
-      return this.getOrCreateState(stateRepository, profile.id);
+      const currentState = await this.getOrCreateState(
+        stateRepository,
+        profile.id,
+      );
+
+      const now = new Date();
+
+      if (
+        currentState.status === DriverOperationalStatus.AVAILABLE &&
+        this.isPresenceExpired(currentState.lastSeenAt, now)
+      ) {
+        currentState.status = DriverOperationalStatus.OFFLINE;
+        currentState.disconnectedAt = now;
+
+        return stateRepository.save(currentState);
+      }
+
+      return currentState;
     });
+
+    if (state.status === DriverOperationalStatus.OFFLINE) {
+      await this.safeRemoveDriverAvailability(state.driverProfileId);
+    }
+
+    return state;
   }
 
   async goOnline(userId: string): Promise<DriverOperationalState> {
@@ -54,7 +79,11 @@ export class DriverOperationsService {
         profile.id,
       );
 
-      this.assertCanGoOnline(vehicle, documents);
+      assertDriverOperationalRequirements(
+        vehicle,
+        documents,
+        this.getTodayIsoDate(),
+      );
 
       const stateRepository = manager.getRepository(DriverOperationalState);
 
@@ -71,7 +100,10 @@ export class DriverOperationsService {
 
       const now = new Date();
 
-      if (currentState.status === DriverOperationalStatus.OFFLINE) {
+      if (
+        currentState.status === DriverOperationalStatus.OFFLINE ||
+        this.isPresenceExpired(currentState.lastSeenAt, now)
+      ) {
         currentState.connectedAt = now;
       }
 
@@ -133,7 +165,7 @@ export class DriverOperationsService {
   }
 
   async heartbeat(userId: string): Promise<DriverOperationalState> {
-    const state = await this.dataSource.transaction(async (manager) => {
+    const result = await this.dataSource.transaction(async (manager) => {
       const profile = await this.lockApprovedProfile(manager, userId);
 
       const stateRepository = manager.getRepository(DriverOperationalState);
@@ -149,16 +181,61 @@ export class DriverOperationsService {
         );
       }
 
-      currentState.lastSeenAt = new Date();
+      const now = new Date();
 
-      return stateRepository.save(currentState);
+      let shouldRegisterAvailablePresence = false;
+
+      if (currentState.status === DriverOperationalStatus.AVAILABLE) {
+        const presenceRenewed =
+          await this.availabilityRedisService.renewPresenceIfExists(profile.id);
+
+        if (!presenceRenewed) {
+          const vehicle = await this.lockVehicle(manager, profile.id);
+
+          const documents = await this.lockOperationalDocuments(
+            manager,
+            profile.id,
+          );
+
+          assertDriverOperationalRequirements(
+            vehicle,
+            documents,
+            this.getTodayIsoDate(),
+          );
+
+          await this.assertNoActiveRide(manager, profile.id);
+
+          if (this.isPresenceExpired(currentState.lastSeenAt, now)) {
+            currentState.connectedAt = now;
+          }
+
+          shouldRegisterAvailablePresence = true;
+        }
+      }
+
+      currentState.lastSeenAt = now;
+
+      return {
+        state: await stateRepository.save(currentState),
+        shouldRegisterAvailablePresence,
+      };
     });
 
-    if (state.status === DriverOperationalStatus.AVAILABLE) {
-      await this.safeRenewPresence(state.driverProfileId);
+    if (result.shouldRegisterAvailablePresence) {
+      try {
+        await this.availabilityRedisService.registerAvailablePresence(
+          result.state.driverProfileId,
+        );
+      } catch {
+        await this.compensateFailedAvailablePresence(result.state);
+
+        throw new ServiceUnavailableException(
+          'No se pudo reconstruir la presencia del conductor. Intenta nuevamente',
+        );
+      }
     }
 
-    return state;
+    return result.state;
   }
 
   private async lockApprovedProfile(
@@ -216,54 +293,6 @@ export class DriverOperationsService {
       .getMany();
   }
 
-  private assertCanGoOnline(
-    vehicle: DriverVehicle | null,
-    documents: DriverDocument[],
-  ): void {
-    const invalidRequirements: string[] = [];
-
-    if (!vehicle) {
-      invalidRequirements.push('DRIVER_VEHICLE_MISSING');
-    } else if (vehicle.status !== VehicleStatus.APPROVED) {
-      invalidRequirements.push(`DRIVER_VEHICLE_STATUS_${vehicle.status}`);
-    }
-
-    const documentsByType = new Map(
-      documents.map((document) => [document.type, document]),
-    );
-
-    const today = this.getTodayIsoDate();
-
-    for (const requiredType of REQUIRED_OPERATIONAL_DOCUMENTS) {
-      const document = documentsByType.get(requiredType);
-
-      if (!document) {
-        invalidRequirements.push(`${requiredType}_MISSING`);
-
-        continue;
-      }
-
-      if (document.status !== DriverDocumentStatus.APPROVED) {
-        invalidRequirements.push(`${requiredType}_STATUS_${document.status}`);
-      }
-
-      if (!document.expiresAt) {
-        invalidRequirements.push(`${requiredType}_EXPIRATION_MISSING`);
-      } else if (document.expiresAt < today) {
-        invalidRequirements.push(`${requiredType}_EXPIRED`);
-      }
-    }
-
-    if (invalidRequirements.length > 0) {
-      throw new BadRequestException({
-        statusCode: 400,
-        message: 'El conductor no cumple los requisitos para conectarse',
-        invalidRequirements,
-        error: 'Bad Request',
-      });
-    }
-  }
-
   private async getOrCreateState(
     repository: Repository<DriverOperationalState>,
     driverProfileId: string,
@@ -298,6 +327,64 @@ export class DriverOperationsService {
       .getOne();
   }
 
+  private async assertNoActiveRide(
+    manager: EntityManager,
+    driverProfileId: string,
+  ): Promise<void> {
+    const activeRide = await manager
+      .getRepository(Ride)
+      .createQueryBuilder('ride')
+      .where('ride.driver_profile_id = :driverProfileId', {
+        driverProfileId,
+      })
+      .andWhere('ride.status IN (:...statuses)', {
+        statuses: ACTIVE_DRIVER_RIDE_STATUSES,
+      })
+      .getOne();
+
+    if (activeRide) {
+      throw new BadRequestException(
+        'El conductor tiene un viaje activo incompatible con AVAILABLE',
+      );
+    }
+  }
+
+  private async compensateFailedAvailablePresence(
+    recoveredState: DriverOperationalState,
+  ): Promise<void> {
+    try {
+      await this.dataSource.transaction(async (manager) => {
+        const stateRepository = manager.getRepository(DriverOperationalState);
+
+        const currentState = await this.lockState(
+          stateRepository,
+          recoveredState.driverProfileId,
+        );
+
+        if (
+          !currentState ||
+          currentState.status !== DriverOperationalStatus.AVAILABLE ||
+          currentState.lastSeenAt?.getTime() !==
+            recoveredState.lastSeenAt?.getTime()
+        ) {
+          return;
+        }
+
+        currentState.status = DriverOperationalStatus.OFFLINE;
+        currentState.disconnectedAt = new Date();
+
+        await stateRepository.save(currentState);
+      });
+
+      await this.safeRemoveDriverAvailability(recoveredState.driverProfileId);
+    } catch (error: unknown) {
+      this.logger.error(
+        `No se pudo compensar la presencia fallida del conductor ${recoveredState.driverProfileId}`,
+        error,
+      );
+    }
+  }
+
   private async safeRemoveDriverAvailability(
     driverProfileId: string,
   ): Promise<void> {
@@ -313,20 +400,17 @@ export class DriverOperationsService {
     }
   }
 
-  private async safeRenewPresence(driverProfileId: string): Promise<void> {
-    try {
-      await this.availabilityRedisService.renewPresenceIfExists(
-        driverProfileId,
-      );
-    } catch (error: unknown) {
-      this.logger.error(
-        `No se pudo renovar la presencia Redis del conductor ${driverProfileId}`,
-        error,
-      );
-    }
-  }
-
   private getTodayIsoDate(): string {
     return new Date().toISOString().slice(0, 10);
+  }
+
+  private isPresenceExpired(lastSeenAt: Date | null, now: Date): boolean {
+    if (!lastSeenAt) {
+      return true;
+    }
+
+    return (
+      now.getTime() - lastSeenAt.getTime() >= DRIVER_PRESENCE_TTL_SECONDS * 1000
+    );
   }
 }

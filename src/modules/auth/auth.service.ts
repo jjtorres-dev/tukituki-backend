@@ -10,6 +10,7 @@ import { JwtService } from '@nestjs/jwt';
 import { UserRole } from '../users/enums/user-role.enum';
 import { UserStatus } from '../users/enums/user-status.enum';
 import { UsersService } from '../users/users.service';
+import { isPassengerOnlyUser } from '../users/utils/user-auth-policy.util';
 import { LoginDto } from './dto/login.dto';
 import { LoginResponseDto } from './dto/login-response.dto';
 import { RegisterPassengerDto } from './dto/register-passenger.dto';
@@ -46,7 +47,7 @@ export class AuthService {
       phoneE164: dto.phoneE164,
       passwordHash,
       roles: [UserRole.PASSENGER],
-      status: UserStatus.PENDING,
+      status: UserStatus.ACTIVE,
       isPhoneVerified: false,
     });
 
@@ -80,14 +81,18 @@ export class AuthService {
       throw new UnauthorizedException('Teléfono o contraseña incorrectos');
     }
 
-    if (!user.isPhoneVerified || user.status === UserStatus.PENDING) {
-      throw new ForbiddenException('Debes verificar tu número telefónico');
-    }
-
     if (user.status !== UserStatus.ACTIVE) {
+      if (user.status === UserStatus.PENDING) {
+        throw new ForbiddenException('Debes verificar tu número telefónico');
+      }
+
       throw new ForbiddenException(
         'La cuenta no está habilitada para iniciar sesión',
       );
+    }
+
+    if (!user.isPhoneVerified && !isPassengerOnlyUser(user)) {
+      throw new ForbiddenException('Debes verificar tu número telefónico');
     }
 
     const session = await this.authSessionsService.create({

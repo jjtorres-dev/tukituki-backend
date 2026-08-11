@@ -28,6 +28,7 @@ import { Roles } from '../authorization/decorators/roles.decorator';
 import { RolesGuard } from '../authorization/guards/roles.guard';
 import { UserRole } from '../users/enums/user-role.enum';
 import { CounterRideOfferDto } from './dto/counter-ride-offer.dto';
+import { DriverPendingProposalResponseDto } from './dto/driver-pending-proposal-response.dto';
 import { DriverRideOfferResponseDto } from './dto/driver-ride-offer-response.dto';
 import { RejectRideOfferDto } from './dto/reject-ride-offer.dto';
 import { DriverRideOffersService } from './driver-ride-offers.service';
@@ -56,6 +57,31 @@ export class DriverRideOffersController {
     @CurrentUser() user: AuthenticatedUser,
   ): Promise<DriverRideOfferResponseDto[]> {
     return this.driverRideOffersService.getActiveOffers(user.id);
+  }
+
+  /*
+   * Recuperación autoritativa de propuestas PROPOSED
+   * vigentes.
+   *
+   * Independiente de "active": nunca devuelve OFFERED,
+   * y "active" nunca devuelve PROPOSED.
+   */
+  @Get('proposals/pending')
+  @ApiOperation({
+    summary:
+      'Recuperar autoritativamente las propuestas PROPOSED vigentes ' +
+      'del conductor',
+  })
+  @ApiOkResponse({
+    type: DriverPendingProposalResponseDto,
+    isArray: true,
+  })
+  @ApiUnauthorizedResponse()
+  @ApiForbiddenResponse()
+  getPendingProposals(
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<DriverPendingProposalResponseDto[]> {
+    return this.driverRideOffersService.getPendingProposals(user.id);
   }
 
   @Get(':offerId')

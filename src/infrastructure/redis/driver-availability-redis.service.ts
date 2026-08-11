@@ -5,7 +5,7 @@ import type { RedisGeoSearchResult } from './redis.service';
 
 const AVAILABLE_DRIVERS_GEO_KEY = 'drivers:available';
 
-const DRIVER_PRESENCE_TTL_SECONDS = 90;
+export const DRIVER_PRESENCE_TTL_SECONDS = 90;
 
 const DRIVER_LOCATION_TTL_SECONDS = 45;
 
@@ -69,6 +69,14 @@ export class DriverAvailabilityRedisService {
         DRIVER_LOCATION_TTL_SECONDS,
       ),
     ]);
+  }
+
+  async registerAvailablePresence(driverProfileId: string): Promise<void> {
+    await this.redisService.setWithTtl(
+      this.getPresenceKey(driverProfileId),
+      new Date().toISOString(),
+      DRIVER_PRESENCE_TTL_SECONDS,
+    );
   }
 
   async removeDriverAvailability(driverProfileId: string): Promise<void> {

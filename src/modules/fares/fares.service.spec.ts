@@ -70,7 +70,7 @@ describe('FaresService', () => {
 
     status: UserStatus.ACTIVE,
 
-    isPhoneVerified: true,
+    isPhoneVerified: false,
 
     createdAt: new Date(),
 

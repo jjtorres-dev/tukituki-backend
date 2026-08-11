@@ -43,6 +43,16 @@ export class AssignedDriverResponseDto {
   @ApiPropertyOptional({ nullable: true })
   photoUrl!: string | null;
 
+  @ApiProperty({
+    example: '4.92',
+  })
+  ratingAverage!: string;
+
+  @ApiProperty({
+    example: 128,
+  })
+  ratingCount!: number;
+
   @ApiProperty({ type: AssignedDriverVehicleResponseDto })
   vehicle!: AssignedDriverVehicleResponseDto;
 }

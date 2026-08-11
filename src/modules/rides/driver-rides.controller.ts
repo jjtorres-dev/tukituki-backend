@@ -40,6 +40,7 @@ import { RideHistoryQueryDto } from './dto/ride-history-query.dto';
 import { RideRatingResponseDto } from './dto/ride-rating-response.dto';
 import { SubmitRideRatingDto } from './dto/submit-ride-rating.dto';
 import { DriverActiveRideResponseDto } from './dto/driver-active-ride-response.dto';
+import { DriverPendingCashPaymentResponseDto } from './dto/driver-pending-cash-payment-response.dto';
 import { RideCompletionResponseDto } from './dto/ride-completion-response.dto';
 import { RideReceiptResponseDto } from './dto/ride-receipt-response.dto';
 import { RideTransitionResponseDto } from './dto/ride-transition-response.dto';
@@ -95,6 +96,17 @@ export class DriverRidesController {
     @Query() query: RideHistoryQueryDto,
   ): Promise<DriverRideHistoryResponseDto> {
     return this.rideHistoryService.getDriverHistory(user.id, query);
+  }
+
+  @Get('pending-payments')
+  @ApiOperation({
+    summary: 'Consultar rides COMPLETED del conductor con RidePayment PENDING',
+  })
+  @ApiOkResponse({ type: [DriverPendingCashPaymentResponseDto] })
+  listPendingCashPayments(
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<DriverPendingCashPaymentResponseDto[]> {
+    return this.driverRidesService.listPendingCashPayments(user.id);
   }
 
   @Get(':rideId')

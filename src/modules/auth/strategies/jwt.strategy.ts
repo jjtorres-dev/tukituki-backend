@@ -6,6 +6,7 @@ import { ExtractJwt, Strategy } from 'passport-jwt';
 import { AuthSessionsService } from '../../auth-sessions/auth-sessions.service';
 import { UserStatus } from '../../users/enums/user-status.enum';
 import { UsersService } from '../../users/users.service';
+import { isPassengerOnlyUser } from '../../users/utils/user-auth-policy.util';
 import type { AuthenticatedUser } from '../interfaces/authenticated-user.interface';
 import type { JwtPayload } from '../interfaces/jwt-payload.interface';
 
@@ -40,7 +41,10 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       throw new UnauthorizedException('El usuario del token ya no existe');
     }
 
-    if (!user.isPhoneVerified || user.status !== UserStatus.ACTIVE) {
+    if (
+      user.status !== UserStatus.ACTIVE ||
+      (!user.isPhoneVerified && !isPassengerOnlyUser(user))
+    ) {
       throw new UnauthorizedException('La cuenta no está habilitada');
     }
 

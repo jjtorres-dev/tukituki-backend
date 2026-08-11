@@ -236,7 +236,6 @@ export class RideTransitionsService {
 
         if (
           passenger.status !== UserStatus.ACTIVE ||
-          !passenger.isPhoneVerified ||
           !passenger.roles.includes(UserRole.PASSENGER)
         ) {
           throw new ForbiddenException(

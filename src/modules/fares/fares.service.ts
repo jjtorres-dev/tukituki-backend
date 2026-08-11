@@ -286,7 +286,6 @@ export class FaresService {
   private assertPassengerEnabled(user: User): void {
     if (
       user.status !== UserStatus.ACTIVE ||
-      !user.isPhoneVerified ||
       !user.roles.includes(UserRole.PASSENGER)
     ) {
       throw new ForbiddenException('La cuenta del pasajero no está habilitada');
