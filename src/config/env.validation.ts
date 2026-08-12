@@ -97,6 +97,32 @@ export const envValidationSchema = Joi.object({
     .max(3600)
     .default(900),
 
+  LOGIN_SECURITY_SECRET: Joi.string().min(32).optional(),
+
+  ADMIN_LOGIN_WINDOW_SECONDS: Joi.number()
+    .integer()
+    .min(60)
+    .max(3600)
+    .default(900),
+
+  ADMIN_LOGIN_ACCOUNT_MAX_FAILURES: Joi.number()
+    .integer()
+    .min(3)
+    .max(20)
+    .default(5),
+
+  ADMIN_LOGIN_IP_MAX_ATTEMPTS: Joi.number()
+    .integer()
+    .min(10)
+    .max(500)
+    .default(30),
+
+  ADMIN_LOGIN_BLOCK_SECONDS: Joi.number()
+    .integer()
+    .min(60)
+    .max(86400)
+    .default(900),
+
   REFRESH_TOKEN_TTL_SECONDS: Joi.number()
     .integer()
     .min(86400)

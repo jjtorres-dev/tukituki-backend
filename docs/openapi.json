@@ -495,6 +495,45 @@
         ]
       }
     },
+    "/api/v1/auth/admin/login": {
+      "post": {
+        "description": "Endpoint exclusivo para ADMIN y SUPER_ADMIN con protección reforzada contra fuerza bruta.",
+        "operationId": "AuthController_adminLogin",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Inicio de sesión administrativo correcto",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Credenciales incorrectas o cuenta no autorizada"
+          },
+          "429": {
+            "description": "Demasiados intentos de acceso"
+          }
+        },
+        "summary": "Iniciar una sesión administrativa",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
     "/api/v1/auth/me": {
       "get": {
         "operationId": "AuthController_me",
@@ -6182,6 +6221,42 @@
         ]
       }
     },
+    "/api/v1/drivers/me/ride-offers/proposals/pending": {
+      "get": {
+        "operationId": "DriverRideOffersController_getPendingProposals",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DriverPendingProposalResponseDto"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": ""
+          },
+          "403": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Recuperar autoritativamente las propuestas PROPOSED vigentes del conductor",
+        "tags": [
+          "Driver ride offers"
+        ]
+      }
+    },
     "/api/v1/drivers/me/ride-offers/{offerId}": {
       "get": {
         "operationId": "DriverRideOffersController_getOffer",
@@ -6301,7 +6376,7 @@
             }
           },
           "400": {
-            "description": "El precio es inválido o no supera la oferta del pasajero"
+            "description": "El precio propuesto es inválido"
           },
           "404": {
             "description": ""
@@ -6487,6 +6562,36 @@
           }
         ],
         "summary": "Consultar el historial paginado del conductor",
+        "tags": [
+          "Driver rides"
+        ]
+      }
+    },
+    "/api/v1/drivers/me/rides/pending-payments": {
+      "get": {
+        "operationId": "DriverRidesController_listPendingCashPayments",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DriverPendingCashPaymentResponseDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Consultar rides COMPLETED del conductor con RidePayment PENDING",
         "tags": [
           "Driver rides"
         ]
@@ -7013,6 +7118,39 @@
         "summary": "Iniciar el viaje mediante el código entregado por el pasajero",
         "tags": [
           "Driver rides"
+        ]
+      }
+    },
+    "/api/v1/drivers/me/stats/daily": {
+      "get": {
+        "operationId": "DriverDailyStatsController_getDailyStats",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DriverDailyStatsResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": ""
+          },
+          "403": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Ganado hoy y viajes completados hoy (America/Lima)",
+        "tags": [
+          "Driver stats"
         ]
       }
     },
@@ -8003,6 +8141,10 @@
     {
       "name": "Driver rides",
       "description": "Ciclo de vida de viajes del conductor."
+    },
+    {
+      "name": "Driver stats",
+      "description": "Estadísticas diarias del conductor para su Home."
     },
     {
       "name": "Admin rides",
@@ -13516,6 +13658,14 @@
             "type": "object",
             "nullable": true
           },
+          "ratingAverage": {
+            "type": "string",
+            "example": "4.92"
+          },
+          "ratingCount": {
+            "type": "number",
+            "example": 128
+          },
           "vehicle": {
             "$ref": "#/components/schemas/AssignedDriverVehicleResponseDto"
           }
@@ -13523,6 +13673,8 @@
         "required": [
           "profileId",
           "firstName",
+          "ratingAverage",
+          "ratingCount",
           "vehicle"
         ]
       },
@@ -14839,13 +14991,86 @@
           "ride"
         ]
       },
+      "RideOfferStatus": {
+        "type": "string",
+        "enum": [
+          "OFFERED",
+          "PROPOSED",
+          "ACCEPTED",
+          "REJECTED",
+          "EXPIRED",
+          "CANCELLED"
+        ]
+      },
+      "DriverPendingProposalResponseDto": {
+        "type": "object",
+        "properties": {
+          "offerId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "rideId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/RideOfferStatus"
+              }
+            ]
+          },
+          "proposedFare": {
+            "type": "string",
+            "example": "4.50"
+          },
+          "passengerOfferFare": {
+            "type": "string",
+            "example": "4.00"
+          },
+          "estimatedFare": {
+            "type": "string",
+            "example": "5.99"
+          },
+          "currency": {
+            "type": "string",
+            "example": "PEN"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "origin": {
+            "$ref": "#/components/schemas/DriverRideOfferLocationDto"
+          },
+          "destination": {
+            "$ref": "#/components/schemas/DriverRideOfferLocationDto"
+          },
+          "distanceToOriginMeters": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "offerId",
+          "rideId",
+          "status",
+          "proposedFare",
+          "passengerOfferFare",
+          "estimatedFare",
+          "currency",
+          "expiresAt",
+          "origin",
+          "destination",
+          "distanceToOriginMeters"
+        ]
+      },
       "CounterRideOfferDto": {
         "type": "object",
         "properties": {
           "proposedFare": {
             "type": "string",
             "example": "6.00",
-            "description": "Nuevo precio propuesto por el conductor. Debe ser mayor que el precio ofrecido por el pasajero."
+            "description": "Nuevo precio propuesto por el conductor. Puede ser menor, igual o mayor que el precio ofrecido por el pasajero."
           }
         },
         "required": [
@@ -14861,6 +15086,36 @@
             "maxLength": 300
           }
         }
+      },
+      "RideAssignedPassengerResponseDto": {
+        "type": "object",
+        "properties": {
+          "profileId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "firstName": {
+            "type": "string"
+          },
+          "photoUrl": {
+            "type": "object",
+            "nullable": true
+          },
+          "ratingAverage": {
+            "type": "string",
+            "example": "4.90"
+          },
+          "ratingCount": {
+            "type": "number",
+            "example": 32
+          }
+        },
+        "required": [
+          "profileId",
+          "firstName",
+          "ratingAverage",
+          "ratingCount"
+        ]
       },
       "DriverActiveRideResponseDto": {
         "type": "object",
@@ -14921,6 +15176,15 @@
           "passengerNotes": {
             "type": "object",
             "nullable": true
+          },
+          "passenger": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/RideAssignedPassengerResponseDto"
+              }
+            ]
           },
           "requestedAt": {
             "type": "string",
@@ -15096,6 +15360,58 @@
         "required": [
           "items",
           "pagination"
+        ]
+      },
+      "DriverPendingCashPaymentResponseDto": {
+        "type": "object",
+        "properties": {
+          "rideId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "rideStatus": {
+            "type": "string",
+            "enum": [
+              "SEARCHING_DRIVER",
+              "DRIVER_ASSIGNED",
+              "DRIVER_ARRIVING",
+              "DRIVER_ARRIVED",
+              "IN_PROGRESS",
+              "COMPLETED",
+              "CANCELLED",
+              "EXPIRED"
+            ]
+          },
+          "originAddress": {
+            "type": "string"
+          },
+          "destinationAddress": {
+            "type": "string"
+          },
+          "completedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "finalFare": {
+            "type": "object",
+            "nullable": true
+          },
+          "currency": {
+            "type": "string",
+            "example": "PEN"
+          },
+          "payment": {
+            "$ref": "#/components/schemas/RidePaymentResponseDto"
+          }
+        },
+        "required": [
+          "rideId",
+          "rideStatus",
+          "originAddress",
+          "destinationAddress",
+          "currency",
+          "payment"
         ]
       },
       "RideTransitionResponseDto": {
@@ -15391,6 +15707,47 @@
           "status",
           "stateVersion",
           "startedAt"
+        ]
+      },
+      "DriverDailyStatsResponseDto": {
+        "type": "object",
+        "properties": {
+          "businessDate": {
+            "type": "string",
+            "example": "2026-08-10",
+            "description": "Fecha local usada para la consulta (YYYY-MM-DD)"
+          },
+          "timezone": {
+            "type": "string",
+            "example": "America/Lima"
+          },
+          "completedRides": {
+            "type": "number",
+            "example": 3,
+            "description": "Cantidad de Rides COMPLETED dentro del día de negocio"
+          },
+          "grossAmount": {
+            "type": "string",
+            "example": "18.50",
+            "description": "Suma de finalFare de los Rides COMPLETED del día"
+          },
+          "currency": {
+            "type": "string",
+            "example": "PEN"
+          },
+          "asOf": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Momento UTC en que se calcularon las estadísticas"
+          }
+        },
+        "required": [
+          "businessDate",
+          "timezone",
+          "completedRides",
+          "grossAmount",
+          "currency",
+          "asOf"
         ]
       },
       "FinancialObligationItemDto": {

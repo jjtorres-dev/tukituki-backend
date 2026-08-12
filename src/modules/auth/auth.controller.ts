@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   Get,
+  Header,
   HttpCode,
   HttpStatus,
   Param,
@@ -25,6 +26,7 @@ import {
   ApiNoContentResponse,
   ApiParam,
 } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 
 import { AuthService } from './auth.service';
 import { CurrentUser } from './decorators/current-user.decorator';
@@ -122,6 +124,8 @@ export class AuthController {
 
   @Post('login')
   @HttpCode(HttpStatus.OK)
+  @Header('Cache-Control', 'no-store')
+  @Header('Pragma', 'no-cache')
   @ApiOperation({
     summary: 'Iniciar sesión con teléfono y contraseña',
   })
@@ -140,6 +144,38 @@ export class AuthController {
     @Req() request: Request,
   ): Promise<LoginResponseDto> {
     return this.authService.login(dto, {
+      ipAddress: request.ip ?? null,
+      userAgent: request.get('user-agent') ?? null,
+    });
+  }
+
+  @Post('admin/login')
+  @HttpCode(HttpStatus.OK)
+  @Header('Cache-Control', 'no-store')
+  @Header('Pragma', 'no-cache')
+  @Throttle({
+    default: { limit: 10, ttl: 60_000, blockDuration: 300_000 },
+  })
+  @ApiOperation({
+    summary: 'Iniciar una sesión administrativa',
+    description:
+      'Endpoint exclusivo para ADMIN y SUPER_ADMIN con protección reforzada contra fuerza bruta.',
+  })
+  @ApiOkResponse({
+    description: 'Inicio de sesión administrativo correcto',
+    type: LoginResponseDto,
+  })
+  @ApiUnauthorizedResponse({
+    description: 'Credenciales incorrectas o cuenta no autorizada',
+  })
+  @ApiTooManyRequestsResponse({
+    description: 'Demasiados intentos de acceso',
+  })
+  adminLogin(
+    @Body() dto: LoginDto,
+    @Req() request: Request,
+  ): Promise<LoginResponseDto> {
+    return this.authService.loginAdmin(dto, {
       ipAddress: request.ip ?? null,
       userAgent: request.get('user-agent') ?? null,
     });
@@ -167,6 +203,8 @@ export class AuthController {
 
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
+  @Header('Cache-Control', 'no-store')
+  @Header('Pragma', 'no-cache')
   @ApiOperation({
     summary: 'Renovar los tokens de una sesión',
   })

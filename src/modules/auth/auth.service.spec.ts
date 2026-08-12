@@ -1,4 +1,4 @@
-import { ForbiddenException } from '@nestjs/common';
+import { ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 
@@ -9,6 +9,7 @@ import { UserStatus } from '../users/enums/user-status.enum';
 import { UsersService } from '../users/users.service';
 import { AuthService } from './auth.service';
 import { PasswordService } from './password.service';
+import { AdminLoginSecurityService } from './admin-login-security.service';
 
 describe('AuthService', () => {
   const phoneE164 = '+51987654321';
@@ -37,10 +38,15 @@ describe('AuthService', () => {
   };
   let passwordService: {
     hash: jest.Mock;
-    verify: jest.Mock;
+    verifyWithFallback: jest.Mock;
   };
   let authSessionsService: {
     create: jest.Mock;
+  };
+  let adminLoginSecurityService: {
+    assertAllowed: jest.Mock;
+    registerFailure: jest.Mock;
+    registerSuccess: jest.Mock;
   };
 
   beforeEach(() => {
@@ -52,7 +58,7 @@ describe('AuthService', () => {
     };
     passwordService = {
       hash: jest.fn(() => Promise.resolve('password-hash')),
-      verify: jest.fn(() => Promise.resolve(true)),
+      verifyWithFallback: jest.fn(() => Promise.resolve(true)),
     };
     authSessionsService = {
       create: jest.fn(() =>
@@ -63,6 +69,11 @@ describe('AuthService', () => {
           expiresAt: new Date('2026-09-09T12:00:00.000Z'),
         }),
       ),
+    };
+    adminLoginSecurityService = {
+      assertAllowed: jest.fn(() => Promise.resolve()),
+      registerFailure: jest.fn(() => Promise.resolve()),
+      registerSuccess: jest.fn(() => Promise.resolve()),
     };
 
     service = new AuthService(
@@ -75,6 +86,7 @@ describe('AuthService', () => {
         getOrThrow: jest.fn(() => 900),
       } as unknown as ConfigService,
       authSessionsService as unknown as AuthSessionsService,
+      adminLoginSecurityService as unknown as AdminLoginSecurityService,
     );
   });
 
@@ -147,6 +159,73 @@ describe('AuthService', () => {
       ),
     ).rejects.toBeInstanceOf(ForbiddenException);
 
+    expect(authSessionsService.create).not.toHaveBeenCalled();
+  });
+
+  it('usa una comparación bcrypt ficticia cuando el usuario no existe', async () => {
+    usersService.findByPhoneE164WithPassword.mockResolvedValue(null);
+    passwordService.verifyWithFallback.mockResolvedValue(false);
+
+    await expect(
+      service.login(
+        { phoneE164, password: 'Password123!' },
+        { ipAddress: null, userAgent: null },
+      ),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
+
+    expect(passwordService.verifyWithFallback).toHaveBeenCalledWith(
+      'Password123!',
+      undefined,
+    );
+  });
+
+  it('permite el endpoint administrativo solo a un administrador elegible', async () => {
+    usersService.findByPhoneE164WithPassword.mockResolvedValue(
+      user({
+        roles: [UserRole.ADMIN],
+        isPhoneVerified: true,
+      }),
+    );
+
+    const result = await service.loginAdmin(
+      { phoneE164, password: 'Password123!' },
+      { ipAddress: '203.0.113.10', userAgent: 'Dashboard' },
+    );
+
+    expect(result.accessToken).toBe('access-token');
+    expect(adminLoginSecurityService.assertAllowed).toHaveBeenCalledWith(
+      phoneE164,
+      '203.0.113.10',
+    );
+    expect(adminLoginSecurityService.registerSuccess).toHaveBeenCalledWith(
+      phoneE164,
+      '203.0.113.10',
+      expect.any(String),
+    );
+    expect(adminLoginSecurityService.registerFailure).not.toHaveBeenCalled();
+  });
+
+  it('rechaza con respuesta genérica una cuenta no administrativa', async () => {
+    usersService.findByPhoneE164WithPassword.mockResolvedValue(
+      user({
+        roles: [UserRole.PASSENGER],
+        isPhoneVerified: true,
+      }),
+    );
+
+    await expect(
+      service.loginAdmin(
+        { phoneE164, password: 'Password123!' },
+        { ipAddress: '203.0.113.10', userAgent: 'Dashboard' },
+      ),
+    ).rejects.toMatchObject({
+      message: 'Teléfono o contraseña incorrectos',
+    });
+
+    expect(adminLoginSecurityService.registerFailure).toHaveBeenCalledWith(
+      phoneE164,
+      '203.0.113.10',
+    );
     expect(authSessionsService.create).not.toHaveBeenCalled();
   });
 });

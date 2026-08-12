@@ -53,6 +53,16 @@ Los contratos para Flutter se generan en `docs/openapi.json` y `docs/tukituki.po
 - Swagger: `/docs` cuando `SWAGGER_ENABLED=true`.
 - CORS HTTP y WebSocket: lista separada por comas en `CORS_ALLOWED_ORIGINS`.
 - Helmet, límite global de solicitudes y límite del cuerpo están habilitados.
+- El dashboard debe autenticarse exclusivamente mediante
+  `POST /api/v1/auth/admin/login`. Este endpoint valida el rol en el backend,
+  usa límites independientes por cuenta e IP respaldados por Redis y devuelve
+  errores genéricos para evitar enumeración de usuarios.
+- Los contadores del login administrativo se configuran con
+  `ADMIN_LOGIN_WINDOW_SECONDS`, `ADMIN_LOGIN_ACCOUNT_MAX_FAILURES`,
+  `ADMIN_LOGIN_IP_MAX_ATTEMPTS` y `ADMIN_LOGIN_BLOCK_SECONDS`.
+- Define un `LOGIN_SECURITY_SECRET` aleatorio de al menos 32 caracteres. Si no
+  existe, el backend usa `JWT_ACCESS_SECRET` con separación de dominio para
+  pseudonimizar teléfonos e IP en Redis y logs.
 - Cada respuesta incluye `X-Request-Id`; los logs pueden emitirse en JSON.
 - `DATABASE_SSL_REJECT_UNAUTHORIZED=true` debe conservarse en producción; usa `DATABASE_SSL_CA_BASE64` cuando el proveedor entregue una CA privada.
 

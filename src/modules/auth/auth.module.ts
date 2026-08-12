@@ -12,6 +12,7 @@ import { JwtStrategy } from './strategies/jwt.strategy';
 import { AuthSessionsModule } from '../auth-sessions/auth-sessions.module';
 import { AuthorizationModule } from '../authorization/authorization.module';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { AdminLoginSecurityService } from './admin-login-security.service';
 
 @Module({
   imports: [
@@ -47,6 +48,7 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
     OtpService,
     JwtStrategy,
     JwtAuthGuard,
+    AdminLoginSecurityService,
   ],
 
   exports: [AuthService, PasswordService, JwtModule, JwtAuthGuard],

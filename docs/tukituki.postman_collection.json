@@ -280,6 +280,48 @@
           "response": []
         },
         {
+          "name": "Iniciar una sesión administrativa",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Endpoint exclusivo para ADMIN y SUPER_ADMIN con protección reforzada contra fuerza bruta.",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/admin/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "admin",
+                "login"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phoneE164\": \"+51987654321\",\n  \"password\": \"TukiTuki2026\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
           "name": "Obtener el usuario autenticado",
           "request": {
             "method": "GET",
@@ -4544,6 +4586,32 @@
           "response": []
         },
         {
+          "name": "Recuperar autoritativamente las propuestas PROPOSED vigentes del conductor",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "description": "Recuperar autoritativamente las propuestas PROPOSED vigentes del conductor",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/drivers/me/ride-offers/proposals/pending",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "drivers",
+                "me",
+                "ride-offers",
+                "proposals",
+                "pending"
+              ],
+              "query": [],
+              "variable": []
+            }
+          },
+          "response": []
+        },
+        {
           "name": "Consultar una solicitud u oferta propia",
           "request": {
             "method": "GET",
@@ -4775,6 +4843,31 @@
                   "disabled": true
                 }
               ],
+              "variable": []
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Consultar rides COMPLETED del conductor con RidePayment PENDING",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "description": "Consultar rides COMPLETED del conductor con RidePayment PENDING",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/drivers/me/rides/pending-payments",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "drivers",
+                "me",
+                "rides",
+                "pending-payments"
+              ],
+              "query": [],
               "variable": []
             }
           },
@@ -5193,6 +5286,36 @@
                   "language": "json"
                 }
               }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Driver stats",
+      "item": [
+        {
+          "name": "Ganado hoy y viajes completados hoy (America/Lima)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "description": "Ganado hoy y viajes completados hoy (America/Lima)",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/drivers/me/stats/daily",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "drivers",
+                "me",
+                "stats",
+                "daily"
+              ],
+              "query": [],
+              "variable": []
             }
           },
           "response": []
