@@ -243,6 +243,163 @@ describe('DriverRideOffersService', () => {
       expect(context.state.status).toBe(DriverOperationalStatus.AVAILABLE);
     },
   );
+
+  it('debe aceptar el precio aunque hayan pasado más de 60s desde offeredAt (G3B1)', async () => {
+    const context = createContext();
+    context.offer.offeredAt = new Date(Date.now() - 90_000);
+    context.offer.expiresAt = context.ride.searchExpiresAt;
+
+    const result = await context.service.acceptOffer(userId, offerId);
+
+    expect(result.status).toBe(RideOfferStatus.PROPOSED);
+    expect(context.offer.expiresAt).toBe(context.ride.searchExpiresAt);
+  });
+
+  it('debe aceptar una contraoferta aunque hayan pasado más de 60s desde offeredAt (G3B1)', async () => {
+    const context = createContext();
+    context.offer.offeredAt = new Date(Date.now() - 90_000);
+    context.offer.expiresAt = context.ride.searchExpiresAt;
+
+    const result = await context.service.counterOffer(userId, offerId, {
+      proposedFare: '6.50',
+    });
+
+    expect(result.status).toBe(RideOfferStatus.PROPOSED);
+    expect(result.proposedFare).toBe('6.50');
+  });
+
+  it('debe rechazar la solicitud aunque hayan pasado más de 60s, sin "offer expired" (G3B1)', async () => {
+    const context = createContext();
+    context.offer.offeredAt = new Date(Date.now() - 90_000);
+    context.offer.expiresAt = context.ride.searchExpiresAt;
+
+    const result = await context.service.rejectOffer(userId, offerId, {});
+
+    expect(result.status).toBe(RideOfferStatus.REJECTED);
+    expect(context.offer.rejectedAt).toBeInstanceOf(Date);
+  });
+});
+
+describe('DriverRideOffersService - getActiveOffers (G3B1)', () => {
+  const userIdA = 'f544d52a-39e0-4da3-8861-6010355c5dba';
+  const driverProfileIdA = '72b81eb5-c53f-4de2-bd9f-11f33d64da64';
+  const rideIdA = '3dbb6cbc-aee8-43f0-8247-e13d8e197b71';
+  const offerIdA = '0847d580-6282-4a15-a967-95cb93650d36';
+
+  function createActiveOffersContext(
+    offers: RideOffer[],
+    driverStatus: DriverOperationalStatus = DriverOperationalStatus.AVAILABLE,
+  ) {
+    const profile = {
+      id: driverProfileIdA,
+      userId: userIdA,
+      status: DriverStatus.APPROVED,
+    } as DriverProfile;
+
+    const state = {
+      driverProfileId: driverProfileIdA,
+      status: driverStatus,
+    } as DriverOperationalState;
+
+    const profileRepository = {
+      findOne: jest.fn(() => Promise.resolve(profile)),
+    };
+
+    const stateRepository = {
+      findOne: jest.fn(() => Promise.resolve(state)),
+    };
+
+    const offerRepository = {
+      update: jest.fn(() => Promise.resolve({ affected: 0 })),
+      find: jest.fn((options: { where: { expiresAt: { value: Date } } }) =>
+        Promise.resolve(
+          offers.filter(
+            (offer) =>
+              offer.expiresAt.getTime() >
+              options.where.expiresAt.value.getTime(),
+          ),
+        ),
+      ),
+    };
+
+    const dataSourceMock = {
+      getRepository: jest.fn((entity: unknown): unknown => {
+        if (entity === DriverProfile) return profileRepository;
+        if (entity === DriverOperationalState) return stateRepository;
+        if (entity === RideOffer) return offerRepository;
+        throw new Error('Repositorio inesperado');
+      }),
+      transaction: jest.fn(),
+    };
+
+    const dispatchService = {
+      dispatchRide: jest.fn(() => Promise.resolve([])),
+    };
+
+    const transitionsService = {
+      expireWithinTransaction: jest.fn(() => Promise.resolve()),
+    };
+
+    const service = new DriverRideOffersService(
+      dataSourceMock as unknown as DataSource,
+      dispatchService as unknown as RideDispatchService,
+      transitionsService as unknown as RideTransitionsService,
+    );
+
+    return { service, offerRepository };
+  }
+
+  it('sigue devolviendo la Offer más de 60s después de creada, si el Ride sigue vigente', async () => {
+    const ride = {
+      id: rideIdA,
+      status: RideStatus.SEARCHING_DRIVER,
+      searchExpiresAt: new Date(Date.now() + 120_000),
+      originPosition: { type: 'Point', coordinates: [-76.3599, -6.4877] },
+      destinationPosition: { type: 'Point', coordinates: [-76.3655, -6.4812] },
+      originAddress: 'Jr. Lima 250, Tarapoto',
+      destinationAddress: 'Plaza de Armas de Morales',
+      estimatedFare: '5.00',
+      passengerOfferFare: '7.00',
+      currency: 'PEN',
+      passengerNotes: null,
+    } as Ride;
+
+    const offer = {
+      id: offerIdA,
+      rideId: rideIdA,
+      driverProfileId: driverProfileIdA,
+      status: RideOfferStatus.OFFERED,
+      distanceToOriginMeters: 420,
+      dispatchRound: 1,
+      searchRadiusMeters: 1000,
+      offeredAt: new Date(Date.now() - 90_000),
+      expiresAt: ride.searchExpiresAt,
+      proposedFare: null,
+      rejectionReason: null,
+      ride,
+    } as RideOffer;
+
+    const context = createActiveOffersContext([offer]);
+
+    const result = await context.service.getActiveOffers(userIdA);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe(offerIdA);
+    expect(result[0].status).toBe(RideOfferStatus.OFFERED);
+  });
+
+  it('no expone la Offer mientras el Driver no está AVAILABLE (p.ej. OFFLINE) (G3B1)', async () => {
+    const context = createActiveOffersContext(
+      [],
+      DriverOperationalStatus.OFFLINE,
+    );
+
+    await expect(context.service.getActiveOffers(userIdA)).rejects.toThrow(
+      'El conductor debe estar AVAILABLE',
+    );
+
+    expect(context.offerRepository.find).not.toHaveBeenCalled();
+  });
 });
 
 describe('DriverRideOffersService - getPendingProposals', () => {

@@ -8,7 +8,7 @@ import { ConfigService } from '@nestjs/config';
 import { DataSource } from 'typeorm';
 
 import { DriverAvailabilityRedisService } from '../../infrastructure/redis/driver-availability-redis.service';
-import { RIDE_OFFER_TTL_MS } from './ride-matching.constants';
+import { RIDE_DISPATCH_INTERVAL_MS } from './ride-matching.constants';
 import { RideDispatchService } from './ride-dispatch.service';
 import { withRideAdvisoryLock } from './ride-advisory-lock.util';
 
@@ -112,6 +112,13 @@ export class RideDispatchWorker
     return processed;
   }
 
+  /*
+   * G3B1: una RideOffer OFFERED todavía viva ya NO impide que una
+   * ride sea "due" para otra ronda (esa era la responsabilidad B
+   * que RIDE_OFFER_TTL_MS mezclaba con la visibilidad del Driver).
+   * La cadencia ahora depende únicamente de RIDE_DISPATCH_INTERVAL_MS
+   * contado desde last_dispatch_at.
+   */
   private async findDueRides(): Promise<DueRideRow[]> {
     const result: unknown = await this.dataSource.query(
       `SELECT ride.id
@@ -128,13 +135,6 @@ export class RideDispatchWorker
            )
            OR (
              ride.dispatch_round < 3
-             AND NOT EXISTS (
-               SELECT 1
-               FROM ride_offers offer
-               WHERE offer.ride_id = ride.id
-                 AND offer.status = 'OFFERED'
-                 AND offer.expires_at > NOW()
-             )
              AND (
                ride.last_dispatch_at IS NULL
                OR ride.last_dispatch_at <= NOW() - ($2 * INTERVAL '1 millisecond')
@@ -143,7 +143,7 @@ export class RideDispatchWorker
          )
        ORDER BY ride.requested_at ASC
        LIMIT $1`,
-      [this.batchSize, RIDE_OFFER_TTL_MS],
+      [this.batchSize, RIDE_DISPATCH_INTERVAL_MS],
     );
     return result as DueRideRow[];
   }

@@ -21,7 +21,7 @@ import { RideOfferStatus } from './enums/ride-offer-status.enum';
 import { RideStatus } from './enums/ride-status.enum';
 import { RideDispatchService } from './ride-dispatch.service';
 import {
-  RIDE_OFFER_TTL_MS,
+  RIDE_DISPATCH_INTERVAL_MS,
   RIDE_SEARCH_RADII_METERS,
 } from './ride-matching.constants';
 import { RideTransitionsService } from './ride-transitions.service';
@@ -190,13 +190,16 @@ describe('RideDispatchService', () => {
     expect(result[0]?.driverProfileId).toBe(driverProfileId);
     expect(result[0]?.distanceToOriginMeters).toBe(420);
     expect(result[0]?.status).toBe(RideOfferStatus.OFFERED);
-    expect(result[0].expiresAt.getTime() - result[0].offeredAt.getTime()).toBe(
-      RIDE_OFFER_TTL_MS,
-    );
+    /*
+     * G3B1: OFFERED ya no vive un TTL técnico corto — dura hasta
+     * el final de la ventana real de búsqueda del Ride, igual que
+     * ya hace PROPOSED.
+     */
+    expect(result[0]?.expiresAt).toEqual(ride.searchExpiresAt);
     expect(ride.dispatchRound).toBe(1);
   });
 
-  it('debe limitar expiresAt de la oferta al deadline global', async () => {
+  it('debe fijar expiresAt exactamente igual al deadline global de búsqueda', async () => {
     ride.searchExpiresAt = new Date(Date.now() + 10_000);
 
     const result = await service.dispatchRide(rideId);
@@ -205,13 +208,15 @@ describe('RideDispatchService', () => {
     expect(result[0]?.expiresAt).toEqual(ride.searchExpiresAt);
   });
 
-  it('debe reutilizar ofertas vigentes sin volver a consultar Redis', async () => {
+  it('no debe buscar una nueva ronda si todavía no transcurrió RIDE_DISPATCH_INTERVAL_MS desde lastDispatchAt', async () => {
+    ride.lastDispatchAt = new Date(Date.now() - 10_000);
+
     const activeOffer = {
       id: '0847d580-6282-4a15-a967-95cb93650d36',
       rideId,
       driverProfileId,
       status: RideOfferStatus.OFFERED,
-      expiresAt: new Date(Date.now() + 10_000),
+      expiresAt: ride.searchExpiresAt,
     } as RideOffer;
     offerRepository.find.mockResolvedValueOnce([activeOffer]);
 
@@ -221,6 +226,104 @@ describe('RideDispatchService', () => {
     expect(
       driverLocationsService.findNearbyAvailableDrivers,
     ).not.toHaveBeenCalled();
+    expect(ride.dispatchRound).toBe(0);
+  });
+
+  it('debe ejecutar la ronda 2 aunque la Offer de la ronda 1 siga OFFERED, una vez transcurrido el intervalo', async () => {
+    ride.dispatchRound = 1;
+    ride.lastDispatchAt = new Date(
+      Date.now() - (RIDE_DISPATCH_INTERVAL_MS + 1_000),
+    );
+
+    /*
+     * La Offer de la ronda 1 pertenece a OTRO Driver (todavía
+     * OFFERED, sin tocar). El candidato de esta ronda 2 es el
+     * Driver ya configurado como elegible en el beforeEach.
+     */
+    const existingOfferFromRoundOne = {
+      id: 'offer-round-1',
+      rideId,
+      driverProfileId: 'a1a1a1a1-1111-4a11-9a11-1a1a1a1a1a1a',
+      status: RideOfferStatus.OFFERED,
+    } as RideOffer;
+
+    offerRepository.find.mockImplementation((options: { select?: unknown }) => {
+      // previousOffers query dentro de createOffersForPlan (dedup)
+      if (options?.select) {
+        return Promise.resolve([existingOfferFromRoundOne]);
+      }
+
+      return Promise.resolve([]);
+    });
+
+    const result = await service.dispatchRide(rideId);
+
+    expect(
+      driverLocationsService.findNearbyAvailableDrivers,
+    ).toHaveBeenCalledWith(-6.4877, -76.3599, 2000, 25);
+    expect(ride.dispatchRound).toBe(2);
+    expect(result).toHaveLength(1);
+    expect(result[0]?.driverProfileId).toBe(driverProfileId);
+    expect(result[0]?.expiresAt).toEqual(ride.searchExpiresAt);
+  });
+
+  it('no debe volver a ofertar a un Driver que ya tiene una fila histórica para ese Ride', async () => {
+    ride.dispatchRound = 1;
+    ride.lastDispatchAt = new Date(
+      Date.now() - (RIDE_DISPATCH_INTERVAL_MS + 1_000),
+    );
+
+    const existingOfferA = {
+      id: 'offer-a',
+      rideId,
+      driverProfileId,
+      status: RideOfferStatus.OFFERED,
+    } as RideOffer;
+
+    offerRepository.find.mockImplementation((options: { select?: unknown }) => {
+      if (options?.select) {
+        return Promise.resolve([existingOfferA]);
+      }
+
+      return Promise.resolve([]);
+    });
+
+    // findNearbyAvailableDrivers vuelve a devolver al mismo Driver A
+    driverLocationsService.findNearbyAvailableDrivers.mockResolvedValueOnce([
+      {
+        driverProfileId,
+        distanceMeters: 900,
+      },
+    ]);
+
+    const result = await service.dispatchRide(rideId);
+
+    expect(result).toEqual([]);
+    expect(offerRepository.save).not.toHaveBeenCalled();
+  });
+
+  it('no debe ejecutar una cuarta ronda tras agotar el límite de 3', async () => {
+    ride.dispatchRound = 3;
+    ride.lastDispatchAt = new Date(
+      Date.now() - (RIDE_DISPATCH_INTERVAL_MS + 1_000),
+    );
+
+    const existingOfferA = {
+      id: 'offer-a',
+      rideId,
+      driverProfileId,
+      status: RideOfferStatus.OFFERED,
+      expiresAt: ride.searchExpiresAt,
+    } as RideOffer;
+    offerRepository.find.mockResolvedValueOnce([existingOfferA]);
+
+    const result = await service.dispatchRide(rideId);
+
+    expect(result).toEqual([existingOfferA]);
+    expect(
+      driverLocationsService.findNearbyAvailableDrivers,
+    ).not.toHaveBeenCalled();
+    expect(ride.dispatchRound).toBe(3);
   });
 
   it('debe avanzar la ronda aunque no encuentre candidatos', async () => {
@@ -507,6 +610,11 @@ describe('RideDispatchService.dispatchLateJoinDriver (G3A)', () => {
       RIDE_SEARCH_RADII_METERS[1],
     );
     expect(ctx.ride.dispatchRound).toBe(1);
+    /*
+     * G3B1: la Offer de late-join también persiste hasta el final
+     * de la ventana real de búsqueda, no un TTL técnico corto.
+     */
+    expect(ctx.savedOffers[0].expiresAt).toEqual(ctx.ride.searchExpiresAt);
   });
 
   it('debe reutilizar exactamente el mismo mecanismo de outbox que el dispatch normal', async () => {

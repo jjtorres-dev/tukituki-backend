@@ -36,9 +36,9 @@ import { RideOfferStatus } from './enums/ride-offer-status.enum';
 import { RideStatus } from './enums/ride-status.enum';
 import {
   ACTIVE_DRIVER_RIDE_STATUSES,
-  calculateRideOfferExpiresAt,
   DRIVER_LOCATION_MAX_AGE_MS,
   DRIVER_PRESENCE_MAX_AGE_MS,
+  RIDE_DISPATCH_INTERVAL_MS,
   RIDE_MATCHING_CANDIDATE_LIMIT,
   RIDE_OFFER_BATCH_SIZE,
   RIDE_SEARCH_RADII_METERS,
@@ -272,8 +272,11 @@ export class RideDispatchService {
         return null;
       }
 
-      const expiresAt = calculateRideOfferExpiresAt(now, ride.searchExpiresAt);
-
+      /*
+       * G3B1: la visibilidad de OFFERED ya no depende de un TTL
+       * técnico corto — dura hasta que termina la ventana real de
+       * búsqueda del Ride, igual que ya hace PROPOSED.
+       */
       const offer = offerRepository.create({
         rideId: ride.id,
         driverProfileId,
@@ -282,7 +285,7 @@ export class RideDispatchService {
         dispatchRound: ride.dispatchRound ?? 0,
         searchRadiusMeters: applicableRadiusMeters,
         offeredAt: now,
-        expiresAt,
+        expiresAt: ride.searchExpiresAt,
         proposedFare: null,
         proposedAt: null,
         respondedAt: null,
@@ -448,6 +451,20 @@ export class RideDispatchService {
     return queryError.driverError?.code === '23505';
   }
 
+  /*
+   * G3B1: la cadencia de rondas ya NO depende de que exista o no
+   * una RideOffer OFFERED viva (esa era la responsabilidad B que
+   * RIDE_OFFER_TTL_MS mezclaba con la visibilidad del Driver).
+   *
+   * Ahora una ride está "due" para otra ronda únicamente por:
+   * - seguir SEARCHING_DRIVER y vigente;
+   * - no haber agotado el límite de rondas (RIDE_SEARCH_RADII_METERS);
+   * - haber pasado RIDE_DISPATCH_INTERVAL_MS desde lastDispatchAt.
+   *
+   * Si no está due (límite de rondas agotado, o todavía muy pronto),
+   * se devuelven las OFFERED actualmente vigentes como "existing":
+   * es un no-op informativo, no dispara ni bloquea nada nuevo.
+   */
   private prepareDispatch(rideId: string): Promise<DispatchPreparation> {
     return this.dataSource.transaction(async (manager) => {
       const ride = await this.lockRide(manager, rideId);
@@ -475,30 +492,29 @@ export class RideDispatchService {
         };
       }
 
-      const activeOffers = await offerRepository.find({
-        where: {
-          rideId: ride.id,
-          status: RideOfferStatus.OFFERED,
-          expiresAt: MoreThan(now),
-        },
-        order: {
-          distanceToOriginMeters: 'ASC',
-        },
-      });
-
-      if (activeOffers.length > 0) {
-        return {
-          kind: 'existing',
-          offers: activeOffers,
-        };
-      }
-
       const roundIndex = ride.dispatchRound ?? 0;
       const radiusMeters = RIDE_SEARCH_RADII_METERS[roundIndex];
 
-      if (radiusMeters === undefined) {
+      const dispatchIntervalElapsed =
+        !ride.lastDispatchAt ||
+        now.getTime() - ride.lastDispatchAt.getTime() >=
+          RIDE_DISPATCH_INTERVAL_MS;
+
+      if (radiusMeters === undefined || !dispatchIntervalElapsed) {
+        const activeOffers = await offerRepository.find({
+          where: {
+            rideId: ride.id,
+            status: RideOfferStatus.OFFERED,
+            expiresAt: MoreThan(now),
+          },
+          order: {
+            distanceToOriginMeters: 'ASC',
+          },
+        });
+
         return {
-          kind: 'skip',
+          kind: 'existing',
+          offers: activeOffers,
         };
       }
 
@@ -545,21 +561,16 @@ export class RideDispatchService {
         return [];
       }
 
-      const activeOffers = await offerRepository.find({
-        where: {
-          rideId: ride.id,
-          status: RideOfferStatus.OFFERED,
-          expiresAt: MoreThan(now),
-        },
-        order: {
-          distanceToOriginMeters: 'ASC',
-        },
-      });
-
-      if (activeOffers.length > 0) {
-        return activeOffers;
-      }
-
+      /*
+       * G3B1: ya NO se corta aquí por haber ofertas OFFERED todavía
+       * vivas de rondas anteriores — eso es exactamente lo que
+       * bloqueaba nuevas rondas mientras un Driver no respondía.
+       * previouslyOfferedDriverIds (más abajo) sigue evitando que
+       * cualquiera de esos Drivers reciba una oferta duplicada.
+       *
+       * Sí seguimos abortando si la ronda ya avanzó de forma
+       * concurrente desde que prepareDispatch armó este plan.
+       */
       if ((ride.dispatchRound ?? 0) !== plan.roundIndex) {
         return [];
       }
@@ -606,7 +617,6 @@ export class RideDispatchService {
         return [];
       }
 
-      const expiresAt = calculateRideOfferExpiresAt(now, ride.searchExpiresAt);
       const offers = selectedCandidates.map((candidate) =>
         offerRepository.create({
           rideId: ride.id,
@@ -619,7 +629,7 @@ export class RideDispatchService {
           dispatchRound: plan.roundIndex + 1,
           searchRadiusMeters: plan.radiusMeters,
           offeredAt: now,
-          expiresAt,
+          expiresAt: ride.searchExpiresAt,
           proposedFare: null,
           proposedAt: null,
           respondedAt: null,
