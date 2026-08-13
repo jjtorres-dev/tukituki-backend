@@ -38,6 +38,7 @@ import {
   ACTIVE_DRIVER_RIDE_STATUSES,
   DRIVER_LOCATION_MAX_AGE_MS,
   DRIVER_PRESENCE_MAX_AGE_MS,
+  getEffectiveSearchRadiusMeters,
   RIDE_DISPATCH_INTERVAL_MS,
   RIDE_MATCHING_CANDIDATE_LIMIT,
   RIDE_OFFER_BATCH_SIZE,
@@ -263,10 +264,9 @@ export class RideDispatchService {
         return null;
       }
 
-      const applicableRadiusMeters =
-        RIDE_SEARCH_RADII_METERS[
-          Math.min(ride.dispatchRound ?? 0, RIDE_SEARCH_RADII_METERS.length - 1)
-        ];
+      const applicableRadiusMeters = getEffectiveSearchRadiusMeters(
+        ride.dispatchRound ?? 0,
+      );
 
       if (distanceMeters > applicableRadiusMeters) {
         return null;
@@ -456,14 +456,17 @@ export class RideDispatchService {
    * una RideOffer OFFERED viva (esa era la responsabilidad B que
    * RIDE_OFFER_TTL_MS mezclaba con la visibilidad del Driver).
    *
-   * Ahora una ride está "due" para otra ronda únicamente por:
-   * - seguir SEARCHING_DRIVER y vigente;
-   * - no haber agotado el límite de rondas (RIDE_SEARCH_RADII_METERS);
-   * - haber pasado RIDE_DISPATCH_INTERVAL_MS desde lastDispatchAt.
+   * G3C-lite: tampoco existe ya un límite de rondas que detenga el
+   * matching. Mientras el Ride siga SEARCHING_DRIVER y vigente, una
+   * ride está "due" para otro intento únicamente por haber pasado
+   * RIDE_DISPATCH_INTERVAL_MS desde lastDispatchAt. El radio usado
+   * en cada intento sale de getEffectiveSearchRadiusMeters: antes de
+   * agotar RIDE_SEARCH_RADII_METERS, expande; después, REUTILIZA el
+   * último radio (nunca inventa uno mayor).
    *
-   * Si no está due (límite de rondas agotado, o todavía muy pronto),
-   * se devuelven las OFFERED actualmente vigentes como "existing":
-   * es un no-op informativo, no dispara ni bloquea nada nuevo.
+   * Si no está due, se devuelven las OFFERED actualmente vigentes
+   * como "existing": es un no-op informativo, no dispara ni bloquea
+   * nada nuevo.
    */
   private prepareDispatch(rideId: string): Promise<DispatchPreparation> {
     return this.dataSource.transaction(async (manager) => {
@@ -493,14 +496,14 @@ export class RideDispatchService {
       }
 
       const roundIndex = ride.dispatchRound ?? 0;
-      const radiusMeters = RIDE_SEARCH_RADII_METERS[roundIndex];
+      const radiusMeters = getEffectiveSearchRadiusMeters(roundIndex);
 
       const dispatchIntervalElapsed =
         !ride.lastDispatchAt ||
         now.getTime() - ride.lastDispatchAt.getTime() >=
           RIDE_DISPATCH_INTERVAL_MS;
 
-      if (radiusMeters === undefined || !dispatchIntervalElapsed) {
+      if (!dispatchIntervalElapsed) {
         const activeOffers = await offerRepository.find({
           where: {
             rideId: ride.id,
@@ -575,7 +578,24 @@ export class RideDispatchService {
         return [];
       }
 
-      ride.dispatchRound = plan.roundIndex + 1;
+      /*
+       * G3C-lite: dispatchRound queda SATURADO en
+       * RIDE_SEARCH_RADII_METERS.length (3 hoy) en vez de crecer
+       * sin límite. Las primeras tres rondas avanzan exactamente
+       * igual que antes (0->1->2->3); cualquier intento posterior en
+       * radio máximo dispatchRound simplemente permanece en 3 —
+       * getEffectiveSearchRadiusMeters ya sabe reutilizar el último
+       * radio para ese valor. lastDispatchAt sigue siendo la única
+       * señal de cadencia, y se actualiza aquí SIEMPRE (incluso si
+       * más abajo no aparece ningún Driver nuevo), evitando que el
+       * siguiente tick del worker reintente antes de tiempo.
+       */
+      const nextDispatchRound = Math.min(
+        plan.roundIndex + 1,
+        RIDE_SEARCH_RADII_METERS.length,
+      );
+
+      ride.dispatchRound = nextDispatchRound;
       ride.lastDispatchAt = now;
       await rideRepository.save(ride);
 
@@ -626,7 +646,7 @@ export class RideDispatchService {
             0,
             Math.round(candidate.distanceMeters),
           ),
-          dispatchRound: plan.roundIndex + 1,
+          dispatchRound: nextDispatchRound,
           searchRadiusMeters: plan.radiusMeters,
           offeredAt: now,
           expiresAt: ride.searchExpiresAt,

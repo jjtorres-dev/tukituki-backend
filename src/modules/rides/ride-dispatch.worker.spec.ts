@@ -20,8 +20,8 @@ describe('RideDispatchWorker', () => {
       .mockResolvedValueOnce([{ unlocked: true }]);
     const release = jest.fn(() => Promise.resolve());
     const queryRunner = { connect, query, release };
-    const dataSourceQuery = jest.fn(() =>
-      Promise.resolve([{ id: '1a50e0bf-8521-4a8c-b54c-44c52ef30213' }]),
+    const dataSourceQuery = jest.fn<Promise<unknown[]>, [string, unknown[]?]>(
+      () => Promise.resolve([{ id: '1a50e0bf-8521-4a8c-b54c-44c52ef30213' }]),
     );
     const createQueryRunner = jest.fn(() => queryRunner);
     const dataSource = {
@@ -48,6 +48,15 @@ describe('RideDispatchWorker', () => {
     expect(expirePendingOffers).toHaveBeenCalledTimes(1);
     expect(dispatchRide).toHaveBeenCalledTimes(1);
     expect(release).toHaveBeenCalledTimes(1);
+
+    /*
+     * G3C-lite: findDueRides ya no debe limitar por dispatch_round —
+     * una ride en radio máximo debe seguir siendo "due" mientras
+     * pasen RIDE_DISPATCH_INTERVAL_MS desde last_dispatch_at.
+     */
+    const [sql] = dataSourceQuery.mock.calls[0];
+    expect(sql).not.toMatch(/dispatch_round\s*</);
+    expect(sql).toContain('last_dispatch_at');
   });
 
   it('drena la cola de late-join y despacha cada conductor', async () => {

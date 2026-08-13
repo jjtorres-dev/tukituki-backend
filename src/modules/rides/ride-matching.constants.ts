@@ -31,6 +31,27 @@ export const RIDE_SEARCH_RADII_METERS: readonly number[] = [
   1_000, 2_000, 3_000,
 ];
 
+/*
+ * G3C-lite - continuar matchmaking tras el radio máximo.
+ *
+ * Punto único para traducir "cuántas rondas ya se intentaron" al
+ * radio que corresponde usar. Antes del último elemento, cada ronda
+ * usa el radio siguiente del array. Una vez alcanzado el último
+ * elemento, los reintentos siguientes REUTILIZAN ese mismo radio
+ * máximo — nunca se inventa un radio mayor.
+ *
+ * Completamente genérico: cuando RIDE_SEARCH_RADII_METERS cambie
+ * (G3B2), este helper sigue funcionando sin modificarse.
+ */
+export function getEffectiveSearchRadiusMeters(dispatchRound: number): number {
+  const index = Math.min(
+    Math.max(dispatchRound, 0),
+    RIDE_SEARCH_RADII_METERS.length - 1,
+  );
+
+  return RIDE_SEARCH_RADII_METERS[index];
+}
+
 export const DRIVER_PRESENCE_MAX_AGE_MS = 90_000;
 export const DRIVER_LOCATION_MAX_AGE_MS = 45_000;
 

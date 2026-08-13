@@ -302,28 +302,184 @@ describe('RideDispatchService', () => {
     expect(offerRepository.save).not.toHaveBeenCalled();
   });
 
-  it('no debe ejecutar una cuarta ronda tras agotar el límite de 3', async () => {
+  it('debe ejecutar la ronda 3 (3000m) tras la ronda 2, con A y B todavía OFFERED', async () => {
+    ride.dispatchRound = 2;
+    ride.lastDispatchAt = new Date(
+      Date.now() - (RIDE_DISPATCH_INTERVAL_MS + 1_000),
+    );
+
+    const existingOffersFromRoundsOneAndTwo = [
+      {
+        id: 'offer-1',
+        rideId,
+        driverProfileId: 'a1a1a1a1-1111-4a11-9a11-1a1a1a1a1a1a',
+        status: RideOfferStatus.OFFERED,
+      } as RideOffer,
+      {
+        id: 'offer-2',
+        rideId,
+        driverProfileId: 'b2b2b2b2-2222-4b22-9b22-2b2b2b2b2b2b',
+        status: RideOfferStatus.OFFERED,
+      } as RideOffer,
+    ];
+
+    offerRepository.find.mockImplementation((options: { select?: unknown }) => {
+      if (options?.select) {
+        return Promise.resolve(existingOffersFromRoundsOneAndTwo);
+      }
+
+      return Promise.resolve([]);
+    });
+
+    const result = await service.dispatchRide(rideId);
+
+    expect(
+      driverLocationsService.findNearbyAvailableDrivers,
+    ).toHaveBeenCalledWith(-6.4877, -76.3599, 3000, 25);
+    expect(ride.dispatchRound).toBe(3);
+    expect(result).toHaveLength(1);
+    expect(result[0]?.searchRadiusMeters).toBe(3000);
+  });
+
+  it('G3C-lite: primer reintento en radio máximo tras agotar las 3 rondas reutiliza 3000m sin crecer dispatchRound', async () => {
     ride.dispatchRound = 3;
     ride.lastDispatchAt = new Date(
       Date.now() - (RIDE_DISPATCH_INTERVAL_MS + 1_000),
     );
 
-    const existingOfferA = {
+    const existingOffersFromPreviousRounds = [
+      {
+        id: 'offer-1',
+        rideId,
+        driverProfileId: 'a1a1a1a1-1111-4a11-9a11-1a1a1a1a1a1a',
+        status: RideOfferStatus.OFFERED,
+      } as RideOffer,
+      {
+        id: 'offer-2',
+        rideId,
+        driverProfileId: 'b2b2b2b2-2222-4b22-9b22-2b2b2b2b2b2b',
+        status: RideOfferStatus.OFFERED,
+      } as RideOffer,
+      {
+        id: 'offer-3',
+        rideId,
+        driverProfileId: 'c3c3c3c3-3333-4c33-9c33-3c3c3c3c3c3c',
+        status: RideOfferStatus.OFFERED,
+      } as RideOffer,
+    ];
+
+    offerRepository.find.mockImplementation((options: { select?: unknown }) => {
+      if (options?.select) {
+        return Promise.resolve(existingOffersFromPreviousRounds);
+      }
+
+      return Promise.resolve([]);
+    });
+
+    const result = await service.dispatchRide(rideId);
+
+    expect(
+      driverLocationsService.findNearbyAvailableDrivers,
+    ).toHaveBeenCalledWith(-6.4877, -76.3599, 3000, 25);
+    expect(ride.dispatchRound).toBe(3);
+    expect(result).toHaveLength(1);
+    expect(result[0]?.driverProfileId).toBe(driverProfileId);
+    expect(result[0]?.searchRadiusMeters).toBe(3000);
+    expect(result[0]?.dispatchRound).toBe(3);
+  });
+
+  it('G3C-lite: antes de RIDE_DISPATCH_INTERVAL_MS en radio máximo, no reintenta', async () => {
+    ride.dispatchRound = 3;
+    ride.lastDispatchAt = new Date(Date.now() - 10_000);
+
+    const activeOffer = {
       id: 'offer-a',
       rideId,
       driverProfileId,
       status: RideOfferStatus.OFFERED,
       expiresAt: ride.searchExpiresAt,
     } as RideOffer;
-    offerRepository.find.mockResolvedValueOnce([existingOfferA]);
+    offerRepository.find.mockResolvedValueOnce([activeOffer]);
 
     const result = await service.dispatchRide(rideId);
 
-    expect(result).toEqual([existingOfferA]);
+    expect(result).toEqual([activeOffer]);
     expect(
       driverLocationsService.findNearbyAvailableDrivers,
     ).not.toHaveBeenCalled();
     expect(ride.dispatchRound).toBe(3);
+  });
+
+  it('G3C-lite: un segundo reintento en radio máximo vuelve a usar 3000m y dispatchRound sigue saturado', async () => {
+    ride.dispatchRound = 3;
+    ride.lastDispatchAt = new Date(
+      Date.now() - (RIDE_DISPATCH_INTERVAL_MS + 1_000),
+    );
+    offerRepository.find.mockImplementation((options: { select?: unknown }) => {
+      if (options?.select) {
+        return Promise.resolve([]);
+      }
+
+      return Promise.resolve([]);
+    });
+
+    const firstAttempt = await service.dispatchRide(rideId);
+
+    expect(firstAttempt).toHaveLength(1);
+    expect(ride.dispatchRound).toBe(3);
+
+    const firstOfferId = firstAttempt[0].id;
+    ride.lastDispatchAt = new Date(
+      Date.now() - (RIDE_DISPATCH_INTERVAL_MS + 1_000),
+    );
+    offerRepository.find.mockImplementation((options: { select?: unknown }) => {
+      if (options?.select) {
+        return Promise.resolve([
+          { id: firstOfferId, rideId, driverProfileId } as RideOffer,
+        ]);
+      }
+
+      return Promise.resolve([]);
+    });
+
+    const secondAttempt = await service.dispatchRide(rideId);
+
+    expect(
+      driverLocationsService.findNearbyAvailableDrivers,
+    ).toHaveBeenLastCalledWith(-6.4877, -76.3599, 3000, 25);
+    expect(ride.dispatchRound).toBe(3);
+    // El único candidato que Redis devuelve ya fue ofertado en el primer intento.
+    expect(secondAttempt).toEqual([]);
+  });
+
+  it('G3C-lite: un reintento en radio máximo sin Drivers nuevos igual actualiza lastDispatchAt (evita hot-loop)', async () => {
+    ride.dispatchRound = 3;
+    ride.lastDispatchAt = new Date(
+      Date.now() - (RIDE_DISPATCH_INTERVAL_MS + 1_000),
+    );
+
+    const alreadyOffered = {
+      id: 'offer-a',
+      rideId,
+      driverProfileId,
+      status: RideOfferStatus.OFFERED,
+    } as RideOffer;
+    offerRepository.find.mockImplementation((options: { select?: unknown }) => {
+      if (options?.select) {
+        return Promise.resolve([alreadyOffered]);
+      }
+
+      return Promise.resolve([]);
+    });
+
+    const before = ride.lastDispatchAt;
+
+    const result = await service.dispatchRide(rideId);
+
+    expect(result).toEqual([]);
+    expect(ride.dispatchRound).toBe(3);
+    expect(ride.lastDispatchAt).not.toEqual(before);
+    expect(ride.lastDispatchAt).toBeInstanceOf(Date);
   });
 
   it('debe avanzar la ronda aunque no encuentre candidatos', async () => {
@@ -678,6 +834,21 @@ describe('RideDispatchService.dispatchLateJoinDriver (G3A)', () => {
     expect(ctx.savedOffers[0].searchRadiusMeters).toBe(
       RIDE_SEARCH_RADII_METERS[2],
     );
+  });
+
+  it('G3C-lite: con la ride en reintentos de radio máximo (dispatchRound > 3), late-join sigue usando 3000m', async () => {
+    const ctx = buildContext({
+      ride: { dispatchRound: 7 },
+      distanceMeters: RIDE_SEARCH_RADII_METERS[2] - 1,
+    });
+
+    const offers = await ctx.service.dispatchLateJoinDriver(driverProfileId);
+
+    expect(offers).toHaveLength(1);
+    expect(ctx.savedOffers[0].searchRadiusMeters).toBe(
+      RIDE_SEARCH_RADII_METERS[2],
+    );
+    expect(ctx.savedOffers[0].dispatchRound).toBe(7);
   });
 
   it('no debe duplicar oferta si el Driver ya tuvo cualquier RideOffer previa para ese Ride', async () => {

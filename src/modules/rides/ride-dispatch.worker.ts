@@ -116,8 +116,13 @@ export class RideDispatchWorker
    * G3B1: una RideOffer OFFERED todavía viva ya NO impide que una
    * ride sea "due" para otra ronda (esa era la responsabilidad B
    * que RIDE_OFFER_TTL_MS mezclaba con la visibilidad del Driver).
-   * La cadencia ahora depende únicamente de RIDE_DISPATCH_INTERVAL_MS
-   * contado desde last_dispatch_at.
+   *
+   * G3C-lite: tampoco existe ya un tope de dispatch_round que
+   * detenga los intentos. Mientras el Ride siga SEARCHING_DRIVER y
+   * vigente, es "due" únicamente por RIDE_DISPATCH_INTERVAL_MS
+   * contado desde last_dispatch_at — RideDispatchService decide
+   * (vía getEffectiveSearchRadiusMeters) si ese intento expande a un
+   * radio nuevo o reutiliza el radio máximo ya alcanzado.
    */
   private async findDueRides(): Promise<DueRideRow[]> {
     const result: unknown = await this.dataSource.query(
@@ -133,13 +138,8 @@ export class RideDispatchWorker
                AND expired_offer.status = 'OFFERED'
                AND expired_offer.expires_at <= NOW()
            )
-           OR (
-             ride.dispatch_round < 3
-             AND (
-               ride.last_dispatch_at IS NULL
-               OR ride.last_dispatch_at <= NOW() - ($2 * INTERVAL '1 millisecond')
-             )
-           )
+           OR ride.last_dispatch_at IS NULL
+           OR ride.last_dispatch_at <= NOW() - ($2 * INTERVAL '1 millisecond')
          )
        ORDER BY ride.requested_at ASC
        LIMIT $1`,
