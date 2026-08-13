@@ -1,6 +1,6 @@
 import { RideStatus } from './enums/ride-status.enum';
 
-export const RIDE_SEARCH_TTL_MS = 4 * 60 * 1000;
+export const RIDE_SEARCH_TTL_MS = 5 * 60 * 1000;
 export const RIDE_OFFER_BATCH_SIZE = 5;
 export const RIDE_MATCHING_CANDIDATE_LIMIT = 25;
 
@@ -28,7 +28,7 @@ export function calculateRideSearchExpiresAt(now: Date): Date {
 }
 
 export const RIDE_SEARCH_RADII_METERS: readonly number[] = [
-  1_000, 2_000, 3_000,
+  2_000, 5_000, 10_000,
 ];
 
 /*
@@ -51,6 +51,19 @@ export function getEffectiveSearchRadiusMeters(dispatchRound: number): number {
 
   return RIDE_SEARCH_RADII_METERS[index];
 }
+
+/*
+ * G3B2: fuente única para "el radio más amplio que el matching
+ * puede alcanzar hoy". La usa el filtro grueso de late-join de G3A
+ * (findNearbySearchingRideIds) para no excluir por PostGIS a un
+ * Driver que en realidad sigue dentro del radio máximo vigente.
+ *
+ * Derivada directamente del último elemento de
+ * RIDE_SEARCH_RADII_METERS — nunca un número aparte, para no tener
+ * dos fuentes de verdad.
+ */
+export const MAX_SEARCH_RADIUS_METERS =
+  RIDE_SEARCH_RADII_METERS[RIDE_SEARCH_RADII_METERS.length - 1];
 
 export const DRIVER_PRESENCE_MAX_AGE_MS = 90_000;
 export const DRIVER_LOCATION_MAX_AGE_MS = 45_000;

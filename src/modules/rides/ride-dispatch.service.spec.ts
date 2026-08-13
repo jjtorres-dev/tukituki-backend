@@ -180,12 +180,12 @@ describe('RideDispatchService', () => {
     service = module.get<RideDispatchService>(RideDispatchService);
   });
 
-  it('debe buscar a un kilómetro y crear ofertas para conductores elegibles', async () => {
+  it('debe buscar a 2 kilómetros (G3B2) y crear ofertas para conductores elegibles', async () => {
     const result = await service.dispatchRide(rideId);
 
     expect(
       driverLocationsService.findNearbyAvailableDrivers,
-    ).toHaveBeenCalledWith(-6.4877, -76.3599, 1000, 25);
+    ).toHaveBeenCalledWith(-6.4877, -76.3599, 2000, 25);
     expect(result).toHaveLength(1);
     expect(result[0]?.driverProfileId).toBe(driverProfileId);
     expect(result[0]?.distanceToOriginMeters).toBe(420);
@@ -260,7 +260,7 @@ describe('RideDispatchService', () => {
 
     expect(
       driverLocationsService.findNearbyAvailableDrivers,
-    ).toHaveBeenCalledWith(-6.4877, -76.3599, 2000, 25);
+    ).toHaveBeenCalledWith(-6.4877, -76.3599, 5000, 25);
     expect(ride.dispatchRound).toBe(2);
     expect(result).toHaveLength(1);
     expect(result[0]?.driverProfileId).toBe(driverProfileId);
@@ -302,7 +302,7 @@ describe('RideDispatchService', () => {
     expect(offerRepository.save).not.toHaveBeenCalled();
   });
 
-  it('debe ejecutar la ronda 3 (3000m) tras la ronda 2, con A y B todavía OFFERED', async () => {
+  it('debe ejecutar la ronda 3 (10000m, G3B2) tras la ronda 2, con A y B todavía OFFERED', async () => {
     ride.dispatchRound = 2;
     ride.lastDispatchAt = new Date(
       Date.now() - (RIDE_DISPATCH_INTERVAL_MS + 1_000),
@@ -335,13 +335,13 @@ describe('RideDispatchService', () => {
 
     expect(
       driverLocationsService.findNearbyAvailableDrivers,
-    ).toHaveBeenCalledWith(-6.4877, -76.3599, 3000, 25);
+    ).toHaveBeenCalledWith(-6.4877, -76.3599, 10000, 25);
     expect(ride.dispatchRound).toBe(3);
     expect(result).toHaveLength(1);
-    expect(result[0]?.searchRadiusMeters).toBe(3000);
+    expect(result[0]?.searchRadiusMeters).toBe(10000);
   });
 
-  it('G3C-lite: primer reintento en radio máximo tras agotar las 3 rondas reutiliza 3000m sin crecer dispatchRound', async () => {
+  it('G3C-lite: primer reintento en radio máximo tras agotar las 3 rondas reutiliza 10000m (G3B2) sin crecer dispatchRound', async () => {
     ride.dispatchRound = 3;
     ride.lastDispatchAt = new Date(
       Date.now() - (RIDE_DISPATCH_INTERVAL_MS + 1_000),
@@ -380,11 +380,11 @@ describe('RideDispatchService', () => {
 
     expect(
       driverLocationsService.findNearbyAvailableDrivers,
-    ).toHaveBeenCalledWith(-6.4877, -76.3599, 3000, 25);
+    ).toHaveBeenCalledWith(-6.4877, -76.3599, 10000, 25);
     expect(ride.dispatchRound).toBe(3);
     expect(result).toHaveLength(1);
     expect(result[0]?.driverProfileId).toBe(driverProfileId);
-    expect(result[0]?.searchRadiusMeters).toBe(3000);
+    expect(result[0]?.searchRadiusMeters).toBe(10000);
     expect(result[0]?.dispatchRound).toBe(3);
   });
 
@@ -410,7 +410,7 @@ describe('RideDispatchService', () => {
     expect(ride.dispatchRound).toBe(3);
   });
 
-  it('G3C-lite: un segundo reintento en radio máximo vuelve a usar 3000m y dispatchRound sigue saturado', async () => {
+  it('G3C-lite: un segundo reintento en radio máximo vuelve a usar 10000m (G3B2) y dispatchRound sigue saturado', async () => {
     ride.dispatchRound = 3;
     ride.lastDispatchAt = new Date(
       Date.now() - (RIDE_DISPATCH_INTERVAL_MS + 1_000),
@@ -446,7 +446,7 @@ describe('RideDispatchService', () => {
 
     expect(
       driverLocationsService.findNearbyAvailableDrivers,
-    ).toHaveBeenLastCalledWith(-6.4877, -76.3599, 3000, 25);
+    ).toHaveBeenLastCalledWith(-6.4877, -76.3599, 10000, 25);
     expect(ride.dispatchRound).toBe(3);
     // El único candidato que Redis devuelve ya fue ofertado en el primer intento.
     expect(secondAttempt).toEqual([]);
@@ -698,9 +698,10 @@ describe('RideDispatchService.dispatchLateJoinDriver (G3A)', () => {
       <T>(work: (manager: EntityManager) => Promise<T>): Promise<T> =>
         work(managerMock as unknown as EntityManager),
     );
-    const topLevelQueryMock = jest.fn(() =>
-      Promise.resolve(candidateIds.map((id) => ({ id }))),
-    );
+    const topLevelQueryMock = jest.fn<
+      Promise<Array<{ id: string }>>,
+      [string, unknown[]?]
+    >(() => Promise.resolve(candidateIds.map((id) => ({ id }))));
     const createQueryRunnerMock = jest.fn(() => queryRunner);
     const dataSourceMock = {
       transaction: transactionMock,
@@ -749,8 +750,26 @@ describe('RideDispatchService.dispatchLateJoinDriver (G3A)', () => {
       queryRunner,
       transactionMock,
       enqueueWithinTransactionMock,
+      topLevelQueryMock,
     };
   }
+
+  it('G3B2: la query preliminar de late-join usa el nuevo radio máximo (10000m), no el viejo 3000m', async () => {
+    const ctx = buildContext();
+
+    await ctx.service.dispatchLateJoinDriver(driverProfileId);
+
+    const [, params] = ctx.topLevelQueryMock.mock.calls[0];
+    const radiusUsed = params?.[1];
+
+    /*
+     * Con el límite viejo (3000m) este assert habría fallado: la
+     * query preliminar de findNearbySearchingRideIds habría enviado
+     * 3000 en vez del nuevo MAX_SEARCH_RADIUS_METERS (10000).
+     */
+    expect(radiusUsed).toBe(10_000);
+    expect(radiusUsed).not.toBe(3_000);
+  });
 
   it('crea una oferta cuando el Ride ya existía y el Driver queda descubrible dentro del radio', async () => {
     const ctx = buildContext();
@@ -836,7 +855,7 @@ describe('RideDispatchService.dispatchLateJoinDriver (G3A)', () => {
     );
   });
 
-  it('G3C-lite: con la ride en reintentos de radio máximo (dispatchRound > 3), late-join sigue usando 3000m', async () => {
+  it('G3C-lite: con la ride en reintentos de radio máximo (dispatchRound > 3), late-join sigue usando el radio máximo (G3B2: 10000m)', async () => {
     const ctx = buildContext({
       ride: { dispatchRound: 7 },
       distanceMeters: RIDE_SEARCH_RADII_METERS[2] - 1,

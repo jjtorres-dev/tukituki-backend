@@ -39,6 +39,7 @@ import {
   DRIVER_LOCATION_MAX_AGE_MS,
   DRIVER_PRESENCE_MAX_AGE_MS,
   getEffectiveSearchRadiusMeters,
+  MAX_SEARCH_RADIUS_METERS,
   RIDE_DISPATCH_INTERVAL_MS,
   RIDE_MATCHING_CANDIDATE_LIMIT,
   RIDE_OFFER_BATCH_SIZE,
@@ -148,12 +149,9 @@ export class RideDispatchService {
    * oferta adicional dentro del radio que la ride ya alcanzó.
    */
   async dispatchLateJoinDriver(driverProfileId: string): Promise<RideOffer[]> {
-    const maxRadiusMeters =
-      RIDE_SEARCH_RADII_METERS[RIDE_SEARCH_RADII_METERS.length - 1];
-
     const candidateRideIds = await this.findNearbySearchingRideIds(
       driverProfileId,
-      maxRadiusMeters,
+      MAX_SEARCH_RADIUS_METERS,
       RIDE_MATCHING_CANDIDATE_LIMIT,
     );
 
