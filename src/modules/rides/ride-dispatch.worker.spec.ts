@@ -1,8 +1,15 @@
 import { ConfigService } from '@nestjs/config';
 import { DataSource } from 'typeorm';
 
+import { DriverAvailabilityRedisService } from '../../infrastructure/redis/driver-availability-redis.service';
 import { RideDispatchService } from './ride-dispatch.service';
 import { RideDispatchWorker } from './ride-dispatch.worker';
+
+function createAvailabilityRedisServiceMock() {
+  return {
+    drainLateJoinPendingDrivers: jest.fn(() => Promise.resolve([])),
+  } as unknown as DriverAvailabilityRedisService;
+}
 
 describe('RideDispatchWorker', () => {
   it('procesa viajes pendientes bajo advisory lock', async () => {
@@ -34,11 +41,67 @@ describe('RideDispatchWorker', () => {
       configService,
       dataSource,
       dispatchService,
+      createAvailabilityRedisServiceMock(),
     );
 
     await expect(worker.runOnce()).resolves.toBe(1);
     expect(expirePendingOffers).toHaveBeenCalledTimes(1);
     expect(dispatchRide).toHaveBeenCalledTimes(1);
     expect(release).toHaveBeenCalledTimes(1);
+  });
+
+  it('drena la cola de late-join y despacha cada conductor', async () => {
+    const configService = {
+      get: jest.fn((_key: string, fallback: unknown) => fallback),
+    } as unknown as ConfigService;
+    const dataSource = {} as unknown as DataSource;
+    const dispatchLateJoinDriver = jest.fn(() => Promise.resolve([]));
+    const dispatchService = {
+      dispatchLateJoinDriver,
+    } as unknown as RideDispatchService;
+    const drainLateJoinPendingDrivers = jest.fn(() =>
+      Promise.resolve(['driver-1', 'driver-2']),
+    );
+    const availabilityRedisService = {
+      drainLateJoinPendingDrivers,
+    } as unknown as DriverAvailabilityRedisService;
+    const worker = new RideDispatchWorker(
+      configService,
+      dataSource,
+      dispatchService,
+      availabilityRedisService,
+    );
+
+    await expect(worker.runLateJoinOnce()).resolves.toBe(2);
+    expect(dispatchLateJoinDriver).toHaveBeenCalledWith('driver-1');
+    expect(dispatchLateJoinDriver).toHaveBeenCalledWith('driver-2');
+  });
+
+  it('un conductor que falla no interrumpe el resto del lote de late-join', async () => {
+    const configService = {
+      get: jest.fn((_key: string, fallback: unknown) => fallback),
+    } as unknown as ConfigService;
+    const dataSource = {} as unknown as DataSource;
+    const dispatchLateJoinDriver = jest
+      .fn()
+      .mockRejectedValueOnce(new Error('boom'))
+      .mockResolvedValueOnce([]);
+    const dispatchService = {
+      dispatchLateJoinDriver,
+    } as unknown as RideDispatchService;
+    const availabilityRedisService = {
+      drainLateJoinPendingDrivers: jest.fn(() =>
+        Promise.resolve(['driver-1', 'driver-2']),
+      ),
+    } as unknown as DriverAvailabilityRedisService;
+    const worker = new RideDispatchWorker(
+      configService,
+      dataSource,
+      dispatchService,
+      availabilityRedisService,
+    );
+
+    await expect(worker.runLateJoinOnce()).resolves.toBe(1);
+    expect(dispatchLateJoinDriver).toHaveBeenCalledTimes(2);
   });
 });

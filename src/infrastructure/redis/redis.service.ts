@@ -71,6 +71,40 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     });
   }
 
+  /*
+   * SET ... EX ... GET de una sola instrucción (Redis >= 6.2, ya
+   * requerido por GEOSEARCH en este mismo servicio): siempre
+   * escribe la key y renueva su TTL, y devuelve atómicamente el
+   * valor ANTERIOR (o null si no existía). Permite implementar un
+   * "lease" que se renueva en cada llamada sin dejar de poder
+   * distinguir, en la misma instrucción, si la key ya existía —
+   * sin carrera posible incluso con múltiples instancias de
+   * Backend concurrentes.
+   */
+  async setWithTtlReturningPrevious(
+    key: string,
+    value: string,
+    ttlSeconds: number,
+  ): Promise<string | null> {
+    const previous = await this.client.set(key, value, {
+      expiration: {
+        type: 'EX',
+        value: ttlSeconds,
+      },
+      GET: true,
+    });
+
+    return previous;
+  }
+
+  async addToSet(key: string, member: string): Promise<void> {
+    await this.client.sAdd(key, member);
+  }
+
+  async popFromSet(key: string, count: number): Promise<string[]> {
+    return this.client.sPopCount(key, count);
+  }
+
   async exists(key: string): Promise<boolean> {
     return (await this.client.exists(key)) === 1;
   }

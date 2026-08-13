@@ -1,11 +1,26 @@
-import { Injectable, NotFoundException, Optional } from '@nestjs/common';
-import { DataSource, In, LessThanOrEqual, MoreThan } from 'typeorm';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  Optional,
+} from '@nestjs/common';
+import {
+  DataSource,
+  In,
+  LessThanOrEqual,
+  MoreThan,
+  QueryFailedError,
+} from 'typeorm';
 import type { EntityManager, Repository } from 'typeorm';
 
 import { DriverLocationsService } from '../driver-operations/driver-locations.service';
 import { DriverLocation } from '../driver-operations/entities/driver-location.entity';
 import { DriverOperationalState } from '../driver-operations/entities/driver-operational-state.entity';
 import { DriverOperationalStatus } from '../driver-operations/enums/driver-operational-status.enum';
+import {
+  assertDriverOperationalRequirements,
+  REQUIRED_OPERATIONAL_DOCUMENTS,
+} from '../driver-operations/driver-operational-requirements.util';
 import { DriverDocument } from '../drivers/entities/driver-document.entity';
 import { DriverProfile } from '../drivers/entities/driver-profile.entity';
 import { DriverVehicle } from '../drivers/entities/driver-vehicle.entity';
@@ -29,6 +44,7 @@ import {
   RIDE_SEARCH_RADII_METERS,
 } from './ride-matching.constants';
 import { RideTransitionsService } from './ride-transitions.service';
+import { withRideAdvisoryLock } from './ride-advisory-lock.util';
 
 interface DispatchPlan {
   rideId: string;
@@ -53,6 +69,8 @@ type DispatchPreparation =
 
 @Injectable()
 export class RideDispatchService {
+  private readonly logger = new Logger(RideDispatchService.name);
+
   constructor(
     private readonly dataSource: DataSource,
     private readonly driverLocationsService: DriverLocationsService,
@@ -111,6 +129,323 @@ export class RideDispatchService {
 
       return affected;
     });
+  }
+
+  /*
+   * G3A - late-join matching.
+   *
+   * Punto de entrada driver-céntrico (en vez de ride-céntrico como
+   * dispatchRide): dado un conductor que ACABA de volverse
+   * realmente descubrible (ver
+   * DriverAvailabilityRedisService.registerDiscoverableTransition),
+   * busca Rides SEARCHING_DRIVER vigentes cercanos que este
+   * conductor todavía no haya recibido y les crea RideOffer
+   * reutilizando exactamente las mismas reglas, locks y outbox que
+   * el dispatch por rondas.
+   *
+   * NO asigna Ride, NO muta dispatchRound: solo puede crear una
+   * oferta adicional dentro del radio que la ride ya alcanzó.
+   */
+  async dispatchLateJoinDriver(driverProfileId: string): Promise<RideOffer[]> {
+    const maxRadiusMeters =
+      RIDE_SEARCH_RADII_METERS[RIDE_SEARCH_RADII_METERS.length - 1];
+
+    const candidateRideIds = await this.findNearbySearchingRideIds(
+      driverProfileId,
+      maxRadiusMeters,
+      RIDE_MATCHING_CANDIDATE_LIMIT,
+    );
+
+    const offers: RideOffer[] = [];
+
+    for (const rideId of candidateRideIds) {
+      const { result } = await withRideAdvisoryLock(
+        this.dataSource,
+        rideId,
+        () => this.tryCreateLateJoinOffer(rideId, driverProfileId),
+      );
+
+      if (result) {
+        offers.push(result);
+      }
+    }
+
+    if (candidateRideIds.length > 0) {
+      this.logger.log(
+        `lateJoinMatch driverId=${driverProfileId} eligibleRideCount=${candidateRideIds.length} offersCreated=${offers.length}`,
+      );
+    }
+
+    return offers;
+  }
+
+  private async findNearbySearchingRideIds(
+    driverProfileId: string,
+    radiusMeters: number,
+    limit: number,
+  ): Promise<string[]> {
+    const rows: Array<{ id: string }> = await this.dataSource.query(
+      `SELECT ride.id
+       FROM rides ride
+       INNER JOIN driver_locations location
+         ON location.driver_profile_id = $1
+       WHERE ride.status = 'SEARCHING_DRIVER'
+         AND ride.search_expires_at > NOW()
+         AND ST_DWithin(ride.origin_position, location.position, $2)
+         AND NOT EXISTS (
+           SELECT 1
+           FROM ride_offers existing
+           WHERE existing.ride_id = ride.id
+             AND existing.driver_profile_id = $1
+         )
+       ORDER BY ST_Distance(ride.origin_position, location.position) ASC
+       LIMIT $3`,
+      [driverProfileId, radiusMeters, limit],
+    );
+
+    return rows.map((row) => row.id);
+  }
+
+  private async tryCreateLateJoinOffer(
+    rideId: string,
+    driverProfileId: string,
+  ): Promise<RideOffer | null> {
+    return this.dataSource.transaction(async (manager) => {
+      const ride = await manager.getRepository(Ride).findOne({
+        where: {
+          id: rideId,
+        },
+        lock: {
+          mode: 'pessimistic_write',
+        },
+      });
+
+      if (!ride || ride.status !== RideStatus.SEARCHING_DRIVER) {
+        return null;
+      }
+
+      const now = new Date();
+
+      if (ride.searchExpiresAt.getTime() <= now.getTime()) {
+        return null;
+      }
+
+      const offerRepository = manager.getRepository(RideOffer);
+
+      const existingOffer = await offerRepository.findOne({
+        where: {
+          rideId,
+          driverProfileId,
+        },
+      });
+
+      if (existingOffer) {
+        return null;
+      }
+
+      const eligible = await this.isDriverEligibleForLateJoin(
+        manager,
+        driverProfileId,
+        now,
+      );
+
+      if (!eligible) {
+        return null;
+      }
+
+      const distanceMeters = await this.distanceToRideOrigin(
+        manager,
+        rideId,
+        driverProfileId,
+      );
+
+      if (distanceMeters === null) {
+        return null;
+      }
+
+      const applicableRadiusMeters =
+        RIDE_SEARCH_RADII_METERS[
+          Math.min(ride.dispatchRound ?? 0, RIDE_SEARCH_RADII_METERS.length - 1)
+        ];
+
+      if (distanceMeters > applicableRadiusMeters) {
+        return null;
+      }
+
+      const expiresAt = calculateRideOfferExpiresAt(now, ride.searchExpiresAt);
+
+      const offer = offerRepository.create({
+        rideId: ride.id,
+        driverProfileId,
+        status: RideOfferStatus.OFFERED,
+        distanceToOriginMeters: Math.max(0, Math.round(distanceMeters)),
+        dispatchRound: ride.dispatchRound ?? 0,
+        searchRadiusMeters: applicableRadiusMeters,
+        offeredAt: now,
+        expiresAt,
+        proposedFare: null,
+        proposedAt: null,
+        respondedAt: null,
+        acceptedAt: null,
+        rejectedAt: null,
+        cancelledAt: null,
+        rejectionReason: null,
+      });
+
+      let savedOffer: RideOffer;
+
+      try {
+        savedOffer = await offerRepository.save(offer);
+      } catch (error: unknown) {
+        if (this.isUniqueViolation(error)) {
+          return null;
+        }
+
+        throw error;
+      }
+
+      if (this.outboxService) {
+        await this.outboxService.enqueueWithinTransaction(manager, {
+          aggregateType: 'RIDE_OFFER',
+          aggregateId: savedOffer.id,
+          eventType: OutboxEventType.RIDE_OFFER_CREATED,
+          payload: {
+            rideId: ride.id,
+            driverProfileId: savedOffer.driverProfileId,
+            dispatchRound: savedOffer.dispatchRound,
+            expiresAt: savedOffer.expiresAt.toISOString(),
+          },
+        });
+      }
+
+      return savedOffer;
+    });
+  }
+
+  private async isDriverEligibleForLateJoin(
+    manager: EntityManager,
+    driverProfileId: string,
+    now: Date,
+  ): Promise<boolean> {
+    const state = await manager
+      .getRepository(DriverOperationalState)
+      .createQueryBuilder('state')
+      .where('state.driver_profile_id = :driverProfileId', {
+        driverProfileId,
+      })
+      .andWhere('state.status = :status', {
+        status: DriverOperationalStatus.AVAILABLE,
+      })
+      .setLock('pessimistic_write')
+      .getOne();
+
+    if (!state) {
+      return false;
+    }
+
+    const minimumLastSeenAt = new Date(
+      now.getTime() - DRIVER_PRESENCE_MAX_AGE_MS,
+    );
+
+    if (
+      !state.lastSeenAt ||
+      state.lastSeenAt.getTime() < minimumLastSeenAt.getTime()
+    ) {
+      return false;
+    }
+
+    const profile = await manager.getRepository(DriverProfile).findOne({
+      where: {
+        id: driverProfileId,
+      },
+    });
+
+    if (!profile || profile.status !== DriverStatus.APPROVED) {
+      return false;
+    }
+
+    const vehicle = await manager.getRepository(DriverVehicle).findOne({
+      where: {
+        driverProfileId,
+      },
+    });
+
+    const documents = await manager.getRepository(DriverDocument).find({
+      where: {
+        driverProfileId,
+        type: In([...REQUIRED_OPERATIONAL_DOCUMENTS]),
+      },
+    });
+
+    try {
+      assertDriverOperationalRequirements(
+        vehicle,
+        documents,
+        now.toISOString().slice(0, 10),
+      );
+    } catch {
+      return false;
+    }
+
+    const minimumLocationAt = new Date(
+      now.getTime() - DRIVER_LOCATION_MAX_AGE_MS,
+    );
+
+    const location = await manager.getRepository(DriverLocation).findOne({
+      where: {
+        driverProfileId,
+      },
+    });
+
+    if (
+      !location ||
+      location.recordedAt.getTime() < minimumLocationAt.getTime()
+    ) {
+      return false;
+    }
+
+    const activeRide = await manager.getRepository(Ride).findOne({
+      where: {
+        driverProfileId,
+        status: In([...ACTIVE_DRIVER_RIDE_STATUSES]),
+      },
+    });
+
+    return !activeRide;
+  }
+
+  private async distanceToRideOrigin(
+    manager: EntityManager,
+    rideId: string,
+    driverProfileId: string,
+  ): Promise<number | null> {
+    const rows: Array<{ distanceMeters: string | number | null }> =
+      await manager.query(
+        `SELECT ST_Distance(location.position, ride.origin_position) AS "distanceMeters"
+         FROM driver_locations location
+         INNER JOIN rides ride ON ride.id = $1
+         WHERE location.driver_profile_id = $2
+         LIMIT 1`,
+        [rideId, driverProfileId],
+      );
+
+    const distanceMeters = Number(rows[0]?.distanceMeters);
+
+    return Number.isFinite(distanceMeters) ? distanceMeters : null;
+  }
+
+  private isUniqueViolation(error: unknown): boolean {
+    if (!(error instanceof QueryFailedError)) {
+      return false;
+    }
+
+    const queryError = error as QueryFailedError & {
+      driverError?: {
+        code?: string;
+      };
+    };
+
+    return queryError.driverError?.code === '23505';
   }
 
   private prepareDispatch(rideId: string): Promise<DispatchPreparation> {

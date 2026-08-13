@@ -9,6 +9,27 @@ export const DRIVER_PRESENCE_TTL_SECONDS = 90;
 
 const DRIVER_LOCATION_TTL_SECONDS = 45;
 
+/*
+ * G3A - late-join matching.
+ *
+ * "discoverable-armed" es una lease continua y compartida entre
+ * instancias (Redis, no memoria de proceso): cada publicación de
+ * ubicación AVAILABLE renueva su TTL a DISCOVERABLE_ARM_TTL_SECONDS
+ * mediante una única instrucción atómica (SET ... EX ... GET), así
+ * que mientras el conductor siga publicando ubicación fresca la
+ * lease nunca expira y las publicaciones periódicas NO disparan una
+ * nueva búsqueda de late-join.
+ *
+ * Solo cuando la lease no existía (primera publicación tras
+ * goOnline/reconexión, o el conductor dejó de publicar por >=
+ * DISCOVERABLE_ARM_TTL_SECONDS y por tanto dejó de ser realmente
+ * descubrible) la operación reporta la transición
+ * no-discoverable -> discoverable, y eso dispara late-join UNA VEZ.
+ */
+const DISCOVERABLE_ARM_TTL_SECONDS = DRIVER_LOCATION_TTL_SECONDS;
+
+export const LATE_JOIN_PENDING_DRIVERS_KEY = 'drivers:late-join-pending';
+
 @Injectable()
 export class DriverAvailabilityRedisService {
   constructor(private readonly redisService: RedisService) {}
@@ -68,6 +89,15 @@ export class DriverAvailabilityRedisService {
         now,
         DRIVER_LOCATION_TTL_SECONDS,
       ),
+      /*
+       * Un conductor BUSY no es discoverable: la lease AVAILABLE
+       * previa (si la había) deja de ser válida de inmediato en
+       * vez de esperar a que expire sola. Así, si vuelve a estar
+       * AVAILABLE poco después (ciclo de ride corto), la siguiente
+       * publicación se reconoce correctamente como una transición
+       * nueva en vez de heredar una lease obsoleta.
+       */
+      this.redisService.delete(this.getDiscoverableArmedKey(driverProfileId)),
     ]);
   }
 
@@ -85,8 +115,55 @@ export class DriverAvailabilityRedisService {
       this.redisService.delete(
         this.getPresenceKey(driverProfileId),
         this.getLocationFreshnessKey(driverProfileId),
+        this.getDiscoverableArmedKey(driverProfileId),
       ),
     ]);
+  }
+
+  /*
+   * Lease continua: CADA llamada renueva el TTL de
+   * discoverable-armed a DISCOVERABLE_ARM_TTL_SECONDS (vía
+   * SET ... EX ... GET, atómico), así que mientras el conductor
+   * siga publicando ubicación dentro de esa ventana la marca nunca
+   * expira. Solo devuelve true (y encola para late-join) la
+   * primera vez, cuando la key todavía no existía: eso es la
+   * transición real no-discoverable -> discoverable. Si dejó de
+   * publicar por más de DISCOVERABLE_ARM_TTL_SECONDS, la key
+   * expira sola y la siguiente publicación vuelve a ser "primera
+   * vez".
+   */
+  async registerDiscoverableTransition(
+    driverProfileId: string,
+  ): Promise<boolean> {
+    const previousValue = await this.redisService.setWithTtlReturningPrevious(
+      this.getDiscoverableArmedKey(driverProfileId),
+      '1',
+      DISCOVERABLE_ARM_TTL_SECONDS,
+    );
+
+    const newlyDiscoverable = previousValue === null;
+
+    if (newlyDiscoverable) {
+      await this.redisService.addToSet(
+        LATE_JOIN_PENDING_DRIVERS_KEY,
+        driverProfileId,
+      );
+    }
+
+    return newlyDiscoverable;
+  }
+
+  /*
+   * Consumida por RideDispatchWorker: extrae (SPOP, atómico) hasta
+   * `maxCount` conductores en espera de late-join matching. Un
+   * mismo driverProfileId solo puede ser extraído por una
+   * instancia, aunque haya varios workers corriendo en paralelo.
+   */
+  drainLateJoinPendingDrivers(maxCount: number): Promise<string[]> {
+    return this.redisService.popFromSet(
+      LATE_JOIN_PENDING_DRIVERS_KEY,
+      maxCount,
+    );
   }
 
   async renewPresenceIfExists(driverProfileId: string): Promise<boolean> {
@@ -155,5 +232,9 @@ export class DriverAvailabilityRedisService {
 
   private getLocationFreshnessKey(driverProfileId: string): string {
     return `drivers:location-fresh:${driverProfileId}`;
+  }
+
+  private getDiscoverableArmedKey(driverProfileId: string): string {
+    return `drivers:discoverable-armed:${driverProfileId}`;
   }
 }

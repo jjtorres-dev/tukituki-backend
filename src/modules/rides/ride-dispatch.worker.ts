@@ -7,15 +7,13 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { DataSource } from 'typeorm';
 
+import { DriverAvailabilityRedisService } from '../../infrastructure/redis/driver-availability-redis.service';
 import { RIDE_OFFER_TTL_MS } from './ride-matching.constants';
 import { RideDispatchService } from './ride-dispatch.service';
+import { withRideAdvisoryLock } from './ride-advisory-lock.util';
 
 interface DueRideRow {
   id: string;
-}
-
-interface AdvisoryLockRow {
-  locked: boolean;
 }
 
 @Injectable()
@@ -33,6 +31,7 @@ export class RideDispatchWorker
     private readonly configService: ConfigService,
     private readonly dataSource: DataSource,
     private readonly rideDispatchService: RideDispatchService,
+    private readonly availabilityRedisService: DriverAvailabilityRedisService,
   ) {
     this.enabled = this.configService.get<boolean>('WORKERS_ENABLED', true);
     this.intervalMs = this.configService.get<number>(
@@ -68,11 +67,46 @@ export class RideDispatchWorker
     let processed = 0;
 
     for (const row of rows) {
-      const handled = await this.withRideAdvisoryLock(row.id, async () => {
-        await this.rideDispatchService.expirePendingOffers(row.id);
-        await this.rideDispatchService.dispatchRide(row.id);
-      });
-      if (handled) processed += 1;
+      const { acquired } = await withRideAdvisoryLock(
+        this.dataSource,
+        row.id,
+        async () => {
+          await this.rideDispatchService.expirePendingOffers(row.id);
+          await this.rideDispatchService.dispatchRide(row.id);
+        },
+      );
+      if (acquired) processed += 1;
+    }
+
+    return processed;
+  }
+
+  /*
+   * G3A - late-join matching.
+   *
+   * Drena (SPOP, atómico) la cola Redis de conductores que acaban
+   * de volverse realmente descubribles (ver
+   * DriverAvailabilityRedisService.registerDiscoverableTransition)
+   * y ejecuta matching retroactivo para cada uno, usando el mismo
+   * ritmo de polling que ya tiene este worker. Un fallo aislado en
+   * un conductor no debe impedir procesar el resto del lote.
+   */
+  async runLateJoinOnce(): Promise<number> {
+    const driverProfileIds =
+      await this.availabilityRedisService.drainLateJoinPendingDrivers(
+        this.batchSize,
+      );
+    let processed = 0;
+
+    for (const driverProfileId of driverProfileIds) {
+      try {
+        await this.rideDispatchService.dispatchLateJoinDriver(driverProfileId);
+        processed += 1;
+      } catch (error: unknown) {
+        this.logger.error(
+          `El late-join matching falló para el conductor ${driverProfileId}: ${this.errorMessage(error)}`,
+        );
+      }
     }
 
     return processed;
@@ -114,35 +148,6 @@ export class RideDispatchWorker
     return result as DueRideRow[];
   }
 
-  private async withRideAdvisoryLock(
-    rideId: string,
-    operation: () => Promise<void>,
-  ): Promise<boolean> {
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-
-    try {
-      const lockResult: unknown = await queryRunner.query(
-        'SELECT pg_try_advisory_lock(hashtext($1)) AS "locked"',
-        [rideId],
-      );
-      const locked = Boolean((lockResult as AdvisoryLockRow[])[0]?.locked);
-      if (!locked) return false;
-
-      try {
-        await operation();
-        return true;
-      } finally {
-        await queryRunner.query(
-          'SELECT pg_advisory_unlock(hashtext($1)) AS "unlocked"',
-          [rideId],
-        );
-      }
-    } finally {
-      await queryRunner.release();
-    }
-  }
-
   private async tick(): Promise<void> {
     if (this.running) return;
     this.running = true;
@@ -151,6 +156,14 @@ export class RideDispatchWorker
     } catch (error: unknown) {
       this.logger.error(
         `El ciclo del matching falló: ${this.errorMessage(error)}`,
+      );
+    }
+
+    try {
+      await this.runLateJoinOnce();
+    } catch (error: unknown) {
+      this.logger.error(
+        `El ciclo de late-join matching falló: ${this.errorMessage(error)}`,
       );
     } finally {
       this.running = false;

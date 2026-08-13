@@ -72,6 +72,10 @@ export class DriverLocationsService {
           result.location.longitude,
           result.location.latitude,
         );
+
+        await this.queueLateJoinMatchingIfNewlyDiscoverable(
+          result.location.driverProfileId,
+        );
       } else {
         await this.availabilityRedisService.registerBusyPresence(
           result.location.driverProfileId,
@@ -114,6 +118,42 @@ export class DriverLocationsService {
     }
 
     return this.mapLocation(result.location);
+  }
+
+  /*
+   * G3A - late-join matching.
+   *
+   * Encola al conductor para matching retroactivo SOLO cuando esta
+   * publicación lo vuelve realmente descubrible (ver
+   * DriverAvailabilityRedisService.registerDiscoverableTransition).
+   * Publicaciones periódicas mientras sigue descubierto no vuelven
+   * a encolarlo.
+   *
+   * Es best-effort: un fallo aquí no debe invalidar la ubicación ni
+   * la publicación de disponibilidad ya confirmadas, porque el
+   * worker de dispatch por rondas sigue siendo la red de seguridad.
+   */
+  private async queueLateJoinMatchingIfNewlyDiscoverable(
+    driverProfileId: string,
+  ): Promise<void> {
+    try {
+      const becameDiscoverable =
+        await this.availabilityRedisService.registerDiscoverableTransition(
+          driverProfileId,
+        );
+
+      if (becameDiscoverable) {
+        this.logger.log(
+          `lateJoinMatch: driver ${driverProfileId} quedó descubrible, encolado para matching retroactivo`,
+        );
+      }
+    } catch (error: unknown) {
+      this.logger.warn(
+        `No se pudo evaluar la transición de descubribilidad de ${driverProfileId}: ${
+          error instanceof Error ? error.message : 'error desconocido'
+        }`,
+      );
+    }
   }
 
   async getMyLocation(userId: string): Promise<DriverLocationResponseDto> {
