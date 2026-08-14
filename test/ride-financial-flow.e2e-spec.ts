@@ -16,6 +16,7 @@ import { DriverLocation } from '../src/modules/driver-operations/entities/driver
 import { DriverOperationalState } from '../src/modules/driver-operations/entities/driver-operational-state.entity';
 import { DriverOperationalStatus } from '../src/modules/driver-operations/enums/driver-operational-status.enum';
 import { FaresService } from '../src/modules/fares/fares.service';
+import { GoogleGeocodingService } from '../src/modules/fares/google-geocoding.service';
 import { GoogleRoutesService } from '../src/modules/fares/google-routes.service';
 import { DriverAvailabilityRedisService } from '../src/infrastructure/redis/driver-availability-redis.service';
 import { OutboxService } from '../src/modules/outbox/outbox.service';
@@ -77,6 +78,10 @@ describe('Flujo financiero real: cotización a liquidación', () => {
 
   let googleRoutesServiceMock: {
     computeRoute: jest.Mock;
+  };
+
+  let googleGeocodingServiceMock: {
+    reverseGeocode: jest.Mock;
   };
 
   let adminUserId: string;
@@ -213,10 +218,21 @@ describe('Flujo financiero real: cotización a liquidación', () => {
       }),
     };
 
+    /*
+     * Mismo motivo que Google Routes arriba: el E2E no debe golpear
+     * Geocoding real (determinista, sin Internet, sin API key, sin
+     * consumo de billing).
+     */
+    googleGeocodingServiceMock = {
+      reverseGeocode: jest.fn().mockResolvedValue('Jr. Lima 250, Tarapoto'),
+    };
+
     faresService = new FaresService(
       dataSource,
 
       googleRoutesServiceMock as unknown as GoogleRoutesService,
+
+      googleGeocodingServiceMock as unknown as GoogleGeocodingService,
     );
 
     passengerRidesService = new PassengerRidesService(

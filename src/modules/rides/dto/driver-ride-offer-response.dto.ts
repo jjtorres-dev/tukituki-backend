@@ -13,11 +13,27 @@ export class DriverRideOfferLocationDto {
   address!: string;
 }
 
+export class DriverRideOfferPassengerDto {
+  /*
+   * Deliberadamente SOLO firstName: sin lastName, phone, email,
+   * documento, rating ni foto. Mismo criterio ya aplicado en
+   * RideAssignedPassengerResponseDto (post-asignación).
+   */
+  @ApiProperty()
+  firstName!: string;
+}
+
 export class DriverRideOfferRideDto {
   @ApiProperty({
     format: 'uuid',
   })
   id!: string;
+
+  @ApiPropertyOptional({
+    type: DriverRideOfferPassengerDto,
+    nullable: true,
+  })
+  passenger!: DriverRideOfferPassengerDto | null;
 
   @ApiProperty({
     type: DriverRideOfferLocationDto,

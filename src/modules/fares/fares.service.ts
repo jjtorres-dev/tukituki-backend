@@ -18,6 +18,7 @@ import { FareQuote } from './entities/fare-quote.entity';
 import { FareRule } from './entities/fare-rule.entity';
 import { FareQuoteStatus } from './enums/fare-quote-status.enum';
 import { FareRuleStatus } from './enums/fare-rule-status.enum';
+import { GoogleGeocodingService } from './google-geocoding.service';
 import { GoogleRoutesService, RouteMetrics } from './google-routes.service';
 import {
   applyMultiplierToCents,
@@ -37,13 +38,31 @@ export class FaresService {
     private readonly dataSource: DataSource,
 
     private readonly googleRoutesService: GoogleRoutesService,
+
+    private readonly googleGeocodingService: GoogleGeocodingService,
   ) {}
 
-  estimate(
+  async estimate(
     passengerUserId: string,
     dto: EstimateFareDto,
   ): Promise<FareEstimateResponseDto> {
     this.assertDifferentPoints(dto);
+
+    /*
+     * Reverse geocoding del pickup ANTES de la transacción: es una
+     * llamada externa (hasta ~6s) que no depende de ningún lock, así
+     * que no tiene sentido mantenerla abierta mientras se sostienen
+     * los pessimistic_read de User/ServiceZone/FareRule. Nunca
+     * lanza (Fase 13): ante cualquier fallo devuelve el fallback
+     * honesto y la cotización sigue su curso normal.
+     *
+     * SOLO origin: destination se deja exactamente igual que hoy
+     * (Fase 17, fuera de alcance de este checkpoint).
+     */
+    const originAddress = await this.googleGeocodingService.reverseGeocode(
+      dto.origin.latitude,
+      dto.origin.longitude,
+    );
 
     return this.dataSource.transaction(async (manager) => {
       const passenger = await this.lockPassenger(manager, passengerUserId);
@@ -136,7 +155,13 @@ export class FaresService {
           coordinates: [dto.destination.longitude, dto.destination.latitude],
         },
 
-        originAddress: dto.origin.address.trim(),
+        /*
+         * Dirección real resuelta por reverse geocoding a partir de
+         * las coordenadas — ya NO confiamos en el literal que manda
+         * el cliente para origin (p.ej. "Ubicación actual del
+         * pasajero"). destination se mantiene sin cambios.
+         */
+        originAddress,
 
         destinationAddress: dto.destination.address.trim(),
 

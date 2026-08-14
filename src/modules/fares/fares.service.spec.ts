@@ -13,6 +13,10 @@ import { FareRule } from './entities/fare-rule.entity';
 import { FareQuoteStatus } from './enums/fare-quote-status.enum';
 import { FareRuleStatus } from './enums/fare-rule-status.enum';
 import { FaresService } from './fares.service';
+import {
+  FALLBACK_ORIGIN_ADDRESS,
+  GoogleGeocodingService,
+} from './google-geocoding.service';
 import { GoogleRoutesService } from './google-routes.service';
 
 type QueryBuilderMock<T> = {
@@ -57,6 +61,10 @@ describe('FaresService', () => {
 
   const googleRoutesServiceMock = {
     computeRoute: jest.fn(),
+  };
+
+  const googleGeocodingServiceMock = {
+    reverseGeocode: jest.fn(),
   };
 
   const passengerUserId = 'f544d52a-39e0-4da3-8861-6010355c5dba';
@@ -142,6 +150,12 @@ describe('FaresService', () => {
       durationSeconds: 720,
     });
 
+    googleGeocodingServiceMock.reverseGeocode.mockReset();
+
+    googleGeocodingServiceMock.reverseGeocode.mockResolvedValue(
+      'Jr. Lima 250, Tarapoto',
+    );
+
     userQueryBuilder = createQueryBuilderMock<User>();
 
     zoneQueryBuilder = createQueryBuilderMock<ServiceZone>();
@@ -224,6 +238,12 @@ describe('FaresService', () => {
 
           useValue: googleRoutesServiceMock,
         },
+
+        {
+          provide: GoogleGeocodingService,
+
+          useValue: googleGeocodingServiceMock,
+        },
       ],
     }).compile();
 
@@ -296,6 +316,92 @@ describe('FaresService', () => {
     expect(result.expiresAt.getTime()).toBeGreaterThanOrEqual(before + 299000);
 
     expect(result.expiresAt.getTime()).toBeLessThanOrEqual(before + 301000);
+  });
+
+  it('reemplaza el originAddress del cliente por la dirección real resuelta vía reverse geocoding (destination NO se toca)', async () => {
+    googleGeocodingServiceMock.reverseGeocode.mockResolvedValue(
+      'Jr. Yurimaguas 350, Tarapoto',
+    );
+
+    const origin = {
+      latitude: -6.4877,
+
+      longitude: -76.3599,
+
+      address: 'Ubicación actual del pasajero',
+    };
+
+    const destination = {
+      latitude: -6.4812,
+
+      longitude: -76.3655,
+
+      address: 'Destino seleccionado en el mapa',
+    };
+
+    const result = await service.estimate(passengerUserId, {
+      origin,
+      destination,
+    });
+
+    expect(googleGeocodingServiceMock.reverseGeocode).toHaveBeenCalledWith(
+      -6.4877,
+      -76.3599,
+    );
+
+    // Origin: la dirección real gana sobre el literal del cliente.
+    expect(savedQuote?.originAddress).toBe('Jr. Yurimaguas 350, Tarapoto');
+
+    expect(result.origin.address).toBe('Jr. Yurimaguas 350, Tarapoto');
+
+    // Las coordenadas nunca se alteran por el geocoding.
+    expect(savedQuote?.originPosition.coordinates).toEqual([-76.3599, -6.4877]);
+
+    // Destination: sin cambios, sigue siendo lo que mandó el cliente
+    // (Fase 17, fuera de alcance de este checkpoint).
+    expect(savedQuote?.destinationAddress).toBe(
+      'Destino seleccionado en el mapa',
+    );
+
+    expect(result.destination.address).toBe('Destino seleccionado en el mapa');
+  });
+
+  it('si el reverse geocoding falla, usa el fallback pero NO bloquea la cotización', async () => {
+    googleGeocodingServiceMock.reverseGeocode.mockResolvedValue(
+      FALLBACK_ORIGIN_ADDRESS,
+    );
+
+    const origin = {
+      latitude: -6.4877,
+
+      longitude: -76.3599,
+
+      address: 'Ubicación actual del pasajero',
+    };
+
+    const destination = {
+      latitude: -6.4812,
+
+      longitude: -76.3655,
+
+      address: 'Plaza de Armas de Morales',
+    };
+
+    const result = await service.estimate(passengerUserId, {
+      origin,
+      destination,
+    });
+
+    expect(savedQuote).toBeDefined();
+
+    expect(savedQuote?.originAddress).toBe(FALLBACK_ORIGIN_ADDRESS);
+
+    expect(result.origin.address).toBe(FALLBACK_ORIGIN_ADDRESS);
+
+    // La cotización se completó con normalidad pese al fallback.
+    expect(result.quoteId).toBe(savedQuote?.id);
+
+    expect(savedQuote?.status).toBe(FareQuoteStatus.ACTIVE);
   });
 
   it('debe ignorar métricas heredadas enviadas por Passenger', async () => {
