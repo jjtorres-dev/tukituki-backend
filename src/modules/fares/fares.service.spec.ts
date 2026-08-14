@@ -14,6 +14,7 @@ import { FareQuoteStatus } from './enums/fare-quote-status.enum';
 import { FareRuleStatus } from './enums/fare-rule-status.enum';
 import { FaresService } from './fares.service';
 import {
+  FALLBACK_DESTINATION_ADDRESS,
   FALLBACK_ORIGIN_ADDRESS,
   GoogleGeocodingService,
 } from './google-geocoding.service';
@@ -318,9 +319,117 @@ describe('FaresService', () => {
     expect(result.expiresAt.getTime()).toBeLessThanOrEqual(before + 301000);
   });
 
-  it('reemplaza el originAddress del cliente por la dirección real resuelta vía reverse geocoding (destination NO se toca)', async () => {
+  it('reemplaza el originAddress del cliente por la dirección real resuelta vía reverse geocoding (destination autocomplete NO se toca)', async () => {
     googleGeocodingServiceMock.reverseGeocode.mockResolvedValue(
       'Jr. Yurimaguas 350, Tarapoto',
+    );
+
+    const origin = {
+      latitude: -6.4877,
+
+      longitude: -76.3599,
+
+      address: 'Ubicación actual del pasajero',
+    };
+
+    // Dirección real de autocomplete, NO el placeholder de selección
+    // manual: no debe disparar una segunda llamada de geocoding.
+    const destination = {
+      latitude: -6.4812,
+
+      longitude: -76.3655,
+
+      address: 'Plaza de Armas de Morales',
+    };
+
+    const result = await service.estimate(passengerUserId, {
+      origin,
+      destination,
+    });
+
+    // Solo UNA llamada: origin. Destination ya trae dirección real.
+    expect(googleGeocodingServiceMock.reverseGeocode).toHaveBeenCalledTimes(1);
+
+    expect(googleGeocodingServiceMock.reverseGeocode).toHaveBeenCalledWith(
+      -6.4877,
+      -76.3599,
+    );
+
+    // Origin: la dirección real gana sobre el literal del cliente.
+    expect(savedQuote?.originAddress).toBe('Jr. Yurimaguas 350, Tarapoto');
+
+    expect(result.origin.address).toBe('Jr. Yurimaguas 350, Tarapoto');
+
+    // Las coordenadas nunca se alteran por el geocoding.
+    expect(savedQuote?.originPosition.coordinates).toEqual([-76.3599, -6.4877]);
+
+    expect(savedQuote?.destinationPosition.coordinates).toEqual([
+      -76.3655, -6.4812,
+    ]);
+
+    // Destination (autocomplete real): NO se sustituye innecesariamente.
+    expect(savedQuote?.destinationAddress).toBe('Plaza de Armas de Morales');
+
+    expect(result.destination.address).toBe('Plaza de Armas de Morales');
+  });
+
+  it('destino manual (placeholder del mapa): resuelve dirección real vía reverse geocoding', async () => {
+    googleGeocodingServiceMock.reverseGeocode.mockImplementation(
+      (latitude: number) =>
+        Promise.resolve(
+          latitude === -6.4877
+            ? 'Jr. Yurimaguas 350, Tarapoto'
+            : 'Jr. Lima 900, Morales',
+        ),
+    );
+
+    const origin = {
+      latitude: -6.4877,
+
+      longitude: -76.3599,
+
+      address: 'Ubicación actual del pasajero',
+    };
+
+    // Literal exacto que Passenger manda al tocar el mapa.
+    const destination = {
+      latitude: -6.4812,
+
+      longitude: -76.3655,
+
+      address: 'Destino seleccionado en el mapa',
+    };
+
+    const result = await service.estimate(passengerUserId, {
+      origin,
+      destination,
+    });
+
+    expect(googleGeocodingServiceMock.reverseGeocode).toHaveBeenCalledTimes(2);
+
+    expect(googleGeocodingServiceMock.reverseGeocode).toHaveBeenCalledWith(
+      -6.4812,
+      -76.3655,
+      FALLBACK_DESTINATION_ADDRESS,
+    );
+
+    expect(savedQuote?.destinationAddress).toBe('Jr. Lima 900, Morales');
+
+    expect(result.destination.address).toBe('Jr. Lima 900, Morales');
+
+    // Las coordenadas del destino nunca se alteran por el geocoding.
+    expect(savedQuote?.destinationPosition.coordinates).toEqual([
+      -76.3655, -6.4812,
+    ]);
+  });
+
+  it('destino manual + falla el reverse geocoding: usa fallback "Destino seleccionado" sin bloquear la cotización', async () => {
+    googleGeocodingServiceMock.reverseGeocode.mockImplementation(
+      (
+        _latitude: number,
+        _longitude: number,
+        fallback: string = FALLBACK_ORIGIN_ADDRESS,
+      ) => Promise.resolve(fallback),
     );
 
     const origin = {
@@ -344,26 +453,21 @@ describe('FaresService', () => {
       destination,
     });
 
-    expect(googleGeocodingServiceMock.reverseGeocode).toHaveBeenCalledWith(
-      -6.4877,
-      -76.3599,
-    );
+    expect(savedQuote?.originAddress).toBe(FALLBACK_ORIGIN_ADDRESS);
 
-    // Origin: la dirección real gana sobre el literal del cliente.
-    expect(savedQuote?.originAddress).toBe('Jr. Yurimaguas 350, Tarapoto');
+    expect(savedQuote?.destinationAddress).toBe(FALLBACK_DESTINATION_ADDRESS);
 
-    expect(result.origin.address).toBe('Jr. Yurimaguas 350, Tarapoto');
-
-    // Las coordenadas nunca se alteran por el geocoding.
-    expect(savedQuote?.originPosition.coordinates).toEqual([-76.3599, -6.4877]);
-
-    // Destination: sin cambios, sigue siendo lo que mandó el cliente
-    // (Fase 17, fuera de alcance de este checkpoint).
-    expect(savedQuote?.destinationAddress).toBe(
+    // Nunca el copy técnico "Destino seleccionado en el mapa".
+    expect(savedQuote?.destinationAddress).not.toBe(
       'Destino seleccionado en el mapa',
     );
 
-    expect(result.destination.address).toBe('Destino seleccionado en el mapa');
+    expect(result.destination.address).toBe(FALLBACK_DESTINATION_ADDRESS);
+
+    // La cotización se completó con normalidad pese al fallback.
+    expect(result.quoteId).toBe(savedQuote?.id);
+
+    expect(savedQuote?.status).toBe(FareQuoteStatus.ACTIVE);
   });
 
   it('si el reverse geocoding falla, usa el fallback pero NO bloquea la cotización', async () => {

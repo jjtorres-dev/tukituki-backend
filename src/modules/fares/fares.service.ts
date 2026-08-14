@@ -18,7 +18,10 @@ import { FareQuote } from './entities/fare-quote.entity';
 import { FareRule } from './entities/fare-rule.entity';
 import { FareQuoteStatus } from './enums/fare-quote-status.enum';
 import { FareRuleStatus } from './enums/fare-rule-status.enum';
-import { GoogleGeocodingService } from './google-geocoding.service';
+import {
+  FALLBACK_DESTINATION_ADDRESS,
+  GoogleGeocodingService,
+} from './google-geocoding.service';
 import { GoogleRoutesService, RouteMetrics } from './google-routes.service';
 import {
   applyMultiplierToCents,
@@ -31,6 +34,17 @@ import {
 } from './utils/fixed-decimal.util';
 
 const FARE_QUOTE_TTL_MS = 5 * 60 * 1000;
+
+/*
+ * Literal exacto que Passenger (home_screen.dart) escribe cuando el
+ * destino se elige tocando el mapa, sin pasar por autocomplete. No
+ * existe (todavía) un flag explícito en EstimateFareDto que
+ * distinga selección manual de autocomplete (Fase 3, G4B-R4) — este
+ * es el único punto de la app que produce este literal, así que
+ * compararlo es seguro y no depende de heurística sobre texto
+ * arbitrario del usuario.
+ */
+const MANUAL_DESTINATION_PLACEHOLDER = 'Destino seleccionado en el mapa';
 
 @Injectable()
 export class FaresService {
@@ -49,20 +63,44 @@ export class FaresService {
     this.assertDifferentPoints(dto);
 
     /*
-     * Reverse geocoding del pickup ANTES de la transacción: es una
-     * llamada externa (hasta ~6s) que no depende de ningún lock, así
-     * que no tiene sentido mantenerla abierta mientras se sostienen
-     * los pessimistic_read de User/ServiceZone/FareRule. Nunca
-     * lanza (Fase 13): ante cualquier fallo devuelve el fallback
-     * honesto y la cotización sigue su curso normal.
+     * Reverse geocoding ANTES de la transacción: son llamadas
+     * externas (hasta ~6s cada una) que no dependen de ningún lock,
+     * así que no tiene sentido mantenerlas abiertas mientras se
+     * sostienen los pessimistic_read de User/ServiceZone/FareRule.
+     * Nunca lanzan (Fase 13): ante cualquier fallo devuelven el
+     * fallback honesto y la cotización sigue su curso normal.
      *
-     * SOLO origin: destination se deja exactamente igual que hoy
-     * (Fase 17, fuera de alcance de este checkpoint).
+     * origin: SIEMPRE se resuelve por reverse geocoding — el cliente
+     * nunca manda una dirección real para origin (GPS puro).
+     *
+     * destination (G4B-R4): solo se resuelve por reverse geocoding
+     * cuando el cliente manda el placeholder de selección manual en
+     * el mapa. Si ya viene de autocomplete (dirección real), NO se
+     * reemplaza — evita una llamada innecesaria y respeta la
+     * dirección que el propio Passenger vio y confirmó.
+     *
+     * Promise.all: ambas llamadas son independientes entre sí, así
+     * que se ejecutan concurrentemente en vez de sumar su latencia.
      */
-    const originAddress = await this.googleGeocodingService.reverseGeocode(
-      dto.origin.latitude,
-      dto.origin.longitude,
-    );
+    const destinationAddressFromClient = dto.destination.address.trim();
+
+    const requiresDestinationGeocoding =
+      destinationAddressFromClient === MANUAL_DESTINATION_PLACEHOLDER;
+
+    const [originAddress, destinationAddress] = await Promise.all([
+      this.googleGeocodingService.reverseGeocode(
+        dto.origin.latitude,
+        dto.origin.longitude,
+      ),
+
+      requiresDestinationGeocoding
+        ? this.googleGeocodingService.reverseGeocode(
+            dto.destination.latitude,
+            dto.destination.longitude,
+            FALLBACK_DESTINATION_ADDRESS,
+          )
+        : Promise.resolve(destinationAddressFromClient),
+    ]);
 
     return this.dataSource.transaction(async (manager) => {
       const passenger = await this.lockPassenger(manager, passengerUserId);
@@ -156,14 +194,17 @@ export class FaresService {
         },
 
         /*
-         * Dirección real resuelta por reverse geocoding a partir de
-         * las coordenadas — ya NO confiamos en el literal que manda
-         * el cliente para origin (p.ej. "Ubicación actual del
-         * pasajero"). destination se mantiene sin cambios.
+         * origin: siempre resuelto por reverse geocoding — ya NO
+         * confiamos en el literal que manda el cliente (p.ej.
+         * "Ubicación actual del pasajero").
+         *
+         * destination: dirección real de autocomplete si el cliente
+         * ya la mandó, o resuelta por reverse geocoding si el
+         * cliente mandó el placeholder de selección manual.
          */
         originAddress,
 
-        destinationAddress: dto.destination.address.trim(),
+        destinationAddress,
 
         /*
          * Métricas verificadas por

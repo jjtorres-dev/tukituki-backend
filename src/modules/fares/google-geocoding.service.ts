@@ -12,6 +12,13 @@ const GOOGLE_GEOCODING_TIMEOUT_MS = 6_000;
  */
 export const FALLBACK_ORIGIN_ADDRESS = 'Ubicación seleccionada';
 
+/*
+ * Mismo criterio que el origen (G4B-R4), pero con copy propio: el
+ * origen usa GPS ("Ubicación actual") y el destino usa selección
+ * manual en el mapa, así que el texto honesto de fallback difiere.
+ */
+export const FALLBACK_DESTINATION_ADDRESS = 'Destino seleccionado';
+
 type GoogleGeocodingResponse = {
   status?: string;
   results?: Array<{
@@ -33,7 +40,11 @@ type GoogleGeocodingResponse = {
 export class GoogleGeocodingService {
   private readonly logger = new Logger(GoogleGeocodingService.name);
 
-  async reverseGeocode(latitude: number, longitude: number): Promise<string> {
+  async reverseGeocode(
+    latitude: number,
+    longitude: number,
+    fallback: string = FALLBACK_ORIGIN_ADDRESS,
+  ): Promise<string> {
     const apiKey = process.env.GOOGLE_PLACES_API_KEY?.trim();
 
     if (!apiKey) {
@@ -41,7 +52,7 @@ export class GoogleGeocodingService {
         'GOOGLE_PLACES_API_KEY no está configurada: se usa el fallback de reverse geocoding',
       );
 
-      return FALLBACK_ORIGIN_ADDRESS;
+      return fallback;
     }
 
     const controller = new AbortController();
@@ -67,7 +78,7 @@ export class GoogleGeocodingService {
           `Google Geocoding respondió status HTTP=${response.status}: se usa fallback`,
         );
 
-        return FALLBACK_ORIGIN_ADDRESS;
+        return fallback;
       }
 
       const data = (await response.json()) as GoogleGeocodingResponse;
@@ -82,7 +93,7 @@ export class GoogleGeocodingService {
           `Google Geocoding devolvió status=${data.status ?? 'desconocido'}: se usa fallback`,
         );
 
-        return FALLBACK_ORIGIN_ADDRESS;
+        return fallback;
       }
 
       const address = data.results?.[0]?.formatted_address?.trim();
@@ -92,7 +103,7 @@ export class GoogleGeocodingService {
           'Google Geocoding devolvió OK sin formatted_address: se usa fallback',
         );
 
-        return FALLBACK_ORIGIN_ADDRESS;
+        return fallback;
       }
 
       return address;
