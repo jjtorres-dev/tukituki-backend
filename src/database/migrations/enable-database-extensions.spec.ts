@@ -21,9 +21,8 @@ describe('EnableDatabaseExtensions1784580000000', () => {
 
   it('no elimina extensiones compartidas al revertir', async () => {
     const query = jest.fn().mockResolvedValue(undefined);
-    const queryRunner = { query } as unknown as QueryRunner;
 
-    await new EnableDatabaseExtensions1784580000000().down(queryRunner);
+    await new EnableDatabaseExtensions1784580000000().down();
 
     expect(query).not.toHaveBeenCalled();
   });
