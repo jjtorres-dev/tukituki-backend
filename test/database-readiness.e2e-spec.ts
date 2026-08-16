@@ -1,10 +1,34 @@
 import { execFileSync } from 'node:child_process';
+import { readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 import type { DataSource } from 'typeorm';
 
 import AppDataSource from '../src/database/data-source';
 import { seedDevelopmentData } from '../src/database/seeds/development-data.seed';
+
+/*
+ * Fuente de verdad del número de migraciones esperadas: el propio
+ * DataSource (AppDataSource, importado desde src/ vía ts-jest) resuelve
+ * su glob `migrations` contra archivos *.js dentro de src/database/migrations
+ * -- una carpeta que solo contiene *.ts en este proceso -- por lo que
+ * `dataSource.migrations` queda vacío aquí y NO es una fuente fiable
+ * dentro de este test. En cambio, contamos directamente los archivos de
+ * migración reales en el filesystem (excluyendo el propio spec de este
+ * directorio), que es exactamente lo que runCompiledMigrations() acaba
+ * de ejecutar contra la base (mismo conjunto de archivos, compilados 1:1
+ * a dist/ por el `npm run build` que siempre precede a este test dentro
+ * de `test:db:smoke`). Así, agregar una migración nueva no exige tocar
+ * este número a mano.
+ */
+function countMigrationSourceFiles(): number {
+  const migrationsDir = join(process.cwd(), 'src', 'database', 'migrations');
+
+  return readdirSync(migrationsDir).filter(
+    (fileName) =>
+      /^\d+-.+\.ts$/.test(fileName) && !fileName.endsWith('.spec.ts'),
+  ).length;
+}
 
 const DEFAULT_ADMIN_PHONE = '+51900000000';
 const DEFAULT_PASSENGER_PHONE = '+51900000001';
@@ -20,6 +44,10 @@ interface DatabaseNameRow {
 
 interface ExtensionRow {
   extensionName: string;
+}
+
+interface MigrationNameRow {
+  name: string;
 }
 
 interface TableRow {
@@ -107,6 +135,10 @@ describe('Database readiness smoke', () => {
       dataSource,
       `SELECT COUNT(*)::text AS count FROM typeorm_migrations`,
     );
+    const migrationNames = await queryRows<MigrationNameRow>(
+      dataSource,
+      `SELECT name FROM typeorm_migrations ORDER BY id`,
+    );
     const extensions = await queryRows<ExtensionRow>(
       dataSource,
       `SELECT extname AS "extensionName"
@@ -132,7 +164,10 @@ describe('Database readiness smoke', () => {
        ORDER BY tablename`,
     );
 
-    expect(Number(migrationRows[0]?.count)).toBe(28);
+    expect(Number(migrationRows[0]?.count)).toBe(countMigrationSourceFiles());
+    expect(migrationNames.map((row) => row.name)).toContain(
+      'AddStorageObjectKeys1786860000000',
+    );
     expect(extensions.map((row) => row.extensionName)).toEqual([
       'postgis',
       'uuid-ossp',
