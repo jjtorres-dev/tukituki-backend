@@ -364,6 +364,24 @@ export const envValidationSchema = Joi.object({
     .min(1024)
     .max(52428800)
     .default(10485760),
+
+  /*
+   * STORAGE-R2.1: secreto para firmar los capability tokens de
+   * avatares (ver src/modules/storage/avatar-url.util.ts). Solo
+   * obligatorio cuando STORAGE_ENABLED es true, porque solo ahí puede
+   * llegar a existir un photoObjectKey que necesite un token.
+   */
+  STORAGE_AVATAR_TOKEN_SECRET: Joi.when('STORAGE_ENABLED', {
+    is: true,
+    then: Joi.string().min(32).required(),
+    otherwise: Joi.string().allow('').optional(),
+  }),
+
+  STORAGE_AVATAR_TOKEN_TTL_SECONDS: Joi.number()
+    .integer()
+    .min(60)
+    .max(3600)
+    .default(900),
 });
 
 function validateCorsOrigins(

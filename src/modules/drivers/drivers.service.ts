@@ -7,7 +7,9 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { QueryFailedError, Repository } from 'typeorm';
 
+import { AvatarUrlResolverService } from '../storage/avatar-url-resolver.service';
 import { CreateDriverProfileDto } from './dto/create-driver-profile.dto';
+import { DriverProfileResponseDto } from './dto/driver-profile-response.dto';
 import { UpdateDriverProfileDto } from './dto/update-driver-profile.dto';
 import { DriverProfile } from './entities/driver-profile.entity';
 import { DriverStatus } from './enums/driver-status.enum';
@@ -17,7 +19,41 @@ export class DriversService {
   constructor(
     @InjectRepository(DriverProfile)
     private readonly driverProfilesRepository: Repository<DriverProfile>,
+
+    private readonly avatarResolver: AvatarUrlResolverService,
   ) {}
+
+  /*
+   * STORAGE-R2.1: única forma de exponer el perfil del conductor hacia
+   * afuera. Nunca devolver la entidad ni photoObjectKey directamente:
+   * photoUrl se resuelve aquí (capability token si hay Storage,
+   * legacy si no).
+   */
+  toProfileResponse(profile: DriverProfile): DriverProfileResponseDto {
+    return {
+      id: profile.id,
+      userId: profile.userId,
+      firstName: profile.firstName,
+      lastName: profile.lastName,
+      documentType: profile.documentType,
+      documentNumber: profile.documentNumber,
+      birthDate: profile.birthDate,
+      address: profile.address,
+      photoUrl: this.avatarResolver.resolveDriverAvatarUrl(profile),
+      ratingAverage: profile.ratingAverage,
+      ratingCount: profile.ratingCount,
+      status: profile.status,
+      rejectionReason: profile.rejectionReason,
+      submittedAt: profile.submittedAt,
+      approvedAt: profile.approvedAt,
+      approvedByUserId: profile.approvedByUserId,
+      suspensionReason: profile.suspensionReason,
+      suspendedAt: profile.suspendedAt,
+      suspendedByUserId: profile.suspendedByUserId,
+      createdAt: profile.createdAt,
+      updatedAt: profile.updatedAt,
+    };
+  }
 
   findByUserId(userId: string): Promise<DriverProfile | null> {
     return this.driverProfilesRepository.findOne({
@@ -160,22 +196,23 @@ export class DriversService {
   }
 
   /*
-   * STORAGE-R2: persiste el objectKey ya validado (HeadObject) y la
-   * URL estable resuelta por modules/storage. Devuelve el objectKey
-   * anterior para que el llamador lo borre del bucket en modo
-   * best-effort después de que esta escritura confirme.
+   * STORAGE-R2.1: persiste únicamente el objectKey ya validado
+   * (HeadObject). Ya NO se escribe una URL resuelta en photoUrl: una
+   * URL estática y persistida no puede llevar un capability token
+   * fresco por request/contexto — photoUrl se resuelve al vuelo en
+   * cada lectura (ver toProfileResponse y AvatarUrlResolverService).
+   * Devuelve el objectKey anterior para que el llamador lo borre del
+   * bucket en modo best-effort después de que esta escritura confirme.
    */
   async completeProfilePhotoUpload(
     userId: string,
     objectKey: string,
-    resolvedPhotoUrl: string,
   ): Promise<{ profile: DriverProfile; previousObjectKey: string | null }> {
     const profile = await this.assertProfilePhotoUploadAllowed(userId);
 
     const previousObjectKey = profile.photoObjectKey;
 
     profile.photoObjectKey = objectKey;
-    profile.photoUrl = resolvedPhotoUrl;
 
     const saved = await this.driverProfilesRepository.save(profile);
 

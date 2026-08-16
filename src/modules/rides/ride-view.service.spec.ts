@@ -5,9 +5,30 @@ import { DriverProfile } from '../drivers/entities/driver-profile.entity';
 import { DriverVehicle } from '../drivers/entities/driver-vehicle.entity';
 import { VehicleType } from '../drivers/enums/vehicle-type.enum';
 import { PassengerProfile } from '../passengers/entities/passenger-profile.entity';
+import { AvatarUrlResolverService } from '../storage/avatar-url-resolver.service';
 import { Ride } from './entities/ride.entity';
 import { RideStatus } from './enums/ride-status.enum';
 import { RideViewService } from './ride-view.service';
+
+interface AvatarProfileLike {
+  photoObjectKey?: string | null;
+  photoUrl: string | null;
+}
+
+const avatarResolverMock = {
+  resolveDriverAvatarUrl: jest.fn(
+    (profile: AvatarProfileLike | null) =>
+      (profile?.photoObjectKey
+        ? 'https://resolved.example/avatar.jpg'
+        : profile?.photoUrl) ?? null,
+  ),
+  resolvePassengerAvatarUrl: jest.fn(
+    (profile: AvatarProfileLike | null) =>
+      (profile?.photoObjectKey
+        ? 'https://resolved.example/avatar.jpg'
+        : profile?.photoUrl) ?? null,
+  ),
+} as unknown as AvatarUrlResolverService;
 
 describe('RideViewService', () => {
   const driverProfileId = '72b81eb5-c53f-4de2-bd9f-11f33d64da64';
@@ -88,6 +109,7 @@ describe('RideViewService', () => {
     };
     const service = new RideViewService(
       dataSourceMock as unknown as DataSource,
+      avatarResolverMock,
     );
 
     const result = await service.toPassengerResponse(ride);
@@ -134,6 +156,7 @@ describe('RideViewService', () => {
     };
     const service = new RideViewService(
       dataSourceMock as unknown as DataSource,
+      avatarResolverMock,
     );
 
     const result = await service.toPassengerResponse(ride);
@@ -148,6 +171,7 @@ describe('RideViewService', () => {
     };
     const service = new RideViewService(
       dataSourceMock as unknown as DataSource,
+      avatarResolverMock,
     );
 
     const result = await service.toPassengerResponse({
@@ -184,6 +208,7 @@ describe('RideViewService', () => {
     };
     const service = new RideViewService(
       dataSourceMock as unknown as DataSource,
+      avatarResolverMock,
     );
 
     const result = await service.toDriverResponse(ride, 650);
@@ -229,6 +254,7 @@ describe('RideViewService', () => {
     };
     const service = new RideViewService(
       dataSourceMock as unknown as DataSource,
+      avatarResolverMock,
     );
 
     const result = await service.toDriverResponse(ride, null);
@@ -246,6 +272,7 @@ describe('RideViewService', () => {
     };
     const service = new RideViewService(
       dataSourceMock as unknown as DataSource,
+      avatarResolverMock,
     );
 
     const result = await service.toDriverResponse(ride, null);

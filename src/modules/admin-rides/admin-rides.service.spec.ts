@@ -4,7 +4,13 @@ import { DataSource } from 'typeorm';
 import { RideLocationSample } from '../rides/entities/ride-location-sample.entity';
 import { Ride } from '../rides/entities/ride.entity';
 import { RideStatus } from '../rides/enums/ride-status.enum';
+import { AvatarUrlResolverService } from '../storage/avatar-url-resolver.service';
 import { AdminRidesService } from './admin-rides.service';
+
+const avatarResolverMock = {
+  resolveDriverAvatarUrl: jest.fn(() => null),
+  resolvePassengerAvatarUrl: jest.fn(() => null),
+} as unknown as AvatarUrlResolverService;
 
 function summaryBuilder(rawItems: unknown[], total: number) {
   const countBuilder = {
@@ -110,7 +116,7 @@ describe('AdminRidesService', () => {
     const dataSource = {
       getRepository: jest.fn(() => rideRepository),
     } as unknown as DataSource;
-    const service = new AdminRidesService(dataSource);
+    const service = new AdminRidesService(dataSource, avatarResolverMock);
 
     const result = await service.list({ page: 1, limit: 20 });
 
@@ -133,7 +139,7 @@ describe('AdminRidesService', () => {
         createQueryBuilder: jest.fn(() => builder),
       })),
     } as unknown as DataSource;
-    const service = new AdminRidesService(dataSource);
+    const service = new AdminRidesService(dataSource, avatarResolverMock);
 
     await service.list({ page: 1, limit: 20 }, true);
 
@@ -161,7 +167,7 @@ describe('AdminRidesService', () => {
         throw new Error('Repositorio inesperado');
       }),
     } as unknown as DataSource;
-    const service = new AdminRidesService(dataSource);
+    const service = new AdminRidesService(dataSource, avatarResolverMock);
 
     await expect(
       service.getTimeline('4aca7a5a-2b09-4af8-ae1b-6e572a6ca1dc'),
@@ -214,7 +220,7 @@ describe('AdminRidesService', () => {
         throw new Error('Repositorio inesperado');
       }),
     } as unknown as DataSource;
-    const service = new AdminRidesService(dataSource);
+    const service = new AdminRidesService(dataSource, avatarResolverMock);
 
     const result = await service.getLocations(
       '4aca7a5a-2b09-4af8-ae1b-6e572a6ca1dc',

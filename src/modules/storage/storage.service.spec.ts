@@ -11,6 +11,7 @@ import type { DriverProfile } from '../drivers/entities/driver-profile.entity';
 import { DriverDocumentType } from '../drivers/enums/driver-document-type.enum';
 import type { PassengerProfile } from '../passengers/entities/passenger-profile.entity';
 import type { StorageObjectHead } from '../../infrastructure/storage/s3-storage.service';
+import { mintAvatarToken } from './avatar-url.util';
 import { StorageCategory } from './enums/storage-category.enum';
 import { StorageService } from './storage.service';
 
@@ -51,14 +52,19 @@ interface RepositoryMock {
   findOne: jest.Mock;
 }
 
+const AVATAR_TOKEN_SECRET = 'a-test-secret-of-at-least-32-characters!!';
+
 function buildConfigService(): ConfigService {
   const values: Record<string, string> = {
     PUBLIC_API_ORIGIN: 'https://api.tukituki.pe',
     API_PREFIX: 'api/v1',
+    STORAGE_AVATAR_TOKEN_SECRET: AVATAR_TOKEN_SECRET,
   };
 
   return {
     getOrThrow: (key: string): string => values[key],
+    get: (key: string, defaultValue?: string): string =>
+      values[key] ?? defaultValue ?? '',
   } as unknown as ConfigService;
 }
 
@@ -410,7 +416,6 @@ describe('StorageService', () => {
       expect(passengersService.completeProfilePhotoUpload).toHaveBeenCalledWith(
         OWNER_USER_ID,
         objectKey,
-        `https://api.tukituki.pe/api/v1/storage/avatars/passenger/${PASSENGER_PROFILE_ID}`,
       );
       expect(driversService.completeProfilePhotoUpload).not.toHaveBeenCalled();
       expect(
@@ -435,7 +440,6 @@ describe('StorageService', () => {
       expect(driversService.completeProfilePhotoUpload).toHaveBeenCalledWith(
         OWNER_USER_ID,
         objectKey,
-        `https://api.tukituki.pe/api/v1/storage/avatars/driver/${DRIVER_PROFILE_ID}`,
       );
       expect(
         driverDocumentsService.completeDocumentUpload,
@@ -685,39 +689,160 @@ describe('StorageService', () => {
     });
   });
 
-  describe('avatares públicos (getDriverAvatarRedirectUrl / getPassengerAvatarRedirectUrl)', () => {
-    it('devuelve una presigned GET cuando el conductor tiene foto en Storage', async () => {
+  describe('avatares (getDriverAvatarRedirectUrl / getPassengerAvatarRedirectUrl) — NO son endpoints públicos genéricos', () => {
+    function driverToken(): string {
+      return mintAvatarToken(
+        'driver',
+        DRIVER_PROFILE_ID,
+        AVATAR_TOKEN_SECRET,
+        900,
+      );
+    }
+
+    function passengerToken(): string {
+      return mintAvatarToken(
+        'passenger',
+        PASSENGER_PROFILE_ID,
+        AVATAR_TOKEN_SECRET,
+        900,
+      );
+    }
+
+    it('con un token válido, devuelve una presigned GET cuando el conductor tiene foto en Storage', async () => {
       driverProfilesRepository.findOne.mockResolvedValue({
         id: DRIVER_PROFILE_ID,
         photoObjectKey: 'drivers/x/profile/1.jpg',
       });
 
-      const url = await service.getDriverAvatarRedirectUrl(DRIVER_PROFILE_ID);
+      const url = await service.getDriverAvatarRedirectUrl(
+        DRIVER_PROFILE_ID,
+        driverToken(),
+      );
 
       expect(url).toBe('https://signed.example/get');
     });
 
-    it('lanza NotFoundException si el conductor no tiene foto en Storage', async () => {
+    it('lanza NotFoundException si el conductor no tiene foto en Storage (con token válido)', async () => {
       driverProfilesRepository.findOne.mockResolvedValue({
         id: DRIVER_PROFILE_ID,
         photoObjectKey: null,
       });
 
       await expect(
-        service.getDriverAvatarRedirectUrl(DRIVER_PROFILE_ID),
+        service.getDriverAvatarRedirectUrl(DRIVER_PROFILE_ID, driverToken()),
       ).rejects.toBeInstanceOf(NotFoundException);
     });
 
-    it('devuelve una presigned GET cuando el pasajero tiene foto en Storage', async () => {
+    it('con un token válido, devuelve una presigned GET cuando el pasajero tiene foto en Storage', async () => {
       passengerProfilesRepository.findOne.mockResolvedValue({
         id: PASSENGER_PROFILE_ID,
         photoObjectKey: 'passengers/x/profile/1.jpg',
       });
 
-      const url =
-        await service.getPassengerAvatarRedirectUrl(PASSENGER_PROFILE_ID);
+      const url = await service.getPassengerAvatarRedirectUrl(
+        PASSENGER_PROFILE_ID,
+        passengerToken(),
+      );
 
       expect(url).toBe('https://signed.example/get');
+    });
+
+    it('un profileId conocido/adivinado SIN token es rechazado (Forbidden) antes de consultar la DB', async () => {
+      await expect(
+        service.getDriverAvatarRedirectUrl(DRIVER_PROFILE_ID, ''),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(driverProfilesRepository.findOne).not.toHaveBeenCalled();
+    });
+
+    it('un token inválido/manipulado es rechazado (Forbidden)', async () => {
+      await expect(
+        service.getDriverAvatarRedirectUrl(
+          DRIVER_PROFILE_ID,
+          `${driverToken()}-tampered`,
+        ),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it('un token vencido es rechazado (Forbidden)', async () => {
+      const expiredToken = mintAvatarToken(
+        'driver',
+        DRIVER_PROFILE_ID,
+        AVATAR_TOKEN_SECRET,
+        -1,
+      );
+
+      await expect(
+        service.getDriverAvatarRedirectUrl(DRIVER_PROFILE_ID, expiredToken),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it('un token emitido para OTRO driverProfileId no sirve para este perfil', async () => {
+      const tokenForAnotherDriver = mintAvatarToken(
+        'driver',
+        'otro-driver-profile',
+        AVATAR_TOKEN_SECRET,
+        900,
+      );
+
+      await expect(
+        service.getDriverAvatarRedirectUrl(
+          DRIVER_PROFILE_ID,
+          tokenForAnotherDriver,
+        ),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it('un token de pasajero no sirve para el endpoint de avatar de conductor (kind cruzado)', async () => {
+      await expect(
+        service.getDriverAvatarRedirectUrl(DRIVER_PROFILE_ID, passengerToken()),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it('un profileId de PASAJERO conocido/adivinado SIN token es rechazado (Forbidden)', async () => {
+      await expect(
+        service.getPassengerAvatarRedirectUrl(PASSENGER_PROFILE_ID, ''),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(passengerProfilesRepository.findOne).not.toHaveBeenCalled();
+    });
+
+    it('un token emitido para OTRO passengerProfileId no sirve para este perfil (Pasajero A no puede ver la foto de Pasajero B)', async () => {
+      const tokenForAnotherPassenger = mintAvatarToken(
+        'passenger',
+        'otro-passenger-profile',
+        AVATAR_TOKEN_SECRET,
+        900,
+      );
+
+      await expect(
+        service.getPassengerAvatarRedirectUrl(
+          PASSENGER_PROFILE_ID,
+          tokenForAnotherPassenger,
+        ),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it('un token de conductor no sirve para el endpoint de avatar de pasajero (kind cruzado)', async () => {
+      await expect(
+        service.getPassengerAvatarRedirectUrl(
+          PASSENGER_PROFILE_ID,
+          driverToken(),
+        ),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it('la respuesta nunca incluye el objectKey ni credenciales', async () => {
+      driverProfilesRepository.findOne.mockResolvedValue({
+        id: DRIVER_PROFILE_ID,
+        photoObjectKey: 'drivers/x/profile/1.jpg',
+      });
+
+      const url = await service.getDriverAvatarRedirectUrl(
+        DRIVER_PROFILE_ID,
+        driverToken(),
+      );
+
+      expect(url).not.toMatch(/drivers\/x\/profile/);
+      expect(url).not.toMatch(/access|secret/i);
     });
   });
 });

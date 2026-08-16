@@ -47,11 +47,13 @@ export class PassengersController {
   @ApiForbiddenResponse({
     description: 'La cuenta no posee el rol PASSENGER',
   })
-  createMyProfile(
+  async createMyProfile(
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: CreatePassengerProfileDto,
   ): Promise<PassengerProfileResponseDto> {
-    return this.passengersService.createMyProfile(user.id, dto);
+    const profile = await this.passengersService.createMyProfile(user.id, dto);
+
+    return this.passengersService.toProfileResponse(profile);
   }
 
   @Get('me')
@@ -64,10 +66,12 @@ export class PassengersController {
   @ApiNotFoundResponse({
     description: 'El perfil todavía no existe',
   })
-  getMyProfile(
+  async getMyProfile(
     @CurrentUser() user: AuthenticatedUser,
   ): Promise<PassengerProfileResponseDto> {
-    return this.passengersService.getMyProfile(user.id);
+    const profile = await this.passengersService.getMyProfile(user.id);
+
+    return this.passengersService.toProfileResponse(profile);
   }
 
   @Patch('me')
@@ -81,10 +85,12 @@ export class PassengersController {
   @ApiNotFoundResponse({
     description: 'El perfil todavía no existe',
   })
-  updateMyProfile(
+  async updateMyProfile(
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: UpdatePassengerProfileDto,
   ): Promise<PassengerProfileResponseDto> {
-    return this.passengersService.updateMyProfile(user.id, dto);
+    const profile = await this.passengersService.updateMyProfile(user.id, dto);
+
+    return this.passengersService.toProfileResponse(profile);
   }
 }

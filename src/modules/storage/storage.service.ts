@@ -16,10 +16,7 @@ import { DriversService } from '../drivers/drivers.service';
 import { PassengerProfile } from '../passengers/entities/passenger-profile.entity';
 import { PassengersService } from '../passengers/passengers.service';
 import { S3StorageService } from '../../infrastructure/storage/s3-storage.service';
-import {
-  buildDriverAvatarUrl,
-  buildPassengerAvatarUrl,
-} from './avatar-url.util';
+import { verifyAvatarToken } from './avatar-url.util';
 import { CompleteUploadDto } from './dto/complete-upload.dto';
 import { CompleteUploadResponseDto } from './dto/complete-upload-response.dto';
 import { CreatePresignedUploadDto } from './dto/create-presigned-upload.dto';
@@ -154,8 +151,19 @@ export class StorageService {
     };
   }
 
-  async getDriverAvatarRedirectUrl(driverProfileId: string): Promise<string> {
+  /*
+   * STORAGE-R2.1: el profileId por sí solo NUNCA es suficiente. El
+   * llamador debe presentar un capability token válido (firmado y no
+   * vencido) que solo el propio Backend pudo haber emitido dentro de
+   * una respuesta ya autorizada (ver AvatarUrlResolverService). Sin
+   * token válido, ni siquiera se consulta si el conductor tiene foto.
+   */
+  async getDriverAvatarRedirectUrl(
+    driverProfileId: string,
+    token: string,
+  ): Promise<string> {
     this.assertStorageEnabled();
+    this.assertAvatarToken('driver', driverProfileId, token);
 
     const profile = await this.driverProfilesRepository.findOne({
       select: {
@@ -176,8 +184,10 @@ export class StorageService {
 
   async getPassengerAvatarRedirectUrl(
     passengerProfileId: string,
+    token: string,
   ): Promise<string> {
     this.assertStorageEnabled();
+    this.assertAvatarToken('passenger', passengerProfileId, token);
 
     const profile = await this.passengerProfilesRepository.findOne({
       select: {
@@ -263,28 +273,20 @@ export class StorageService {
   ): Promise<string | null> {
     switch (category) {
       case StorageCategory.PASSENGER_PROFILE_PHOTO: {
-        const preview =
-          await this.passengersService.assertProfilePhotoUploadAllowed(userId);
-        const avatarUrl = this.buildPassengerAvatarUrl(preview.id);
         const { previousObjectKey } =
           await this.passengersService.completeProfilePhotoUpload(
             userId,
             objectKey,
-            avatarUrl,
           );
 
         return previousObjectKey;
       }
 
       case StorageCategory.DRIVER_PROFILE_PHOTO: {
-        const preview =
-          await this.driversService.assertProfilePhotoUploadAllowed(userId);
-        const avatarUrl = this.buildDriverAvatarUrl(preview.id);
         const { previousObjectKey } =
           await this.driversService.completeProfilePhotoUpload(
             userId,
             objectKey,
-            avatarUrl,
           );
 
         return previousObjectKey;
@@ -340,20 +342,25 @@ export class StorageService {
     }
   }
 
-  private buildDriverAvatarUrl(driverProfileId: string): string {
-    return buildDriverAvatarUrl(
-      this.configService.getOrThrow<string>('PUBLIC_API_ORIGIN'),
-      this.configService.getOrThrow<string>('API_PREFIX'),
-      driverProfileId,
+  private assertAvatarToken(
+    kind: 'driver' | 'passenger',
+    profileId: string,
+    token: string,
+  ): void {
+    const secret = this.configService.get<string>(
+      'STORAGE_AVATAR_TOKEN_SECRET',
+      '',
     );
-  }
 
-  private buildPassengerAvatarUrl(passengerProfileId: string): string {
-    return buildPassengerAvatarUrl(
-      this.configService.getOrThrow<string>('PUBLIC_API_ORIGIN'),
-      this.configService.getOrThrow<string>('API_PREFIX'),
-      passengerProfileId,
-    );
+    if (
+      !token ||
+      !secret ||
+      !verifyAvatarToken(kind, profileId, token, secret)
+    ) {
+      throw new ForbiddenException(
+        'El token de acceso al avatar es inválido, venció o falta',
+      );
+    }
   }
 
   private assertStorageEnabled(): void {

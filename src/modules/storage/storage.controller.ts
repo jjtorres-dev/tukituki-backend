@@ -7,6 +7,7 @@ import {
   Param,
   ParseUUIDPipe,
   Post,
+  Query,
   Redirect,
   UseGuards,
 } from '@nestjs/common';
@@ -19,6 +20,7 @@ import {
   ApiOkResponse,
   ApiOperation,
   ApiParam,
+  ApiQuery,
   ApiServiceUnavailableResponse,
   ApiTags,
   ApiUnauthorizedResponse,
@@ -138,29 +140,42 @@ export class StorageController {
   }
 
   /*
-   * Avatares: endpoint público a propósito (sin guard). Es
-   * funcionalmente equivalente a la exposición actual de photoUrl
-   * (una URL de foto ya es visible a quien reciba la respuesta JSON
-   * correspondiente, incluido el share-link público de un viaje).
-   * Solo quien ya conoce el UUID del perfil (obtenido de una
-   * respuesta autorizada) puede resolver el avatar; no es enumerable.
+   * STORAGE-R2.1: NO son endpoints públicos genéricos por profileId.
+   * El profileId por sí solo (UUID conocido o adivinado) nunca alcanza
+   * — StorageService exige además un capability token firmado y no
+   * vencido (?token=...), que el Backend solo emite dentro de una
+   * respuesta ya autorizada (ride propio, historial propio, share-link
+   * de viaje válido, admin). Sin JwtAuthGuard a propósito: Flutter
+   * carga estas imágenes con Image.network(url) sin poder adjuntar el
+   * header Authorization (ver decisiones.md), por eso la autorización
+   * viaja en el propio token de la URL, no en un header.
    */
   @Get('avatars/driver/:driverProfileId')
   @Redirect()
   @ApiOperation({
-    summary: 'Redirigir a una URL presignada temporal de la foto del conductor',
+    summary:
+      'Redirigir a una URL presignada temporal de la foto del conductor (requiere ?token= vigente)',
   })
   @ApiParam({ name: 'driverProfileId', format: 'uuid' })
+  @ApiQuery({
+    name: 'token',
+    description:
+      'Capability token firmado, emitido por el Backend en un contexto autorizado',
+  })
   @ApiFoundResponse({
     description: 'Redirección a la presigned GET del avatar',
   })
+  @ApiForbiddenResponse({ description: 'Token inválido, vencido o ausente' })
   @ApiNotFoundResponse({ description: 'El conductor no tiene foto disponible' })
   async getDriverAvatar(
     @Param('driverProfileId', new ParseUUIDPipe({ version: '4' }))
     driverProfileId: string,
+    @Query('token') token: string,
   ): Promise<{ url: string; statusCode: number }> {
-    const url =
-      await this.storageService.getDriverAvatarRedirectUrl(driverProfileId);
+    const url = await this.storageService.getDriverAvatarRedirectUrl(
+      driverProfileId,
+      token,
+    );
 
     return { url, statusCode: HttpStatus.FOUND };
   }
@@ -168,21 +183,29 @@ export class StorageController {
   @Get('avatars/passenger/:passengerProfileId')
   @Redirect()
   @ApiOperation({
-    summary: 'Redirigir a una URL presignada temporal de la foto del pasajero',
+    summary:
+      'Redirigir a una URL presignada temporal de la foto del pasajero (requiere ?token= vigente)',
   })
   @ApiParam({ name: 'passengerProfileId', format: 'uuid' })
+  @ApiQuery({
+    name: 'token',
+    description:
+      'Capability token firmado, emitido por el Backend en un contexto autorizado',
+  })
   @ApiFoundResponse({
     description: 'Redirección a la presigned GET del avatar',
   })
+  @ApiForbiddenResponse({ description: 'Token inválido, vencido o ausente' })
   @ApiNotFoundResponse({ description: 'El pasajero no tiene foto disponible' })
   async getPassengerAvatar(
     @Param('passengerProfileId', new ParseUUIDPipe({ version: '4' }))
     passengerProfileId: string,
+    @Query('token') token: string,
   ): Promise<{ url: string; statusCode: number }> {
-    const url =
-      await this.storageService.getPassengerAvatarRedirectUrl(
-        passengerProfileId,
-      );
+    const url = await this.storageService.getPassengerAvatarRedirectUrl(
+      passengerProfileId,
+      token,
+    );
 
     return { url, statusCode: HttpStatus.FOUND };
   }

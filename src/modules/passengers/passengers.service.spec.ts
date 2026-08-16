@@ -3,8 +3,14 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { Test, TestingModule } from '@nestjs/testing';
 import type { DeepPartial, FindOneOptions } from 'typeorm';
 
+import { AvatarUrlResolverService } from '../storage/avatar-url-resolver.service';
 import { PassengerProfile } from './entities/passenger-profile.entity';
 import { PassengersService } from './passengers.service';
+
+interface AvatarResolverMock {
+  resolveDriverAvatarUrl: jest.Mock;
+  resolvePassengerAvatarUrl: jest.Mock;
+}
 
 type RepositoryMock = {
   findOne: jest.Mock<
@@ -20,6 +26,7 @@ type RepositoryMock = {
 describe('PassengersService', () => {
   let service: PassengersService;
   let repository: RepositoryMock;
+  let avatarResolver: AvatarResolverMock;
 
   const userId = 'f544d52a-39e0-4da3-8861-6010355c5dba';
 
@@ -52,12 +59,25 @@ describe('PassengersService', () => {
       ),
     };
 
+    const avatarResolverMock: AvatarResolverMock = {
+      resolveDriverAvatarUrl: jest.fn(
+        () => 'https://resolved.example/avatar.jpg',
+      ),
+      resolvePassengerAvatarUrl: jest.fn(
+        () => 'https://resolved.example/avatar.jpg',
+      ),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PassengersService,
         {
           provide: getRepositoryToken(PassengerProfile),
           useValue: repositoryMock,
+        },
+        {
+          provide: AvatarUrlResolverService,
+          useValue: avatarResolverMock,
         },
       ],
     }).compile();
@@ -67,6 +87,8 @@ describe('PassengersService', () => {
     repository = module.get<RepositoryMock>(
       getRepositoryToken(PassengerProfile),
     );
+
+    avatarResolver = module.get<AvatarResolverMock>(AvatarUrlResolverService);
   });
 
   it('debe estar definido', () => {
@@ -144,9 +166,10 @@ describe('PassengersService', () => {
       ).rejects.toBeInstanceOf(NotFoundException);
     });
 
-    it('completeProfilePhotoUpload persiste objectKey y la URL resuelta, y devuelve el objectKey anterior', async () => {
+    it('completeProfilePhotoUpload persiste únicamente el objectKey (photoUrl legacy no se toca)', async () => {
       repository.findOne.mockResolvedValue({
         ...profile,
+        photoUrl: 'https://cdn.tukituki.pe/legacy.jpg',
         photoObjectKey: 'passengers/profile/old.jpg',
       });
 
@@ -154,13 +177,10 @@ describe('PassengersService', () => {
         await service.completeProfilePhotoUpload(
           userId,
           'passengers/profile/new.jpg',
-          'https://api.tukituki.pe/api/v1/storage/avatars/passenger/profile-1',
         );
 
       expect(saved.photoObjectKey).toBe('passengers/profile/new.jpg');
-      expect(saved.photoUrl).toBe(
-        'https://api.tukituki.pe/api/v1/storage/avatars/passenger/profile-1',
-      );
+      expect(saved.photoUrl).toBe('https://cdn.tukituki.pe/legacy.jpg');
       expect(previousObjectKey).toBe('passengers/profile/old.jpg');
     });
   });
@@ -177,6 +197,23 @@ describe('PassengersService', () => {
 
       expect(result.photoUrl).toBe('https://cdn.tukituki.pe/passenger.jpg');
       expect(result.photoObjectKey).toBeNull();
+    });
+  });
+
+  describe('STORAGE-R2.1: toProfileResponse', () => {
+    it('resuelve photoUrl a través de AvatarUrlResolverService y nunca expone photoObjectKey', () => {
+      const response = service.toProfileResponse({
+        ...profile,
+        photoObjectKey: 'passengers/profile/1.jpg',
+      });
+
+      expect(avatarResolver.resolvePassengerAvatarUrl).toHaveBeenCalledWith(
+        expect.objectContaining({ photoObjectKey: 'passengers/profile/1.jpg' }),
+      );
+      expect(response.photoUrl).toBe('https://resolved.example/avatar.jpg');
+      expect(
+        Object.prototype.hasOwnProperty.call(response, 'photoObjectKey'),
+      ).toBe(false);
     });
   });
 });

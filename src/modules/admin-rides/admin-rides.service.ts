@@ -17,6 +17,7 @@ import { Ride } from '../rides/entities/ride.entity';
 import { RideStatus } from '../rides/enums/ride-status.enum';
 import { RideSafetyIncident } from '../safety/entities/ride-safety-incident.entity';
 import { SafetyIncidentStatus } from '../safety/enums/safety-incident-status.enum';
+import { AvatarUrlResolverService } from '../storage/avatar-url-resolver.service';
 import { AdminRideLocationQueryDto } from './dto/admin-ride-location-query.dto';
 import { AdminRideQueryDto } from './dto/admin-ride-query.dto';
 import {
@@ -46,10 +47,12 @@ interface AdminRideSummaryRaw {
   status: RideStatus;
   stateVersion: number | string;
   passengerUserId: string;
+  passengerProfileId: string | null;
   passengerPhoneE164: string;
   passengerFirstName: string | null;
   passengerLastName: string | null;
   passengerPhotoUrl: string | null;
+  passengerPhotoObjectKey: string | null;
   passengerRatingAverage: string | null;
   driverProfileId: string | null;
   driverUserId: string | null;
@@ -57,6 +60,7 @@ interface AdminRideSummaryRaw {
   driverFirstName: string | null;
   driverLastName: string | null;
   driverPhotoUrl: string | null;
+  driverPhotoObjectKey: string | null;
   driverRatingAverage: string | null;
   vehicleId: string | null;
   vehiclePlate: string | null;
@@ -99,7 +103,10 @@ interface AdminRideSummaryRaw {
 
 @Injectable()
 export class AdminRidesService {
-  constructor(private readonly dataSource: DataSource) {}
+  constructor(
+    private readonly dataSource: DataSource,
+    private readonly avatarResolver: AvatarUrlResolverService,
+  ) {}
 
   async list(
     query: AdminRideQueryDto,
@@ -397,9 +404,11 @@ export class AdminRidesService {
         'ride.state_version AS "stateVersion"',
         'ride.passenger_user_id AS "passengerUserId"',
         'passenger_user.phone_e164 AS "passengerPhoneE164"',
+        'passenger_profile.id AS "passengerProfileId"',
         'passenger_profile.first_name AS "passengerFirstName"',
         'passenger_profile.last_name AS "passengerLastName"',
         'passenger_profile.photo_url AS "passengerPhotoUrl"',
+        'passenger_profile.photo_object_key AS "passengerPhotoObjectKey"',
         'passenger_profile.rating_average AS "passengerRatingAverage"',
         'driver_profile.id AS "driverProfileId"',
         'driver_profile.user_id AS "driverUserId"',
@@ -407,6 +416,7 @@ export class AdminRidesService {
         'driver_profile.first_name AS "driverFirstName"',
         'driver_profile.last_name AS "driverLastName"',
         'driver_profile.photo_url AS "driverPhotoUrl"',
+        'driver_profile.photo_object_key AS "driverPhotoObjectKey"',
         'driver_profile.rating_average AS "driverRatingAverage"',
         'vehicle.id AS "vehicleId"',
         'vehicle.plate AS "vehiclePlate"',
@@ -546,7 +556,15 @@ export class AdminRidesService {
         phoneE164: raw.passengerPhoneE164,
         firstName: raw.passengerFirstName,
         lastName: raw.passengerLastName,
-        photoUrl: raw.passengerPhotoUrl,
+        photoUrl: this.avatarResolver.resolvePassengerAvatarUrl(
+          raw.passengerProfileId
+            ? {
+                id: raw.passengerProfileId,
+                photoObjectKey: raw.passengerPhotoObjectKey,
+                photoUrl: raw.passengerPhotoUrl,
+              }
+            : null,
+        ),
         ratingAverage: raw.passengerRatingAverage,
       },
       driver: hasDriver
@@ -556,7 +574,11 @@ export class AdminRidesService {
             phoneE164: raw.driverPhoneE164 as string,
             firstName: raw.driverFirstName as string,
             lastName: raw.driverLastName as string,
-            photoUrl: raw.driverPhotoUrl,
+            photoUrl: this.avatarResolver.resolveDriverAvatarUrl({
+              id: raw.driverProfileId as string,
+              photoObjectKey: raw.driverPhotoObjectKey,
+              photoUrl: raw.driverPhotoUrl,
+            }),
             ratingAverage: raw.driverRatingAverage ?? '0.00',
           }
         : null,

@@ -12,6 +12,7 @@ import { DriverStatus } from '../drivers/enums/driver-status.enum';
 import { IdentityDocumentType } from '../drivers/enums/identity-document-type.enum';
 import { VehicleStatus } from '../drivers/enums/vehicle-status.enum';
 import { VehicleType } from '../drivers/enums/vehicle-type.enum';
+import { AvatarUrlResolverService } from '../storage/avatar-url-resolver.service';
 import { UserRole } from '../users/enums/user-role.enum';
 import { UserStatus } from '../users/enums/user-status.enum';
 import { AdminDriversService } from './admin-drivers.service';
@@ -190,6 +191,13 @@ describe('AdminDriversService', () => {
         {
           provide: getRepositoryToken(DriverDocument),
           useValue: documentsRepositoryMock,
+        },
+        {
+          provide: AvatarUrlResolverService,
+          useValue: {
+            resolveDriverAvatarUrl: jest.fn(() => null),
+            resolvePassengerAvatarUrl: jest.fn(() => null),
+          },
         },
       ],
     }).compile();

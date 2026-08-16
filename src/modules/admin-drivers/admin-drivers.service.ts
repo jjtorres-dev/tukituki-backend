@@ -9,6 +9,7 @@ import { DriverDocument } from '../drivers/entities/driver-document.entity';
 import { DriverProfile } from '../drivers/entities/driver-profile.entity';
 import { DriverVehicle } from '../drivers/entities/driver-vehicle.entity';
 import { DriverStatus } from '../drivers/enums/driver-status.enum';
+import { AvatarUrlResolverService } from '../storage/avatar-url-resolver.service';
 import { AdminDriverDetailResponseDto } from './dto/admin-driver-detail-response.dto';
 import {
   AdminDriverListItemDto,
@@ -41,6 +42,8 @@ export class AdminDriversService {
 
     @InjectRepository(DriverDocument)
     private readonly driverDocumentsRepository: Repository<DriverDocument>,
+
+    private readonly avatarResolver: AvatarUrlResolverService,
   ) {}
 
   async list(query: AdminDriverQueryDto): Promise<AdminDriverListResponseDto> {
@@ -204,7 +207,7 @@ export class AdminDriversService {
       documentNumber: profile.documentNumber,
       birthDate: profile.birthDate,
       address: profile.address,
-      photoUrl: profile.photoUrl,
+      photoUrl: this.avatarResolver.resolveDriverAvatarUrl(profile),
       ratingAverage: profile.ratingAverage,
       ratingCount: profile.ratingCount,
       status: profile.status,

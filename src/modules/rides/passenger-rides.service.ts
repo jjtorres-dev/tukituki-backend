@@ -59,6 +59,7 @@ import {
   ACTIVE_DRIVER_RIDE_STATUSES,
   calculateRideSearchExpiresAt,
 } from './ride-matching.constants';
+import { AvatarUrlResolverService } from '../storage/avatar-url-resolver.service';
 
 export const ACTIVE_RIDE_STATUSES: readonly RideStatus[] = [
   RideStatus.SEARCHING_DRIVER,
@@ -92,6 +93,7 @@ export class PassengerRidesService {
     private readonly availabilityRedisService?: DriverAvailabilityRedisService,
     @Optional()
     private readonly realtimeService?: RideRealtimeService,
+    @Optional() private readonly avatarResolver?: AvatarUrlResolverService,
   ) {}
 
   async createRide(
@@ -522,7 +524,9 @@ export class PassengerRidesService {
 
           lastNameInitial,
 
-          photoUrl: offer.driverProfile.photoUrl,
+          photoUrl:
+            this.avatarResolver?.resolveDriverAvatarUrl(offer.driverProfile) ??
+            offer.driverProfile.photoUrl,
 
           ratingAverage: offer.driverProfile.ratingAverage,
 

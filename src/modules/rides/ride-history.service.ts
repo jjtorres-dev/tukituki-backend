@@ -7,6 +7,7 @@ import { DataSource } from 'typeorm';
 
 import { DriverProfile } from '../drivers/entities/driver-profile.entity';
 import { VehicleType } from '../drivers/enums/vehicle-type.enum';
+import { AvatarUrlResolverService } from '../storage/avatar-url-resolver.service';
 import { DriverRideHistoryResponseDto } from './dto/driver-ride-history-response.dto';
 import {
   PassengerRideHistoryResponseDto,
@@ -39,6 +40,7 @@ interface PassengerHistoryRow {
   driverProfileId: string | null;
   driverFirstName: string | null;
   driverPhotoUrl: string | null;
+  driverPhotoObjectKey: string | null;
   driverRatingAverage: string | null;
   driverRatingCount: number | string | null;
   vehiclePlate: string | null;
@@ -63,8 +65,10 @@ interface DriverHistoryRow {
   estimatedFare: string;
   finalFare: string | null;
   currency: string;
+  passengerProfileId: string | null;
   passengerFirstName: string | null;
   passengerPhotoUrl: string | null;
+  passengerPhotoObjectKey: string | null;
   passengerRatingAverage: string | null;
   passengerRatingCount: number | string | null;
   ratingSubmitted: boolean;
@@ -77,7 +81,10 @@ interface HistoryFilter {
 
 @Injectable()
 export class RideHistoryService {
-  constructor(private readonly dataSource: DataSource) {}
+  constructor(
+    private readonly dataSource: DataSource,
+    private readonly avatarResolver: AvatarUrlResolverService,
+  ) {}
 
   async getPassengerHistory(
     passengerUserId: string,
@@ -115,6 +122,7 @@ export class RideHistoryService {
          driver.id AS "driverProfileId",
          driver.first_name AS "driverFirstName",
          driver.photo_url AS "driverPhotoUrl",
+         driver.photo_object_key AS "driverPhotoObjectKey",
          driver.rating_average AS "driverRatingAverage",
          driver.rating_count AS "driverRatingCount",
          vehicle.plate AS "vehiclePlate",
@@ -220,8 +228,10 @@ export class RideHistoryService {
          ride.estimated_fare AS "estimatedFare",
          ride.final_fare AS "finalFare",
          ride.currency AS "currency",
+         passenger.id AS "passengerProfileId",
          passenger.first_name AS "passengerFirstName",
          passenger.photo_url AS "passengerPhotoUrl",
+         passenger.photo_object_key AS "passengerPhotoObjectKey",
          passenger.rating_average AS "passengerRatingAverage",
          passenger.rating_count AS "passengerRatingCount",
          EXISTS (
@@ -260,7 +270,15 @@ export class RideHistoryService {
             ? null
             : {
                 firstName: row.passengerFirstName,
-                photoUrl: row.passengerPhotoUrl,
+                photoUrl: this.avatarResolver.resolvePassengerAvatarUrl(
+                  row.passengerProfileId
+                    ? {
+                        id: row.passengerProfileId,
+                        photoObjectKey: row.passengerPhotoObjectKey,
+                        photoUrl: row.passengerPhotoUrl,
+                      }
+                    : null,
+                ),
                 ratingAverage: row.passengerRatingAverage ?? '0.00',
                 ratingCount: Number(row.passengerRatingCount ?? 0),
               },
@@ -349,7 +367,11 @@ export class RideHistoryService {
     return {
       profileId: row.driverProfileId,
       firstName: row.driverFirstName,
-      photoUrl: row.driverPhotoUrl,
+      photoUrl: this.avatarResolver.resolveDriverAvatarUrl({
+        id: row.driverProfileId,
+        photoObjectKey: row.driverPhotoObjectKey,
+        photoUrl: row.driverPhotoUrl,
+      }),
       vehiclePlate: row.vehiclePlate,
       vehicleBrand: row.vehicleBrand,
       vehicleModel: row.vehicleModel,
