@@ -11,12 +11,27 @@ describe('UsersService', () => {
   let repository: {
     findOne: jest.Mock;
     save: jest.Mock;
+    createQueryBuilder: jest.Mock;
+  };
+  let queryBuilder: {
+    addSelect: jest.Mock;
+    where: jest.Mock;
+    getOne: jest.Mock;
   };
 
   beforeEach(async () => {
+    queryBuilder = {
+      addSelect: jest.fn(),
+      where: jest.fn(),
+      getOne: jest.fn(),
+    };
+    queryBuilder.addSelect.mockReturnValue(queryBuilder);
+    queryBuilder.where.mockReturnValue(queryBuilder);
+
     const repositoryMock = {
       findOne: jest.fn(),
       save: jest.fn((user: User) => Promise.resolve(user)),
+      createQueryBuilder: jest.fn(() => queryBuilder),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -49,6 +64,22 @@ describe('UsersService', () => {
     });
 
     expect(result).toBeNull();
+  });
+
+  it('enlaza el teléfono como parámetro y nunca lo concatena al SQL', async () => {
+    const injectionPayload = "+51912345678' OR '1'='1";
+    queryBuilder.getOne.mockResolvedValue(null);
+
+    await service.findByPhoneE164WithPassword(injectionPayload);
+
+    expect(queryBuilder.where).toHaveBeenCalledWith(
+      'user.phoneE164 = :phoneE164',
+      { phoneE164: injectionPayload },
+    );
+    expect(queryBuilder.where).not.toHaveBeenCalledWith(
+      expect.stringContaining(injectionPayload),
+      expect.anything(),
+    );
   });
 
   it.each([

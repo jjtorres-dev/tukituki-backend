@@ -113,6 +113,28 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     return this.client.incr(key);
   }
 
+  async incrementWithTtl(key: string, ttlSeconds: number): Promise<number> {
+    const result: unknown = await this.client.sendCommand([
+      'EVAL',
+      [
+        "local current = redis.call('INCR', KEYS[1])",
+        "if current == 1 then redis.call('EXPIRE', KEYS[1], ARGV[1]) end",
+        'return current',
+      ].join('\n'),
+      '1',
+      key,
+      ttlSeconds.toString(),
+    ]);
+
+    const value = Number(result);
+
+    if (!Number.isSafeInteger(value) || value < 1) {
+      throw new Error('Redis devolvió un contador inválido');
+    }
+
+    return value;
+  }
+
   async expire(key: string, ttlSeconds: number): Promise<void> {
     await this.client.expire(key, ttlSeconds);
   }
