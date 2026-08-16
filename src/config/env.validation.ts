@@ -87,7 +87,49 @@ export const envValidationSchema = Joi.object({
 
   OTP_HASH_SECRET: Joi.string().min(32).required(),
 
-  OTP_DEBUG_ENABLED: Joi.boolean().truthy('true').falsy('false').default(false),
+  /*
+   * OTP-R2: en producción es estructuralmente imposible dejar
+   * OTP_DEBUG_ENABLED=true (el Backend no arranca), en vez de
+   * depender de que nadie olvide apagarlo manualmente en Railway.
+   */
+  OTP_DEBUG_ENABLED: Joi.when('NODE_ENV', {
+    is: 'production',
+    then: Joi.boolean()
+      .truthy('true')
+      .falsy('false')
+      .valid(false)
+      .default(false)
+      .messages({
+        'any.only':
+          'OTP_DEBUG_ENABLED debe ser false cuando NODE_ENV=production',
+      }),
+    otherwise: Joi.boolean().truthy('true').falsy('false').default(false),
+  }),
+
+  /*
+   * OTP-R2: protección de costo dedicada a POST /auth/otp/request,
+   * independiente del throttle global (RATE_LIMIT_*). El cooldown
+   * (OTP_RESEND_COOLDOWN_SECONDS) ya limita a ~1 solicitud/minuto/
+   * teléfono; estos límites acotan además el total de solicitudes
+   * por IP y por teléfono dentro de una ventana larga, para que un
+   * teléfono no pueda recibir SMS indefinidamente solo esperando el
+   * cooldown entre solicitudes.
+   */
+  OTP_REQUEST_IP_LIMIT: Joi.number().integer().min(1).max(1000).default(20),
+
+  OTP_REQUEST_IP_WINDOW_SECONDS: Joi.number()
+    .integer()
+    .min(60)
+    .max(86400)
+    .default(3600),
+
+  OTP_REQUEST_PHONE_LIMIT: Joi.number().integer().min(1).max(100).default(5),
+
+  OTP_REQUEST_PHONE_WINDOW_SECONDS: Joi.number()
+    .integer()
+    .min(60)
+    .max(86400)
+    .default(3600),
 
   JWT_ACCESS_SECRET: Joi.string().min(64).required(),
 

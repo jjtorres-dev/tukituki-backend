@@ -4,7 +4,6 @@ import {
   HttpException,
   HttpStatus,
   Injectable,
-  NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -21,21 +20,21 @@ export class OtpService {
     private readonly configService: ConfigService,
   ) {}
 
-  async requestPhoneVerification(phoneE164: string): Promise<{
+  async requestPhoneVerification(
+    phoneE164: string,
+    ipAddress: string | null,
+  ): Promise<{
     expiresIn: number;
     debugOtp?: string;
   }> {
-    const user = await this.usersService.findByPhoneE164(phoneE164);
+    await this.enforceIpRequestLimit(ipAddress);
+    await this.enforcePhoneWindowRequestLimit(phoneE164);
 
-    if (!user) {
-      throw new NotFoundException(
-        'No existe una cuenta registrada con este teléfono',
-      );
-    }
+    const ttl = this.configService.getOrThrow<number>('OTP_TTL_SECONDS');
 
-    if (user.isPhoneVerified) {
-      throw new ConflictException('El teléfono ya se encuentra verificado');
-    }
+    const cooldown = this.configService.getOrThrow<number>(
+      'OTP_RESEND_COOLDOWN_SECONDS',
+    );
 
     const cooldownKey = this.getCooldownKey(phoneE164);
 
@@ -48,11 +47,26 @@ export class OtpService {
       );
     }
 
-    const ttl = this.configService.getOrThrow<number>('OTP_TTL_SECONDS');
+    const user = await this.usersService.findByPhoneE164(phoneE164);
 
-    const cooldown = this.configService.getOrThrow<number>(
-      'OTP_RESEND_COOLDOWN_SECONDS',
-    );
+    /*
+     * OTP-R2: un teléfono sin cuenta registrada recibe exactamente la
+     * misma respuesta 200 que un envío real (mismo shape, mismo
+     * cooldown aplicado) para no permitir enumerar cuentas por
+     * teléfono a través de este endpoint. No se genera, hashea ni
+     * almacena ningún código para un teléfono sin cuenta.
+     */
+    if (!user) {
+      await this.redisService.setWithTtl(cooldownKey, '1', cooldown);
+
+      return {
+        expiresIn: ttl,
+      };
+    }
+
+    if (user.isPhoneVerified) {
+      throw new ConflictException('El teléfono ya se encuentra verificado');
+    }
 
     const code = randomInt(0, 1_000_000).toString().padStart(6, '0');
 
@@ -96,7 +110,7 @@ export class OtpService {
     const attempts = Number((await this.redisService.get(attemptsKey)) ?? '0');
 
     if (attempts >= maxAttempts) {
-      await this.clearOtp(phoneE164);
+      await this.clearOtp(phoneE164, { preserveCooldown: true });
 
       throw new HttpException(
         'Superaste el número máximo de intentos',
@@ -110,7 +124,7 @@ export class OtpService {
       const currentAttempts = await this.redisService.increment(attemptsKey);
 
       if (currentAttempts >= maxAttempts) {
-        await this.clearOtp(phoneE164);
+        await this.clearOtp(phoneE164, { preserveCooldown: true });
 
         throw new HttpException(
           'Superaste el número máximo de intentos',
@@ -167,11 +181,111 @@ export class OtpService {
     return `auth:otp:phone:${phoneE164}:cooldown`;
   }
 
-  private async clearOtp(phoneE164: string): Promise<void> {
+  /*
+   * OTP-R2: al agotar los intentos de verificación, el código y el
+   * contador siempre se invalidan, pero el cooldown puede
+   * preservarse deliberadamente (`preserveCooldown: true`) en vez de
+   * borrarse. Sin esto, agotar los intentos dejaba pedir un OTP
+   * nuevo de inmediato (el resend cooldown se borraba junto con
+   * todo lo demás), permitiendo un loop instantáneo de
+   * intentos→nuevo código→intentos. Se aplica siempre una duración
+   * de cooldown completa y fresca (no la que quedaba de la
+   * solicitud original), para garantizar una espera mínima real tras
+   * agotar los intentos sin importar cuánto haya tardado el usuario
+   * en consumirlos.
+   */
+  private async clearOtp(
+    phoneE164: string,
+    options: { preserveCooldown?: boolean } = {},
+  ): Promise<void> {
+    if (options.preserveCooldown) {
+      const cooldown = this.configService.getOrThrow<number>(
+        'OTP_RESEND_COOLDOWN_SECONDS',
+      );
+
+      await Promise.all([
+        this.redisService.delete(
+          this.getOtpKey(phoneE164),
+          this.getAttemptsKey(phoneE164),
+        ),
+        this.redisService.setWithTtl(
+          this.getCooldownKey(phoneE164),
+          '1',
+          cooldown,
+        ),
+      ]);
+
+      return;
+    }
+
     await this.redisService.delete(
       this.getOtpKey(phoneE164),
       this.getAttemptsKey(phoneE164),
       this.getCooldownKey(phoneE164),
     );
+  }
+
+  /*
+   * OTP-R2: protección de costo dedicada a POST /auth/otp/request,
+   * en profundidad respecto al throttle global (RATE_LIMIT_*, por
+   * IP, aplicado a toda la API). Los contadores se identifican por
+   * huella HMAC (nunca la IP/teléfono en claro como key de Redis),
+   * mismo patrón que AdminLoginSecurityService.
+   */
+  private async enforceIpRequestLimit(ipAddress: string | null): Promise<void> {
+    const limit = this.configService.getOrThrow<number>('OTP_REQUEST_IP_LIMIT');
+
+    const windowSeconds = this.configService.getOrThrow<number>(
+      'OTP_REQUEST_IP_WINDOW_SECONDS',
+    );
+
+    const fingerprint = this.fingerprint('ip', ipAddress ?? 'unknown');
+
+    const count = await this.redisService.incrementWithTtl(
+      `auth:otp:request:ip:${fingerprint}`,
+      windowSeconds,
+    );
+
+    if (count > limit) {
+      throw new HttpException(
+        'Demasiadas solicitudes de código; inténtalo nuevamente más tarde',
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+  }
+
+  private async enforcePhoneWindowRequestLimit(
+    phoneE164: string,
+  ): Promise<void> {
+    const limit = this.configService.getOrThrow<number>(
+      'OTP_REQUEST_PHONE_LIMIT',
+    );
+
+    const windowSeconds = this.configService.getOrThrow<number>(
+      'OTP_REQUEST_PHONE_WINDOW_SECONDS',
+    );
+
+    const fingerprint = this.fingerprint('phone-window', phoneE164);
+
+    const count = await this.redisService.incrementWithTtl(
+      `auth:otp:request:phone-window:${fingerprint}`,
+      windowSeconds,
+    );
+
+    if (count > limit) {
+      throw new HttpException(
+        'Superaste el número máximo de solicitudes de código para este teléfono; inténtalo más tarde',
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+  }
+
+  private fingerprint(namespace: 'ip' | 'phone-window', value: string): string {
+    const secret = this.configService.getOrThrow<string>('OTP_HASH_SECRET');
+
+    return createHmac('sha256', secret)
+      .update(`otp-request:${namespace}\0${value}`, 'utf8')
+      .digest('hex')
+      .slice(0, 24);
   }
 }
