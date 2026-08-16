@@ -58,8 +58,9 @@ export class DriverVehiclesService {
       model: dto.model,
       year: dto.year,
       color: dto.color,
-      engineNumber: dto.engineNumber,
-      chassisNumber: dto.chassisNumber,
+      engineNumber: dto.engineNumber ?? null,
+      chassisNumber: dto.chassisNumber ?? null,
+      ownership: dto.ownership,
       vehicleType: VehicleType.MOTOTAXI,
       status: VehicleStatus.DRAFT,
       rejectionReason: null,
@@ -138,6 +139,10 @@ export class DriverVehiclesService {
 
     if (dto.chassisNumber !== undefined) {
       vehicle.chassisNumber = dto.chassisNumber;
+    }
+
+    if (dto.ownership !== undefined) {
+      vehicle.ownership = dto.ownership;
     }
 
     if (vehicle.status === VehicleStatus.REJECTED) {

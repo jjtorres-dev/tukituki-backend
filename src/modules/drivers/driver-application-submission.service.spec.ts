@@ -105,7 +105,9 @@ describe('DriverApplicationSubmissionService', () => {
 
     address: 'Jr. Los Jardines 245, Tarapoto',
 
-    photoUrl: null,
+    photoUrl: 'https://cdn.tukituki.pe/drivers/photo.jpg',
+
+    photoObjectKey: null,
 
     status: DriverStatus.DRAFT,
 
@@ -456,6 +458,105 @@ describe('DriverApplicationSubmissionService', () => {
     expect(vehicleQueryBuilder.getOne).not.toHaveBeenCalled();
 
     expect(profileRepository.save).not.toHaveBeenCalled();
+  });
+
+  describe('DRIVER-ONBOARDING-R2: 3 documentos target + foto obligatoria', () => {
+    const targetOnlyDocuments = [
+      createDocument(DriverDocumentType.DRIVER_LICENSE),
+      createDocument(DriverDocumentType.SOAT),
+      createDocument(DriverDocumentType.VEHICLE_REGISTRATION),
+    ];
+
+    it('acepta el envío solo con los 3 documentos target (sin DNI_FRONT/DNI_BACK/PROFILE_PHOTO)', async () => {
+      documentQueryBuilder.getMany.mockResolvedValue(
+        targetOnlyDocuments.map((document) => ({ ...document })),
+      );
+
+      const result = await service.submit(userId);
+
+      expect(result.status).toBe(DriverStatus.PENDING_REVIEW);
+    });
+
+    it('rechaza si falta DRIVER_LICENSE', async () => {
+      documentQueryBuilder.getMany.mockResolvedValue(
+        targetOnlyDocuments
+          .filter(
+            (document) => document.type !== DriverDocumentType.DRIVER_LICENSE,
+          )
+          .map((document) => ({ ...document })),
+      );
+
+      await expect(service.submit(userId)).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+
+      expect(profileRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('rechaza si falta SOAT', async () => {
+      documentQueryBuilder.getMany.mockResolvedValue(
+        targetOnlyDocuments
+          .filter((document) => document.type !== DriverDocumentType.SOAT)
+          .map((document) => ({ ...document })),
+      );
+
+      await expect(service.submit(userId)).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+
+      expect(profileRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('rechaza si falta VEHICLE_REGISTRATION', async () => {
+      documentQueryBuilder.getMany.mockResolvedValue(
+        targetOnlyDocuments
+          .filter(
+            (document) =>
+              document.type !== DriverDocumentType.VEHICLE_REGISTRATION,
+          )
+          .map((document) => ({ ...document })),
+      );
+
+      await expect(service.submit(userId)).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+
+      expect(profileRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('rechaza el envío sin foto de perfil (ni photoUrl ni photoObjectKey)', async () => {
+      profileQueryBuilder.getOne.mockResolvedValue({
+        ...profile,
+        photoUrl: null,
+        photoObjectKey: null,
+      });
+
+      documentQueryBuilder.getMany.mockResolvedValue(
+        targetOnlyDocuments.map((document) => ({ ...document })),
+      );
+
+      await expect(service.submit(userId)).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+
+      expect(profileRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('acepta el envío con foto vía photoObjectKey (Storage) sin photoUrl legacy', async () => {
+      profileQueryBuilder.getOne.mockResolvedValue({
+        ...profile,
+        photoUrl: null,
+        photoObjectKey: 'drivers/profile/1.jpg',
+      });
+
+      documentQueryBuilder.getMany.mockResolvedValue(
+        targetOnlyDocuments.map((document) => ({ ...document })),
+      );
+
+      const result = await service.submit(userId);
+
+      expect(result.status).toBe(DriverStatus.PENDING_REVIEW);
+    });
   });
 
   it('debe propagar un error durante el guardado', async () => {

@@ -1,6 +1,7 @@
 import { Transform } from 'class-transformer';
 import type { TransformFnParams } from 'class-transformer';
 import {
+  IsEmail,
   IsEnum,
   IsNotEmpty,
   IsOptional,
@@ -16,6 +17,10 @@ import { IdentityDocumentType } from '../enums/identity-document-type.enum';
 
 function trimString({ value }: TransformFnParams): unknown {
   return typeof value === 'string' ? value.trim() : value;
+}
+
+function normalizeEmail({ value }: TransformFnParams): unknown {
+  return typeof value === 'string' ? value.trim().toLowerCase() : value;
 }
 
 function normalizeDocumentNumber({ value }: TransformFnParams): unknown {
@@ -77,17 +82,31 @@ export class CreateDriverProfileDto {
   })
   birthDate!: string;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     example: 'Jr. Los Jardines 245, Tarapoto',
     minLength: 5,
     maxLength: 255,
+    description:
+      'Opcional (DRIVER-ONBOARDING-R2): el onboarding nuevo ya no la pide.',
   })
+  @IsOptional()
   @Transform(trimString)
   @IsString()
   @IsNotEmpty()
   @MinLength(5)
   @MaxLength(255)
-  address!: string;
+  address?: string;
+
+  @ApiPropertyOptional({
+    example: 'juan.torres@example.com',
+    maxLength: 255,
+  })
+  @IsOptional()
+  @Transform(normalizeEmail)
+  @IsString()
+  @IsEmail()
+  @MaxLength(255)
+  email?: string;
 
   @ApiPropertyOptional({
     example: 'https://cdn.tukituki.pe/drivers/profile.jpg',

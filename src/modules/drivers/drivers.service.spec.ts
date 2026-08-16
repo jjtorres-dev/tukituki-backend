@@ -119,6 +119,39 @@ describe('DriversService', () => {
     expect(repository.save).toHaveBeenCalledTimes(1);
   });
 
+  it('debe crear una solicitud sin address (DRIVER-ONBOARDING-R2)', async () => {
+    repository.findOne.mockResolvedValue(null);
+
+    const result = await service.createMyProfile(userId, {
+      firstName: 'Juan José',
+      lastName: 'Torres Solano',
+      documentType: IdentityDocumentType.DNI,
+      documentNumber: '12345678',
+      birthDate: '1995-06-15',
+    });
+
+    expect(result.address).toBeNull();
+  });
+
+  it('debe crear una solicitud con email y devolverlo en toProfileResponse', async () => {
+    repository.findOne.mockResolvedValue(null);
+
+    const result = await service.createMyProfile(userId, {
+      firstName: 'Juan José',
+      lastName: 'Torres Solano',
+      documentType: IdentityDocumentType.DNI,
+      documentNumber: '12345678',
+      birthDate: '1995-06-15',
+      email: 'juan.torres@example.com',
+    });
+
+    expect(result.email).toBe('juan.torres@example.com');
+
+    expect(service.toProfileResponse(result).email).toBe(
+      'juan.torres@example.com',
+    );
+  });
+
   it('debe rechazar una segunda solicitud', async () => {
     repository.findOne.mockResolvedValue(profile);
 

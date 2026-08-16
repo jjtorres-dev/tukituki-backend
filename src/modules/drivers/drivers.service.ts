@@ -39,6 +39,7 @@ export class DriversService {
       documentNumber: profile.documentNumber,
       birthDate: profile.birthDate,
       address: profile.address,
+      email: profile.email,
       photoUrl: this.avatarResolver.resolveDriverAvatarUrl(profile),
       ratingAverage: profile.ratingAverage,
       ratingCount: profile.ratingCount,
@@ -84,7 +85,8 @@ export class DriversService {
       documentType: dto.documentType,
       documentNumber: dto.documentNumber,
       birthDate: dto.birthDate,
-      address: dto.address,
+      address: dto.address ?? null,
+      email: dto.email ?? null,
       photoUrl: dto.photoUrl ?? null,
       status: DriverStatus.DRAFT,
       rejectionReason: null,
@@ -149,6 +151,10 @@ export class DriversService {
 
     if (dto.address !== undefined) {
       profile.address = dto.address;
+    }
+
+    if (dto.email !== undefined) {
+      profile.email = dto.email;
     }
 
     if (dto.photoUrl !== undefined) {

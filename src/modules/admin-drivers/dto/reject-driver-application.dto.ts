@@ -66,7 +66,7 @@ export class RejectDriverApplicationDto {
   })
   @IsOptional()
   @IsArray()
-  @ArrayMaxSize(6)
+  @ArrayMaxSize(3)
   @ValidateNested({
     each: true,
   })

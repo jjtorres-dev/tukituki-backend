@@ -88,8 +88,21 @@ export class DriverProfile {
   @Column({
     type: 'varchar',
     length: 255,
+    nullable: true,
   })
-  address!: string;
+  address!: string | null;
+
+  /*
+   * Opcional (DRIVER-ONBOARDING-R2): el paso 2 del onboarding nuevo
+   * ("Sobre ti") no exige correo. Nullable, sin unicidad — no hay
+   * decisión de producto que la requiera todavía.
+   */
+  @Column({
+    type: 'varchar',
+    length: 255,
+    nullable: true,
+  })
+  email!: string | null;
 
   @Column({
     name: 'photo_url',

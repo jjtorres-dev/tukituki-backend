@@ -1,8 +1,10 @@
 import { Transform, Type } from 'class-transformer';
 import type { TransformFnParams } from 'class-transformer';
 import {
+  IsEnum,
   IsInt,
   IsNotEmpty,
+  IsOptional,
   IsString,
   Matches,
   Max,
@@ -11,6 +13,8 @@ import {
   MinLength,
 } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
+
+import { VehicleOwnership } from '../enums/vehicle-ownership.enum';
 
 function trimString({ value }: TransformFnParams): unknown {
   return typeof value === 'string' ? value.trim() : value;
@@ -83,28 +87,43 @@ export class CreateDriverVehicleDto {
   color!: string;
 
   @ApiProperty({
+    required: false,
     example: 'ENG123456789',
     minLength: 5,
     maxLength: 80,
+    description:
+      'Opcional (DRIVER-ONBOARDING-R2): el onboarding nuevo ya no lo pide.',
   })
+  @IsOptional()
   @Transform(normalizeIdentifier)
   @IsString()
   @Matches(/^[A-Z0-9-]{5,80}$/, {
     message:
       'El número de motor debe contener entre 5 y 80 caracteres alfanuméricos',
   })
-  engineNumber!: string;
+  engineNumber?: string;
 
   @ApiProperty({
+    required: false,
     example: 'CHS123456789',
     minLength: 5,
     maxLength: 80,
+    description:
+      'Opcional (DRIVER-ONBOARDING-R2): el onboarding nuevo ya no lo pide.',
   })
+  @IsOptional()
   @Transform(normalizeIdentifier)
   @IsString()
   @Matches(/^[A-Z0-9-]{5,80}$/, {
     message:
       'El número de chasis debe contener entre 5 y 80 caracteres alfanuméricos',
   })
-  chassisNumber!: string;
+  chassisNumber?: string;
+
+  @ApiProperty({
+    enum: VehicleOwnership,
+    example: VehicleOwnership.OWNED,
+  })
+  @IsEnum(VehicleOwnership)
+  ownership!: VehicleOwnership;
 }

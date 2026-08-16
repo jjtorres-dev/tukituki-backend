@@ -12,6 +12,7 @@ import { DriverProfile } from './entities/driver-profile.entity';
 import { DriverVehicle } from './entities/driver-vehicle.entity';
 import { DriverStatus } from './enums/driver-status.enum';
 import { IdentityDocumentType } from './enums/identity-document-type.enum';
+import { VehicleOwnership } from './enums/vehicle-ownership.enum';
 import { VehicleStatus } from './enums/vehicle-status.enum';
 import { VehicleType } from './enums/vehicle-type.enum';
 
@@ -145,6 +146,7 @@ describe('DriverVehiclesService', () => {
       color: 'Azul',
       engineNumber: 'ENG123456789',
       chassisNumber: 'CHS123456789',
+      ownership: VehicleOwnership.OWNED,
     });
 
     expect(result.status).toBe(VehicleStatus.DRAFT);
@@ -152,6 +154,65 @@ describe('DriverVehiclesService', () => {
     expect(result.vehicleType).toBe(VehicleType.MOTOTAXI);
 
     expect(driverVehiclesRepository.save).toHaveBeenCalledTimes(1);
+  });
+
+  it('debe crear un vehículo sin engineNumber (DRIVER-ONBOARDING-R2)', async () => {
+    driverProfilesRepository.findOne.mockResolvedValue({
+      ...driverProfile,
+    });
+
+    driverVehiclesRepository.findOne.mockResolvedValue(null);
+
+    const result = await service.createMyVehicle(userId, {
+      plate: '1234-AB',
+      brand: 'Bajaj',
+      model: 'RE 4S',
+      year: 2024,
+      color: 'Azul',
+      chassisNumber: 'CHS123456789',
+      ownership: VehicleOwnership.OWNED,
+    });
+
+    expect(result.engineNumber).toBeNull();
+  });
+
+  it('debe crear un vehículo sin chassisNumber (DRIVER-ONBOARDING-R2)', async () => {
+    driverProfilesRepository.findOne.mockResolvedValue({
+      ...driverProfile,
+    });
+
+    driverVehiclesRepository.findOne.mockResolvedValue(null);
+
+    const result = await service.createMyVehicle(userId, {
+      plate: '1234-AB',
+      brand: 'Bajaj',
+      model: 'RE 4S',
+      year: 2024,
+      color: 'Azul',
+      engineNumber: 'ENG123456789',
+      ownership: VehicleOwnership.OWNED,
+    });
+
+    expect(result.chassisNumber).toBeNull();
+  });
+
+  it('debe crear un vehículo con ownership RENTED', async () => {
+    driverProfilesRepository.findOne.mockResolvedValue({
+      ...driverProfile,
+    });
+
+    driverVehiclesRepository.findOne.mockResolvedValue(null);
+
+    const result = await service.createMyVehicle(userId, {
+      plate: '1234-AB',
+      brand: 'Bajaj',
+      model: 'RE 4S',
+      year: 2024,
+      color: 'Azul',
+      ownership: VehicleOwnership.RENTED,
+    });
+
+    expect(result.ownership).toBe(VehicleOwnership.RENTED);
   });
 
   it('debe rechazar un segundo vehículo', async () => {
@@ -172,6 +233,7 @@ describe('DriverVehiclesService', () => {
         color: 'Rojo',
         engineNumber: 'ENG987654321',
         chassisNumber: 'CHS987654321',
+        ownership: VehicleOwnership.OWNED,
       }),
     ).rejects.toBeInstanceOf(ConflictException);
   });
