@@ -98,6 +98,39 @@ export class PassengersService {
     return this.passengerProfilesRepository.save(profile);
   }
 
+  /*
+   * STORAGE-R2: valida que el usuario pueda subir su foto de perfil
+   * (perfil propio ya creado). El perfil de pasajero no tiene un
+   * estado que bloquee edición (a diferencia de DriverProfile), por
+   * eso no hay una comprobación adicional además de la propiedad.
+   */
+  assertProfilePhotoUploadAllowed(userId: string): Promise<PassengerProfile> {
+    return this.getMyProfile(userId);
+  }
+
+  /*
+   * STORAGE-R2: persiste el objectKey ya validado (HeadObject) y la
+   * URL estable resuelta por modules/storage. Devuelve el objectKey
+   * anterior para que el llamador lo borre del bucket en modo
+   * best-effort después de que esta escritura confirme.
+   */
+  async completeProfilePhotoUpload(
+    userId: string,
+    objectKey: string,
+    resolvedPhotoUrl: string,
+  ): Promise<{ profile: PassengerProfile; previousObjectKey: string | null }> {
+    const profile = await this.assertProfilePhotoUploadAllowed(userId);
+
+    const previousObjectKey = profile.photoObjectKey;
+
+    profile.photoObjectKey = objectKey;
+    profile.photoUrl = resolvedPhotoUrl;
+
+    const saved = await this.passengerProfilesRepository.save(profile);
+
+    return { profile: saved, previousObjectKey };
+  }
+
   private isUniqueConstraintViolation(error: unknown): boolean {
     if (!(error instanceof QueryFailedError)) {
       return false;

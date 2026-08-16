@@ -247,6 +247,7 @@ export class AdminDriversService {
       driverProfileId: document.driverProfileId,
       type: document.type,
       fileUrl: document.fileUrl,
+      fileObjectKey: document.fileObjectKey,
       documentNumber: document.documentNumber,
       issuedAt: document.issuedAt,
       expiresAt: document.expiresAt,

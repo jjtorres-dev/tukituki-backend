@@ -140,4 +140,60 @@ describe('DriversService', () => {
 
     expect(result.rejectionReason).toBeNull();
   });
+
+  describe('STORAGE-R2: assertProfilePhotoUploadAllowed / completeProfilePhotoUpload', () => {
+    it('assertProfilePhotoUploadAllowed permite subir foto con perfil en DRAFT', async () => {
+      repository.findOne.mockResolvedValue({ ...profile });
+
+      await expect(
+        service.assertProfilePhotoUploadAllowed(userId),
+      ).resolves.toMatchObject({ id: profile.id });
+    });
+
+    it('assertProfilePhotoUploadAllowed rechaza si el perfil está PENDING_REVIEW', async () => {
+      repository.findOne.mockResolvedValue({
+        ...profile,
+        status: DriverStatus.PENDING_REVIEW,
+      });
+
+      await expect(
+        service.assertProfilePhotoUploadAllowed(userId),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('completeProfilePhotoUpload persiste objectKey y la URL resuelta, y devuelve el objectKey anterior', async () => {
+      repository.findOne.mockResolvedValue({
+        ...profile,
+        photoObjectKey: 'drivers/profile/old.jpg',
+      });
+
+      const { profile: saved, previousObjectKey } =
+        await service.completeProfilePhotoUpload(
+          userId,
+          'drivers/profile/new.jpg',
+          'https://api.tukituki.pe/api/v1/storage/avatars/driver/profile-1',
+        );
+
+      expect(saved.photoObjectKey).toBe('drivers/profile/new.jpg');
+      expect(saved.photoUrl).toBe(
+        'https://api.tukituki.pe/api/v1/storage/avatars/driver/profile-1',
+      );
+      expect(previousObjectKey).toBe('drivers/profile/old.jpg');
+    });
+
+    it('completeProfilePhotoUpload en el primer upload devuelve previousObjectKey null', async () => {
+      repository.findOne.mockResolvedValue({
+        ...profile,
+        photoObjectKey: null,
+      });
+
+      const { previousObjectKey } = await service.completeProfilePhotoUpload(
+        userId,
+        'drivers/profile/first.jpg',
+        'https://api.tukituki.pe/api/v1/storage/avatars/driver/profile-1',
+      );
+
+      expect(previousObjectKey).toBeNull();
+    });
+  });
 });

@@ -300,6 +300,70 @@ export const envValidationSchema = Joi.object({
     then: Joi.string().min(100).required(),
     otherwise: Joi.string().allow('').optional(),
   }),
+
+  /*
+   * STORAGE-R2: Railway Storage Buckets (compatible S3).
+   *
+   * Deshabilitado por defecto: el Backend debe poder arrancar y
+   * ejecutar tests sin credenciales reales. Cuando STORAGE_ENABLED
+   * es true, el bucket/credenciales/región/endpoint pasan a ser
+   * obligatorios.
+   */
+  STORAGE_ENABLED: Joi.boolean().default(false),
+
+  STORAGE_BUCKET: Joi.when('STORAGE_ENABLED', {
+    is: true,
+    then: Joi.string().min(3).max(255).required(),
+    otherwise: Joi.string().allow('').optional(),
+  }),
+
+  STORAGE_ACCESS_KEY_ID: Joi.when('STORAGE_ENABLED', {
+    is: true,
+    then: Joi.string().min(1).max(500).required(),
+    otherwise: Joi.string().allow('').optional(),
+  }),
+
+  STORAGE_SECRET_ACCESS_KEY: Joi.when('STORAGE_ENABLED', {
+    is: true,
+    then: Joi.string().min(1).max(500).required(),
+    otherwise: Joi.string().allow('').optional(),
+  }),
+
+  STORAGE_REGION: Joi.when('STORAGE_ENABLED', {
+    is: true,
+    then: Joi.string().min(1).max(100).required(),
+    otherwise: Joi.string().allow('').default('auto'),
+  }),
+
+  STORAGE_ENDPOINT: Joi.when('STORAGE_ENABLED', {
+    is: true,
+    then: Joi.string().uri().required(),
+    otherwise: Joi.string().allow('').optional(),
+  }),
+
+  STORAGE_UPLOAD_URL_TTL_SECONDS: Joi.number()
+    .integer()
+    .min(60)
+    .max(3600)
+    .default(300),
+
+  STORAGE_DOWNLOAD_URL_TTL_SECONDS: Joi.number()
+    .integer()
+    .min(60)
+    .max(3600)
+    .default(900),
+
+  STORAGE_MAX_IMAGE_SIZE_BYTES: Joi.number()
+    .integer()
+    .min(1024)
+    .max(52428800)
+    .default(8388608),
+
+  STORAGE_MAX_PDF_SIZE_BYTES: Joi.number()
+    .integer()
+    .min(1024)
+    .max(52428800)
+    .default(10485760),
 });
 
 function validateCorsOrigins(

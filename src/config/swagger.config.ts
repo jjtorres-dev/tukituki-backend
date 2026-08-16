@@ -60,6 +60,7 @@ export const SWAGGER_TAGS = [
   ],
   ['Admin audit', 'Trazabilidad de acciones administrativas.'],
   ['Admin drivers', 'Revisión y administración de conductores.'],
+  ['Storage', 'Subida y lectura de archivos en Railway Storage Buckets.'],
 ] as const;
 
 export function buildSwaggerConfiguration(

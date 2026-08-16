@@ -126,4 +126,57 @@ describe('PassengersService', () => {
     expect(result.firstName).toBe('Juan');
     expect(repository.save).toHaveBeenCalledTimes(1);
   });
+
+  describe('STORAGE-R2: assertProfilePhotoUploadAllowed / completeProfilePhotoUpload', () => {
+    it('assertProfilePhotoUploadAllowed exige que el perfil ya exista (sin restricción de estado)', async () => {
+      repository.findOne.mockResolvedValue({ ...profile });
+
+      await expect(
+        service.assertProfilePhotoUploadAllowed(userId),
+      ).resolves.toMatchObject({ id: profile.id });
+    });
+
+    it('assertProfilePhotoUploadAllowed lanza NotFoundException si el perfil todavía no existe', async () => {
+      repository.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.assertProfilePhotoUploadAllowed(userId),
+      ).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('completeProfilePhotoUpload persiste objectKey y la URL resuelta, y devuelve el objectKey anterior', async () => {
+      repository.findOne.mockResolvedValue({
+        ...profile,
+        photoObjectKey: 'passengers/profile/old.jpg',
+      });
+
+      const { profile: saved, previousObjectKey } =
+        await service.completeProfilePhotoUpload(
+          userId,
+          'passengers/profile/new.jpg',
+          'https://api.tukituki.pe/api/v1/storage/avatars/passenger/profile-1',
+        );
+
+      expect(saved.photoObjectKey).toBe('passengers/profile/new.jpg');
+      expect(saved.photoUrl).toBe(
+        'https://api.tukituki.pe/api/v1/storage/avatars/passenger/profile-1',
+      );
+      expect(previousObjectKey).toBe('passengers/profile/old.jpg');
+    });
+  });
+
+  describe('LEGACY: un perfil con photoUrl y sin photoObjectKey sigue siendo representable', () => {
+    it('getMyProfile devuelve tal cual un perfil legacy (photoUrl set, photoObjectKey null)', async () => {
+      repository.findOne.mockResolvedValue({
+        ...profile,
+        photoUrl: 'https://cdn.tukituki.pe/passenger.jpg',
+        photoObjectKey: null,
+      });
+
+      const result = await service.getMyProfile(userId);
+
+      expect(result.photoUrl).toBe('https://cdn.tukituki.pe/passenger.jpg');
+      expect(result.photoObjectKey).toBeNull();
+    });
+  });
 });

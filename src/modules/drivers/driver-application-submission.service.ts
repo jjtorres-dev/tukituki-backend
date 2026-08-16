@@ -208,7 +208,12 @@ export class DriverApplicationSubmissionService {
       invalidRequirements.push(`${document.type}_STATUS_${document.status}`);
     }
 
-    if (!document.fileUrl) {
+    /*
+     * STORAGE-R2: un documento es válido si tiene la URL legacy
+     * (fileUrl) o el objectKey canónico de Railway Storage
+     * (fileObjectKey) — nunca ambos ausentes.
+     */
+    if (!document.fileUrl && !document.fileObjectKey) {
       invalidRequirements.push(`${document.type}_FILE_MISSING`);
     }
 

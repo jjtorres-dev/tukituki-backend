@@ -144,6 +144,44 @@ export class DriversService {
     }
   }
 
+  /*
+   * STORAGE-R2: valida que el usuario pueda subir su foto de perfil
+   * (perfil propio ya creado, solicitud editable) sin persistir
+   * todavía nada. Reutilizado por modules/storage antes de presignar.
+   */
+  async assertProfilePhotoUploadAllowed(
+    userId: string,
+  ): Promise<DriverProfile> {
+    const profile = await this.getMyProfile(userId);
+
+    this.assertEditable(profile);
+
+    return profile;
+  }
+
+  /*
+   * STORAGE-R2: persiste el objectKey ya validado (HeadObject) y la
+   * URL estable resuelta por modules/storage. Devuelve el objectKey
+   * anterior para que el llamador lo borre del bucket en modo
+   * best-effort después de que esta escritura confirme.
+   */
+  async completeProfilePhotoUpload(
+    userId: string,
+    objectKey: string,
+    resolvedPhotoUrl: string,
+  ): Promise<{ profile: DriverProfile; previousObjectKey: string | null }> {
+    const profile = await this.assertProfilePhotoUploadAllowed(userId);
+
+    const previousObjectKey = profile.photoObjectKey;
+
+    profile.photoObjectKey = objectKey;
+    profile.photoUrl = resolvedPhotoUrl;
+
+    const saved = await this.driverProfilesRepository.save(profile);
+
+    return { profile: saved, previousObjectKey };
+  }
+
   private assertEditable(profile: DriverProfile): void {
     const editableStatuses = [DriverStatus.DRAFT, DriverStatus.REJECTED];
 

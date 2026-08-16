@@ -380,6 +380,46 @@ describe('DriverApplicationSubmissionService', () => {
     expect(profileRepository.save).not.toHaveBeenCalled();
   });
 
+  it('STORAGE-R2: acepta un documento subido vía Storage (fileObjectKey) sin fileUrl legacy', async () => {
+    /*
+     * submitWithinTransaction muta los documentos recibidos en el
+     * lugar (status/rejectionReason/...). Cada test debe pasarle
+     * copias propias, nunca las referencias compartidas de
+     * completeDocuments, o contamina los demás tests del archivo.
+     */
+    const documentsWithStorageSoat = completeDocuments.map((document) =>
+      document.type === DriverDocumentType.SOAT
+        ? {
+            ...document,
+            fileUrl: null,
+            fileObjectKey: 'drivers/profile-1/documents/soat/1.jpg',
+          }
+        : { ...document },
+    );
+
+    documentQueryBuilder.getMany.mockResolvedValue(documentsWithStorageSoat);
+
+    const result = await service.submit(userId);
+
+    expect(result.status).toBe(DriverStatus.PENDING_REVIEW);
+  });
+
+  it('STORAGE-R2: rechaza un documento sin fileUrl NI fileObjectKey', async () => {
+    const documentsWithoutFile = completeDocuments.map((document) =>
+      document.type === DriverDocumentType.SOAT
+        ? { ...document, fileUrl: null, fileObjectKey: null }
+        : { ...document },
+    );
+
+    documentQueryBuilder.getMany.mockResolvedValue(documentsWithoutFile);
+
+    await expect(service.submit(userId)).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+
+    expect(profileRepository.save).not.toHaveBeenCalled();
+  });
+
   it('debe rechazar un SOAT vencido', async () => {
     documentQueryBuilder.getMany.mockResolvedValue(
       completeDocuments.map((document) =>

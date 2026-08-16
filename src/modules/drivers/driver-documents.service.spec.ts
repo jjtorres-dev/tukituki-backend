@@ -340,4 +340,123 @@ describe('DriverDocumentsService', () => {
 
     expect(documentRepository.remove).toHaveBeenCalledTimes(1);
   });
+
+  describe('STORAGE-R2: assertDocumentUploadAllowed / completeDocumentUpload', () => {
+    it('assertDocumentUploadAllowed exige perfil editable y vehículo registrado', async () => {
+      profileRepository.findOne.mockResolvedValue({ ...profile });
+      vehicleRepository.findOne.mockResolvedValue({ ...vehicle });
+
+      await expect(
+        service.assertDocumentUploadAllowed(userId),
+      ).resolves.toMatchObject({ id: profile.id });
+    });
+
+    it('assertDocumentUploadAllowed rechaza si todavía no hay vehículo', async () => {
+      profileRepository.findOne.mockResolvedValue({ ...profile });
+      vehicleRepository.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.assertDocumentUploadAllowed(userId),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('completeDocumentUpload crea el documento en DRAFT cuando no existe todavía', async () => {
+      profileRepository.findOne.mockResolvedValue({ ...profile });
+      vehicleRepository.findOne.mockResolvedValue({ ...vehicle });
+      documentRepository.findOne.mockResolvedValue(null);
+
+      const { document: created, previousObjectKey } =
+        await service.completeDocumentUpload(
+          userId,
+          DriverDocumentType.SOAT,
+          'drivers/profile-1/documents/soat/new-object-key.jpg',
+        );
+
+      expect(created.status).toBe(DriverDocumentStatus.DRAFT);
+      expect(created.fileObjectKey).toBe(
+        'drivers/profile-1/documents/soat/new-object-key.jpg',
+      );
+      expect(created.fileUrl).toBeNull();
+      expect(previousObjectKey).toBeNull();
+    });
+
+    it('completeDocumentUpload reemplaza el objectKey de un documento existente y devuelve el anterior', async () => {
+      profileRepository.findOne.mockResolvedValue({ ...profile });
+      vehicleRepository.findOne.mockResolvedValue({ ...vehicle });
+      documentRepository.findOne.mockResolvedValue({
+        ...document,
+        fileObjectKey: 'drivers/profile-1/documents/driver-license/old.jpg',
+      });
+
+      const { document: updated, previousObjectKey } =
+        await service.completeDocumentUpload(
+          userId,
+          DriverDocumentType.DRIVER_LICENSE,
+          'drivers/profile-1/documents/driver-license/new.jpg',
+        );
+
+      expect(updated.fileObjectKey).toBe(
+        'drivers/profile-1/documents/driver-license/new.jpg',
+      );
+      expect(previousObjectKey).toBe(
+        'drivers/profile-1/documents/driver-license/old.jpg',
+      );
+    });
+
+    it('completeDocumentUpload reactiva a DRAFT un documento previamente RECHAZADO', async () => {
+      profileRepository.findOne.mockResolvedValue({ ...profile });
+      vehicleRepository.findOne.mockResolvedValue({ ...vehicle });
+      documentRepository.findOne.mockResolvedValue({
+        ...document,
+        status: DriverDocumentStatus.REJECTED,
+        rejectionReason: 'Ilegible',
+      });
+
+      const { document: updated } = await service.completeDocumentUpload(
+        userId,
+        DriverDocumentType.DRIVER_LICENSE,
+        'drivers/profile-1/documents/driver-license/new.jpg',
+      );
+
+      expect(updated.status).toBe(DriverDocumentStatus.DRAFT);
+      expect(updated.rejectionReason).toBeNull();
+    });
+
+    it('completeDocumentUpload rechaza reemplazar un documento ya PENDING_REVIEW', async () => {
+      profileRepository.findOne.mockResolvedValue({ ...profile });
+      vehicleRepository.findOne.mockResolvedValue({ ...vehicle });
+      documentRepository.findOne.mockResolvedValue({
+        ...document,
+        status: DriverDocumentStatus.PENDING_REVIEW,
+      });
+
+      await expect(
+        service.completeDocumentUpload(
+          userId,
+          DriverDocumentType.DRIVER_LICENSE,
+          'drivers/profile-1/documents/driver-license/new.jpg',
+        ),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+  });
+
+  describe('STORAGE-R2: getMyDocumentForDownload', () => {
+    it('devuelve el documento cuando pertenece al conductor autenticado', async () => {
+      profileRepository.findOne.mockResolvedValue({ ...profile });
+      documentRepository.findOne.mockResolvedValue({ ...document });
+
+      await expect(
+        service.getMyDocumentForDownload(userId, document.id),
+      ).resolves.toMatchObject({ id: document.id });
+    });
+
+    it('lanza NotFoundException si el documento no pertenece al conductor', async () => {
+      profileRepository.findOne.mockResolvedValue({ ...profile });
+      documentRepository.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.getMyDocumentForDownload(userId, 'otro-documento'),
+      ).rejects.toBeInstanceOf(NotFoundException);
+    });
+  });
 });
