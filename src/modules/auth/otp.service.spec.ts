@@ -341,6 +341,131 @@ describe('OtpService', () => {
     });
   });
 
+  describe('OTP-DEMO-R1 — demo mode en staging', () => {
+    const DEMO_PHONE = '+51911111111';
+
+    function buildDemoService(overrides: Record<string, unknown> = {}) {
+      return buildService({
+        OTP_DEBUG_ENABLED: false,
+        NODE_ENV: 'production',
+        OTP_DEMO_ENABLED: true,
+        RAILWAY_ENVIRONMENT_NAME: 'staging',
+        OTP_DEMO_ALLOWED_PHONE_E164: DEMO_PHONE,
+        ...overrides,
+      });
+    }
+
+    it('demo off: no incluye debugOtp aunque el resto de condiciones se cumplan', async () => {
+      const { service, usersService } = buildDemoService({
+        OTP_DEMO_ENABLED: false,
+      });
+      usersService.findByPhoneE164.mockResolvedValue(buildUser());
+
+      const result = await service.requestPhoneVerification(DEMO_PHONE, IP);
+
+      expect(result.debugOtp).toBeUndefined();
+    });
+
+    it('demo on + staging + teléfono permitido: incluye debugOtp', async () => {
+      const { service, usersService } = buildDemoService();
+      usersService.findByPhoneE164.mockResolvedValue(buildUser());
+
+      const result = await service.requestPhoneVerification(DEMO_PHONE, IP);
+
+      expect(result.debugOtp).toMatch(/^\d{6}$/);
+    });
+
+    it('demo on + staging + teléfono distinto al allowlisted: no incluye debugOtp', async () => {
+      const { service, usersService } = buildDemoService();
+      usersService.findByPhoneE164.mockResolvedValue(
+        buildUser({ phoneE164: PHONE }),
+      );
+
+      const result = await service.requestPhoneVerification(PHONE, IP);
+
+      expect(result.debugOtp).toBeUndefined();
+    });
+
+    it('demo on pero environment de Railway no es staging: no incluye debugOtp', async () => {
+      const { service, usersService } = buildDemoService({
+        RAILWAY_ENVIRONMENT_NAME: 'production',
+      });
+      usersService.findByPhoneE164.mockResolvedValue(buildUser());
+
+      const result = await service.requestPhoneVerification(DEMO_PHONE, IP);
+
+      expect(result.debugOtp).toBeUndefined();
+    });
+
+    it('el debugOtp expuesto es exactamente el OTP real: verify lo acepta', async () => {
+      const { service, usersService } = buildDemoService();
+      usersService.findByPhoneE164.mockResolvedValue(
+        buildUser({ phoneE164: DEMO_PHONE }),
+      );
+      usersService.activatePhone.mockResolvedValue(
+        buildUser({ phoneE164: DEMO_PHONE, isPhoneVerified: true }),
+      );
+
+      const { debugOtp } = await service.requestPhoneVerification(
+        DEMO_PHONE,
+        IP,
+      );
+      const result = await service.verifyPhone(DEMO_PHONE, debugOtp as string);
+
+      expect(result.user.isPhoneVerified).toBe(true);
+    });
+
+    it('demo mode no evita el cooldown de reenvío', async () => {
+      const { service, usersService } = buildDemoService();
+      usersService.findByPhoneE164.mockResolvedValue(
+        buildUser({ phoneE164: DEMO_PHONE }),
+      );
+
+      await service.requestPhoneVerification(DEMO_PHONE, IP);
+
+      await expectTooManyRequests(
+        service.requestPhoneVerification(DEMO_PHONE, IP),
+      );
+    });
+
+    it('demo mode no evita el rate limit por teléfono', async () => {
+      const { service, usersService, store } = buildDemoService({
+        OTP_REQUEST_PHONE_LIMIT: 1,
+      });
+      usersService.findByPhoneE164.mockResolvedValue(
+        buildUser({ phoneE164: DEMO_PHONE }),
+      );
+
+      await service.requestPhoneVerification(DEMO_PHONE, IP);
+      store.delete(`auth:otp:phone:${DEMO_PHONE}:cooldown`);
+
+      await expectTooManyRequests(
+        service.requestPhoneVerification(DEMO_PHONE, IP),
+        'teléfono',
+      );
+    });
+
+    it('demo mode preserva el single-use del código', async () => {
+      const { service, usersService } = buildDemoService();
+      usersService.findByPhoneE164.mockResolvedValue(
+        buildUser({ phoneE164: DEMO_PHONE }),
+      );
+      usersService.activatePhone.mockResolvedValue(
+        buildUser({ phoneE164: DEMO_PHONE, isPhoneVerified: true }),
+      );
+
+      const { debugOtp } = await service.requestPhoneVerification(
+        DEMO_PHONE,
+        IP,
+      );
+      await service.verifyPhone(DEMO_PHONE, debugOtp as string);
+
+      await expect(
+        service.verifyPhone(DEMO_PHONE, debugOtp as string),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+  });
+
   describe('verifyPhone', () => {
     async function requestValidOtp(overrides: Record<string, unknown> = {}) {
       const built = buildService(overrides);

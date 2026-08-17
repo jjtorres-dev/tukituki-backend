@@ -81,6 +81,84 @@ describe('envValidationSchema — OTP_DEBUG_ENABLED', () => {
   });
 });
 
+describe('envValidationSchema — OTP_DEMO_ENABLED (OTP-DEMO-R1)', () => {
+  it('OTP_DEMO_ENABLED=false → pasa sin importar el environment de Railway', () => {
+    const { error, value } = validate(baseEnv({ OTP_DEMO_ENABLED: 'false' }));
+
+    expect(error).toBeUndefined();
+    expect(value.OTP_DEMO_ENABLED).toBe(false);
+  });
+
+  it('sin OTP_DEMO_ENABLED → pasa con default false', () => {
+    const { error, value } = validate(baseEnv());
+
+    expect(error).toBeUndefined();
+    expect(value.OTP_DEMO_ENABLED).toBe(false);
+  });
+
+  it('OTP_DEMO_ENABLED=true + RAILWAY_ENVIRONMENT_NAME=staging + teléfono permitido → pasa', () => {
+    const { error } = validate(
+      baseEnv({
+        OTP_DEMO_ENABLED: 'true',
+        RAILWAY_ENVIRONMENT_NAME: 'staging',
+        OTP_DEMO_ALLOWED_PHONE_E164: '+51900000001',
+      }),
+    );
+
+    expect(error).toBeUndefined();
+  });
+
+  it('OTP_DEMO_ENABLED=true + Railway environment production → falla', () => {
+    const { error } = validate(
+      baseEnv({
+        OTP_DEMO_ENABLED: 'true',
+        RAILWAY_ENVIRONMENT_NAME: 'production',
+        OTP_DEMO_ALLOWED_PHONE_E164: '+51900000001',
+      }),
+    );
+
+    expect(error).toBeDefined();
+    expect(error?.message).toContain('RAILWAY_ENVIRONMENT_NAME');
+  });
+
+  it('OTP_DEMO_ENABLED=true + Railway environment vacío/no disponible → falla', () => {
+    const { error } = validate(
+      baseEnv({
+        OTP_DEMO_ENABLED: 'true',
+        OTP_DEMO_ALLOWED_PHONE_E164: '+51900000001',
+      }),
+    );
+
+    expect(error).toBeDefined();
+    expect(error?.message).toContain('RAILWAY_ENVIRONMENT_NAME');
+  });
+
+  it('OTP_DEMO_ENABLED=true + staging pero sin teléfono allowlisted → falla', () => {
+    const { error } = validate(
+      baseEnv({
+        OTP_DEMO_ENABLED: 'true',
+        RAILWAY_ENVIRONMENT_NAME: 'staging',
+      }),
+    );
+
+    expect(error).toBeDefined();
+    expect(error?.message).toContain('OTP_DEMO_ALLOWED_PHONE_E164');
+  });
+
+  it('OTP_DEBUG_ENABLED=true + NODE_ENV=production sigue fallando aunque OTP_DEMO esté involucrado', () => {
+    const { error } = validate(
+      baseEnv({
+        NODE_ENV: 'production',
+        OTP_DEBUG_ENABLED: 'true',
+        OTP_DEMO_ENABLED: 'false',
+      }),
+    );
+
+    expect(error).toBeDefined();
+    expect(error?.message).toContain('OTP_DEBUG_ENABLED');
+  });
+});
+
 describe('envValidationSchema — límites dedicados de OTP request', () => {
   it('aplica los defaults documentados cuando no se configuran', () => {
     const { error, value } = validate(baseEnv());

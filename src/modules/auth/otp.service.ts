@@ -83,15 +83,46 @@ export class OtpService {
     const otpDebugEnabled =
       this.configService.get<boolean>('OTP_DEBUG_ENABLED') ?? false;
 
+    const demoOtpAllowed = this.isDemoOtpAllowed(phoneE164);
+
     return {
       expiresIn: ttl,
 
-      ...(nodeEnvironment === 'development' || otpDebugEnabled
+      ...(nodeEnvironment === 'development' || otpDebugEnabled || demoOtpAllowed
         ? {
             debugOtp: code,
           }
         : {}),
     };
+  }
+
+  /*
+   * OTP-DEMO-R1 (TEMPORARY): expone el OTP real generado arriba —
+   * nunca uno distinto ni un bypass de verify — únicamente cuando las
+   * tres condiciones se cumplen a la vez: el flag demo está activo, el
+   * environment real de Railway (no NODE_ENV) es "staging", y el
+   * teléfono solicitado es exactamente el de la allowlist QA. Retirar
+   * junto con OTP_DEMO_ENABLED cuando OTP-R3 (SMS real) esté listo.
+   */
+  private isDemoOtpAllowed(phoneE164: string): boolean {
+    const demoEnabled =
+      this.configService.get<boolean>('OTP_DEMO_ENABLED') ?? false;
+
+    if (!demoEnabled) {
+      return false;
+    }
+
+    const railwayEnvironmentName =
+      this.configService.get<string>('RAILWAY_ENVIRONMENT_NAME') ?? '';
+
+    if (railwayEnvironmentName !== 'staging') {
+      return false;
+    }
+
+    const allowedPhone =
+      this.configService.get<string>('OTP_DEMO_ALLOWED_PHONE_E164') ?? '';
+
+    return allowedPhone.length > 0 && phoneE164 === allowedPhone;
   }
 
   async verifyPhone(phoneE164: string, code: string) {
