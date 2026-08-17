@@ -131,6 +131,37 @@ export const envValidationSchema = Joi.object({
     .max(86400)
     .default(3600),
 
+  /*
+   * OTP-DEMO-R1 (TEMPORARY): infraestructura demo para mostrar el
+   * flujo real de verificación telefónica en Railway STAGING mientras
+   * no exista proveedor SMS (OTP-R3). Deliberadamente separado de
+   * OTP_DEBUG_ENABLED, que sigue bloqueado en producción por OTP-R2 y
+   * NO se reutiliza aquí. Railway inyecta RAILWAY_ENVIRONMENT_NAME en
+   * cada deployment; ese es el único environment de confianza — nunca
+   * NODE_ENV (que en staging sigue siendo "production") ni nada
+   * definido desde Flutter. Retirar cuando OTP-R3 esté disponible.
+   */
+  RAILWAY_ENVIRONMENT_NAME: Joi.when('OTP_DEMO_ENABLED', {
+    is: true,
+    then: Joi.string().valid('staging').required().messages({
+      'any.only':
+        'OTP_DEMO_ENABLED solo puede activarse cuando RAILWAY_ENVIRONMENT_NAME=staging',
+      'any.required':
+        'OTP_DEMO_ENABLED requiere que Railway exponga RAILWAY_ENVIRONMENT_NAME=staging',
+      'string.empty':
+        'OTP_DEMO_ENABLED requiere que Railway exponga RAILWAY_ENVIRONMENT_NAME=staging',
+    }),
+    otherwise: Joi.string().allow('').optional(),
+  }),
+
+  OTP_DEMO_ENABLED: Joi.boolean().truthy('true').falsy('false').default(false),
+
+  OTP_DEMO_ALLOWED_PHONE_E164: Joi.when('OTP_DEMO_ENABLED', {
+    is: true,
+    then: Joi.string().min(8).max(20).required(),
+    otherwise: Joi.string().allow('').optional(),
+  }),
+
   JWT_ACCESS_SECRET: Joi.string().min(64).required(),
 
   JWT_ACCESS_TTL_SECONDS: Joi.number()
