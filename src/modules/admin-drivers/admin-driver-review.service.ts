@@ -19,7 +19,7 @@ import { DriverStatus } from '../drivers/enums/driver-status.enum';
 import { VehicleStatus } from '../drivers/enums/vehicle-status.enum';
 import { User } from '../users/entities/user.entity';
 import { UserRole } from '../users/enums/user-role.enum';
-import { UserStatus } from '../users/enums/user-status.enum';
+import { isUserOperationallyEnabled } from '../users/utils/user-auth-policy.util';
 import { RejectDriverApplicationDto } from './dto/reject-driver-application.dto';
 
 @Injectable()
@@ -358,7 +358,7 @@ export class AdminDriverReviewService {
   }
 
   private assertUserCanBecomeDriver(user: User): void {
-    if (user.status !== UserStatus.ACTIVE || !user.isPhoneVerified) {
+    if (!isUserOperationallyEnabled(user)) {
       throw new BadRequestException(
         'La cuenta del solicitante no está habilitada',
       );

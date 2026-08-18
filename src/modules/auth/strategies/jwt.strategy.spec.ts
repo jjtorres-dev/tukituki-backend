@@ -22,13 +22,17 @@ describe('JwtStrategy', () => {
     type: 'access',
   };
 
-  const user = (roles: UserRole[], status = UserStatus.ACTIVE): User =>
+  const user = (
+    roles: UserRole[],
+    status = UserStatus.ACTIVE,
+    isPhoneVerified = false,
+  ): User =>
     ({
       id: userId,
       phoneE164,
       roles,
       status,
-      isPhoneVerified: false,
+      isPhoneVerified,
       createdAt,
     }) as User;
 
@@ -53,43 +57,112 @@ describe('JwtStrategy', () => {
     );
   });
 
-  it('permite Passenger-only ACTIVE no verificado con sesión activa', async () => {
-    usersService.findById.mockResolvedValue(user([UserRole.PASSENGER]));
+  it.each<[string, UserRole[]]>([
+    ['Passenger', [UserRole.PASSENGER]],
+    ['Driver', [UserRole.DRIVER]],
+    ['Passenger + Driver', [UserRole.PASSENGER, UserRole.DRIVER]],
+  ])(
+    'permite JWT de %s ACTIVE no verificado durante MVP (isPhoneVerified no gatea consumidor)',
+    async (_label, roles) => {
+      usersService.findById.mockResolvedValue(
+        user(roles, UserStatus.ACTIVE, false),
+      );
+
+      const result = await strategy.validate(payload);
+
+      expect(result.roles).toEqual(roles);
+      expect(result.isPhoneVerified).toBe(false);
+      expect(authSessionsService.isActive).toHaveBeenCalledWith(
+        sessionId,
+        userId,
+      );
+    },
+  );
+
+  it.each<[string, UserRole[]]>([
+    ['Passenger', [UserRole.PASSENGER]],
+    ['Driver', [UserRole.DRIVER]],
+  ])('permite JWT de %s ACTIVE verificado', async (_label, roles) => {
+    usersService.findById.mockResolvedValue(
+      user(roles, UserStatus.ACTIVE, true),
+    );
 
     const result = await strategy.validate(payload);
 
-    expect(result.isPhoneVerified).toBe(false);
-    expect(result.roles).toEqual([UserRole.PASSENGER]);
+    expect(result.isPhoneVerified).toBe(true);
     expect(authSessionsService.isActive).toHaveBeenCalledWith(
       sessionId,
       userId,
     );
   });
 
-  it('rechaza JWT de Passenger-only PENDING no verificado', async () => {
+  it.each<[string, UserRole[]]>([
+    ['Admin', [UserRole.ADMIN]],
+    ['Super Admin', [UserRole.SUPER_ADMIN]],
+  ])(
+    'rechaza JWT de %s ACTIVE no verificado (seguridad administrativa preservada)',
+    async (_label, roles) => {
+      usersService.findById.mockResolvedValue(
+        user(roles, UserStatus.ACTIVE, false),
+      );
+
+      await expect(strategy.validate(payload)).rejects.toBeInstanceOf(
+        UnauthorizedException,
+      );
+
+      expect(authSessionsService.isActive).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each<[string, UserRole[]]>([
+    ['Admin', [UserRole.ADMIN]],
+    ['Super Admin', [UserRole.SUPER_ADMIN]],
+  ])('permite JWT de %s ACTIVE verificado', async (_label, roles) => {
     usersService.findById.mockResolvedValue(
-      user([UserRole.PASSENGER], UserStatus.PENDING),
+      user(roles, UserStatus.ACTIVE, true),
     );
 
-    await expect(strategy.validate(payload)).rejects.toBeInstanceOf(
-      UnauthorizedException,
-    );
+    const result = await strategy.validate(payload);
 
-    expect(authSessionsService.isActive).not.toHaveBeenCalled();
+    expect(result.isPhoneVerified).toBe(true);
+    expect(authSessionsService.isActive).toHaveBeenCalledWith(
+      sessionId,
+      userId,
+    );
   });
 
   it.each<[string, UserRole[]]>([
-    ['Driver', [UserRole.DRIVER]],
-    ['Admin', [UserRole.ADMIN]],
-    ['Super Admin', [UserRole.SUPER_ADMIN]],
-    ['Passenger + Driver', [UserRole.PASSENGER, UserRole.DRIVER]],
-  ])('rechaza JWT de %s ACTIVE no verificado', async (_label, roles) => {
-    usersService.findById.mockResolvedValue(user(roles));
+    ['Passenger + Admin', [UserRole.PASSENGER, UserRole.ADMIN]],
+    ['Driver + Super Admin', [UserRole.DRIVER, UserRole.SUPER_ADMIN]],
+  ])(
+    'rechaza JWT de %s ACTIVE no verificado (el rol administrativo gana)',
+    async (_label, roles) => {
+      usersService.findById.mockResolvedValue(
+        user(roles, UserStatus.ACTIVE, false),
+      );
 
-    await expect(strategy.validate(payload)).rejects.toBeInstanceOf(
-      UnauthorizedException,
-    );
+      await expect(strategy.validate(payload)).rejects.toBeInstanceOf(
+        UnauthorizedException,
+      );
 
-    expect(authSessionsService.isActive).not.toHaveBeenCalled();
-  });
+      expect(authSessionsService.isActive).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each<[string, UserRole[], UserStatus]>([
+    ['Passenger', [UserRole.PASSENGER], UserStatus.PENDING],
+    ['Driver', [UserRole.DRIVER], UserStatus.SUSPENDED],
+    ['Admin', [UserRole.ADMIN], UserStatus.BLOCKED],
+  ])(
+    'rechaza JWT de %s cuando el status no es ACTIVE, aunque isPhoneVerified sea true',
+    async (_label, roles, status) => {
+      usersService.findById.mockResolvedValue(user(roles, status, true));
+
+      await expect(strategy.validate(payload)).rejects.toBeInstanceOf(
+        UnauthorizedException,
+      );
+
+      expect(authSessionsService.isActive).not.toHaveBeenCalled();
+    },
+  );
 });

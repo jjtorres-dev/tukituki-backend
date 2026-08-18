@@ -388,6 +388,49 @@ describe('AdminDriverReviewService', () => {
     ).toHaveBeenCalledWith(profile.id);
   });
 
+  describe('MVP: isPhoneVerified no gatea la aprobación de Driver', () => {
+    it('aprueba un solicitante ACTIVE con isPhoneVerified=false', async () => {
+      userQueryBuilder.getOne.mockResolvedValue({
+        ...user,
+        isPhoneVerified: false,
+      });
+
+      await service.approve(profile.id, adminUserId);
+
+      expect(savedProfile?.status).toBe(DriverStatus.APPROVED);
+      expect(savedUser?.roles).toContain(UserRole.DRIVER);
+      expect(savedUser?.isPhoneVerified).toBe(false);
+    });
+
+    it('aprueba un solicitante ACTIVE con isPhoneVerified=true', async () => {
+      userQueryBuilder.getOne.mockResolvedValue({
+        ...user,
+        isPhoneVerified: true,
+      });
+
+      await service.approve(profile.id, adminUserId);
+
+      expect(savedProfile?.status).toBe(DriverStatus.APPROVED);
+      expect(savedUser?.roles).toContain(UserRole.DRIVER);
+      expect(savedUser?.isPhoneVerified).toBe(true);
+    });
+
+    it('rechaza aprobar un solicitante cuyo status no es ACTIVE, aunque isPhoneVerified sea true', async () => {
+      userQueryBuilder.getOne.mockResolvedValue({
+        ...user,
+        status: UserStatus.SUSPENDED,
+        isPhoneVerified: true,
+      });
+
+      await expect(
+        service.approve(profile.id, adminUserId),
+      ).rejects.toBeInstanceOf(BadRequestException);
+
+      expect(savedProfile).toBeUndefined();
+      expect(savedUser).toBeUndefined();
+    });
+  });
+
   describe('DRIVER-ONBOARDING-R2: 3 documentos target + foto obligatoria', () => {
     const targetOnlyDocuments: DriverDocument[] = [
       createDocument(DriverDocumentType.DRIVER_LICENSE),

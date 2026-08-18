@@ -11,7 +11,7 @@ import { UserRole } from '../users/enums/user-role.enum';
 import { UserStatus } from '../users/enums/user-status.enum';
 import type { User } from '../users/entities/user.entity';
 import { UsersService } from '../users/users.service';
-import { isPassengerOnlyUser } from '../users/utils/user-auth-policy.util';
+import { isUserOperationallyEnabled } from '../users/utils/user-auth-policy.util';
 import { LoginDto } from './dto/login.dto';
 import { LoginResponseDto } from './dto/login-response.dto';
 import { RegisterPassengerDto } from './dto/register-passenger.dto';
@@ -80,7 +80,7 @@ export class AuthService {
       throw new UnauthorizedException('Teléfono o contraseña incorrectos');
     }
 
-    if (user.status !== UserStatus.ACTIVE) {
+    if (!isUserOperationallyEnabled(user)) {
       if (user.status === UserStatus.PENDING) {
         throw new ForbiddenException('Debes verificar tu número telefónico');
       }
@@ -88,10 +88,6 @@ export class AuthService {
       throw new ForbiddenException(
         'La cuenta no está habilitada para iniciar sesión',
       );
-    }
-
-    if (!user.isPhoneVerified && !isPassengerOnlyUser(user)) {
-      throw new ForbiddenException('Debes verificar tu número telefónico');
     }
 
     return this.createSession(user, context);
