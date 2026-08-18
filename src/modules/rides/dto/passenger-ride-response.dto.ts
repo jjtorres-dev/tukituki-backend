@@ -40,6 +40,12 @@ export class AssignedDriverResponseDto {
   @ApiProperty()
   firstName!: string;
 
+  /*
+   * "Pérez" -> "P.". Nunca el apellido completo.
+   */
+  @ApiProperty({ example: 'P.' })
+  lastNameInitial!: string;
+
   @ApiPropertyOptional({ nullable: true })
   photoUrl!: string | null;
 

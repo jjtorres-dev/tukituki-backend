@@ -141,7 +141,11 @@ describe('DriverRideOffersService', () => {
     const passengerProfileRepository = {
       find: jest.fn(() =>
         Promise.resolve([
-          { userId: ride.passengerUserId, firstName: 'Carlos' },
+          {
+            userId: ride.passengerUserId,
+            firstName: 'Carlos',
+            lastName: 'Mendoza',
+          },
         ]),
       ),
     };
@@ -303,17 +307,23 @@ describe('DriverRideOffersService - getActiveOffers (G3B1)', () => {
   function createActiveOffersContext(
     offers: RideOffer[],
     driverStatus: DriverOperationalStatus = DriverOperationalStatus.AVAILABLE,
-    passengerFirstNames?: Map<string, string>,
+    passengerIdentities?: Map<string, { firstName: string; lastName: string }>,
   ) {
     /*
      * Por defecto, cada passengerUserId presente en las Offers
-     * "tiene" un PassengerProfile real (firstName: 'Carlos'). Pasar
-     * un Map explícito (incluso vacío) permite simular un
-     * PassengerProfile faltante para probar el camino null-safe.
+     * "tiene" un PassengerProfile real (firstName: 'Carlos',
+     * lastName: 'Mendoza' -> lastNameInitial 'M.'). Pasar un Map
+     * explícito (incluso vacío) permite simular un PassengerProfile
+     * faltante para probar el camino null-safe.
      */
-    const knownFirstNames =
-      passengerFirstNames ??
-      new Map(offers.map((offer) => [offer.ride.passengerUserId, 'Carlos']));
+    const knownIdentities =
+      passengerIdentities ??
+      new Map(
+        offers.map((offer) => [
+          offer.ride.passengerUserId,
+          { firstName: 'Carlos', lastName: 'Mendoza' },
+        ]),
+      );
 
     const profile = {
       id: driverProfileIdA,
@@ -353,8 +363,16 @@ describe('DriverRideOffersService - getActiveOffers (G3B1)', () => {
 
         return Promise.resolve(
           requestedIds
-            .filter((id) => knownFirstNames.has(id))
-            .map((id) => ({ userId: id, firstName: knownFirstNames.get(id) })),
+            .filter((id) => knownIdentities.has(id))
+            .map((id) => {
+              const identity = knownIdentities.get(id)!;
+
+              return {
+                userId: id,
+                firstName: identity.firstName,
+                lastName: identity.lastName,
+              };
+            }),
         );
       }),
     };
@@ -387,7 +405,7 @@ describe('DriverRideOffersService - getActiveOffers (G3B1)', () => {
     return { service, offerRepository, passengerProfileRepository };
   }
 
-  it('incluye firstName real del Passenger en cada Offer, vía UNA sola query batch (sin N+1)', async () => {
+  it('incluye firstName + lastNameInitial real del Passenger en cada Offer, vía UNA sola query batch (sin N+1)', async () => {
     const rideA = {
       id: rideIdA,
       passengerUserId: 'passenger-a',
@@ -438,9 +456,11 @@ describe('DriverRideOffersService - getActiveOffers (G3B1)', () => {
     expect(result).toHaveLength(2);
     expect(result.find((o) => o.id === offerIdA)?.ride.passenger).toEqual({
       firstName: 'Carlos',
+      lastNameInitial: 'M.',
     });
     expect(result.find((o) => o.id === 'offer-b')?.ride.passenger).toEqual({
       firstName: 'Carlos',
+      lastNameInitial: 'M.',
     });
 
     // Batch real: UNA sola query para las 2 Offers de 2 passengers

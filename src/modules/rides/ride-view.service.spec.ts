@@ -75,6 +75,7 @@ describe('RideViewService', () => {
     const profile = {
       id: driverProfileId,
       firstName: 'Carlos',
+      lastName: 'Landeo',
       photoUrl: 'https://cdn.tukituki.pe/carlos.jpg',
       ratingAverage: '4.92',
       ratingCount: 128,
@@ -116,6 +117,7 @@ describe('RideViewService', () => {
 
     expect(result.driver?.profileId).toBe(driverProfileId);
     expect(result.driver?.firstName).toBe('Carlos');
+    expect(result.driver?.lastNameInitial).toBe('L.');
     expect(result.driver?.photoUrl).toBe('https://cdn.tukituki.pe/carlos.jpg');
     expect(result.driver?.ratingAverage).toBe('4.92');
     expect(result.driver?.ratingCount).toBe(128);
@@ -131,6 +133,7 @@ describe('RideViewService', () => {
     const profile = {
       id: driverProfileId,
       firstName: 'Carlos',
+      lastName: 'Landeo',
       photoUrl: null,
       ratingAverage: '0.00',
       ratingCount: 0,
@@ -216,6 +219,7 @@ describe('RideViewService', () => {
     expect(result.passenger).not.toBeNull();
     expect(result.passenger?.profileId).toBe(passengerProfileId);
     expect(result.passenger?.firstName).toBe('María');
+    expect(result.passenger?.lastNameInitial).toBe('F.');
     expect(result.passenger?.photoUrl).toBe(
       'https://cdn.tukituki.pe/maria.jpg',
     );
@@ -262,6 +266,38 @@ describe('RideViewService', () => {
     expect(result.passenger?.photoUrl).toBeNull();
     expect(result.passenger?.ratingAverage).toBe('0.00');
     expect(result.passenger?.ratingCount).toBe(0);
+  });
+
+  it('legacy: lastName vacío/solo espacios no produce crash y lastNameInitial queda vacío', async () => {
+    const passengerProfile = {
+      id: passengerProfileId,
+      userId: passengerUserId,
+      firstName: 'María',
+      lastName: '   ',
+      photoUrl: null,
+      ratingAverage: '0.00',
+      ratingCount: 0,
+    } as PassengerProfile;
+
+    const dataSourceMock = {
+      getRepository: jest.fn((entity: unknown): unknown => ({
+        findOne: jest.fn(() => {
+          if (entity === PassengerProfile) {
+            return Promise.resolve(passengerProfile);
+          }
+          return Promise.resolve(null);
+        }),
+      })),
+    };
+    const service = new RideViewService(
+      dataSourceMock as unknown as DataSource,
+      avatarResolverMock,
+    );
+
+    const result = await service.toDriverResponse(ride, null);
+
+    expect(result.passenger?.firstName).toBe('María');
+    expect(result.passenger?.lastNameInitial).toBe('');
   });
 
   it('debe devolver passenger null si el perfil no existe', async () => {

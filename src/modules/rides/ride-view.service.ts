@@ -6,6 +6,7 @@ import { DriverProfile } from '../drivers/entities/driver-profile.entity';
 import { DriverVehicle } from '../drivers/entities/driver-vehicle.entity';
 import { PassengerProfile } from '../passengers/entities/passenger-profile.entity';
 import { AvatarUrlResolverService } from '../storage/avatar-url-resolver.service';
+import { deriveLastNameInitial } from './utils/last-name-initial.util';
 import {
   DriverActiveRideResponseDto,
   RideAssignedPassengerResponseDto,
@@ -41,6 +42,7 @@ export class RideViewService {
         driver = {
           profileId: profile.id,
           firstName: profile.firstName,
+          lastNameInitial: deriveLastNameInitial(profile.lastName),
           photoUrl: this.avatarResolver.resolveDriverAvatarUrl(profile),
           ratingAverage: profile.ratingAverage,
           ratingCount: profile.ratingCount,
@@ -108,9 +110,10 @@ export class RideViewService {
   }
 
   /**
-   * Resumen mínimo del Passenger, sin apellido/teléfono/email/documento.
-   * Degrada a null si el perfil no existe (nunca inventa "Pasajero" ni
-   * un rating por defecto que no venga del propio perfil).
+   * Resumen mínimo del Passenger: firstName + lastNameInitial (nunca
+   * apellido completo/teléfono/email/documento). Degrada a null si el
+   * perfil no existe (nunca inventa "Pasajero" ni un rating por
+   * defecto que no venga del propio perfil).
    */
   private passengerSummary(
     profile: PassengerProfile | null,
@@ -122,6 +125,7 @@ export class RideViewService {
     return {
       profileId: profile.id,
       firstName: profile.firstName,
+      lastNameInitial: deriveLastNameInitial(profile.lastName),
       photoUrl: this.avatarResolver.resolvePassengerAvatarUrl(profile),
       ratingAverage: profile.ratingAverage,
       ratingCount: profile.ratingCount,

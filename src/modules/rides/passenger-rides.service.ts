@@ -60,6 +60,7 @@ import {
   calculateRideSearchExpiresAt,
 } from './ride-matching.constants';
 import { AvatarUrlResolverService } from '../storage/avatar-url-resolver.service';
+import { deriveLastNameInitial } from './utils/last-name-initial.util';
 
 export const ACTIVE_RIDE_STATUSES: readonly RideStatus[] = [
   RideStatus.SEARCHING_DRIVER,
@@ -507,10 +508,9 @@ export class PassengerRidesService {
 
       const proposedCents = parseScaledDecimal(offer.proposedFare, 2);
 
-      const lastName = offer.driverProfile.lastName.trim();
-
-      const lastNameInitial =
-        lastName.length > 0 ? `${lastName.charAt(0).toUpperCase()}.` : '';
+      const lastNameInitial = deriveLastNameInitial(
+        offer.driverProfile.lastName,
+      );
 
       return {
         offerId: offer.id,

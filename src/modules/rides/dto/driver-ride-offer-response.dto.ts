@@ -15,12 +15,20 @@ export class DriverRideOfferLocationDto {
 
 export class DriverRideOfferPassengerDto {
   /*
-   * Deliberadamente SOLO firstName: sin lastName, phone, email,
-   * documento, rating ni foto. Mismo criterio ya aplicado en
+   * Deliberadamente firstName + lastNameInitial (nunca lastName
+   * completo, phone, email, documento, rating ni foto): mismo
+   * contrato mínimo ya usado en PassengerRideOfferDriverDto
+   * (Passenger viendo propuestas de Driver) y en
    * RideAssignedPassengerResponseDto (post-asignación).
    */
   @ApiProperty()
   firstName!: string;
+
+  /*
+   * "Pérez" -> "P.". Nunca el apellido completo.
+   */
+  @ApiProperty({ example: 'L.' })
+  lastNameInitial!: string;
 }
 
 export class DriverRideOfferRideDto {
