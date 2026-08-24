@@ -373,7 +373,7 @@ describe('FaresService', () => {
     expect(result.destination.address).toBe('Plaza de Armas de Morales');
   });
 
-  it('destino manual (placeholder del mapa): resuelve dirección real vía reverse geocoding', async () => {
+  it('destino manual (placeholder del mapa, SIN isManualSelection — cliente legado): resuelve dirección real vía reverse geocoding', async () => {
     googleGeocodingServiceMock.reverseGeocode.mockImplementation(
       (latitude: number) =>
         Promise.resolve(
@@ -421,6 +421,94 @@ describe('FaresService', () => {
     expect(savedQuote?.destinationPosition.coordinates).toEqual([
       -76.3655, -6.4812,
     ]);
+  });
+
+  it('G4B-CONTRACT-R1: isManualSelection=true dispara reverse geocoding SIN IMPORTAR el texto de address — no depende del placeholder legado', async () => {
+    googleGeocodingServiceMock.reverseGeocode.mockImplementation(
+      (latitude: number) =>
+        Promise.resolve(
+          latitude === -6.4877
+            ? 'Jr. Yurimaguas 350, Tarapoto'
+            : 'Jr. Lima 900, Morales',
+        ),
+    );
+
+    const origin = {
+      latitude: -6.4877,
+
+      longitude: -76.3599,
+
+      address: 'Ubicación actual del pasajero',
+    };
+
+    // A propósito NO es el literal legado ('Destino seleccionado en
+    // el mapa'): si este test pasara solo por coincidencia de texto,
+    // dejaría de probar la bandera. Este texto demuestra que
+    // `isManualSelection` por sí solo, sin ayuda del contenido de
+    // `address`, es lo que dispara el reverse geocoding.
+    const destination = {
+      latitude: -6.4812,
+
+      longitude: -76.3655,
+
+      address: 'cualquier texto arbitrario, no el placeholder histórico',
+
+      isManualSelection: true,
+    };
+
+    const result = await service.estimate(passengerUserId, {
+      origin,
+      destination,
+    });
+
+    expect(googleGeocodingServiceMock.reverseGeocode).toHaveBeenCalledTimes(2);
+
+    expect(googleGeocodingServiceMock.reverseGeocode).toHaveBeenCalledWith(
+      -6.4812,
+      -76.3655,
+      FALLBACK_DESTINATION_ADDRESS,
+    );
+
+    expect(savedQuote?.destinationAddress).toBe('Jr. Lima 900, Morales');
+
+    expect(result.destination.address).toBe('Jr. Lima 900, Morales');
+  });
+
+  it('G4B-CONTRACT-R1: isManualSelection=false explícito NUNCA cae al fallback legado, aunque address coincida por casualidad con el placeholder histórico', async () => {
+    const origin = {
+      latitude: -6.4877,
+
+      longitude: -76.3599,
+
+      address: 'Ubicación actual del pasajero',
+    };
+
+    // Un cliente nuevo (ya manda la bandera) que por algún motivo
+    // reutilizara el mismo texto legado como address real de
+    // autocomplete NO debe disparar geocoding — la bandera manda,
+    // el contenido de `address` ya no importa para esta decisión.
+    const destination = {
+      latitude: -6.4812,
+
+      longitude: -76.3655,
+
+      address: 'Destino seleccionado en el mapa',
+
+      isManualSelection: false,
+    };
+
+    const result = await service.estimate(passengerUserId, {
+      origin,
+      destination,
+    });
+
+    // Solo UNA llamada: origin. Destination con isManualSelection:false
+    // nunca dispara geocoding, sin importar su texto.
+    expect(googleGeocodingServiceMock.reverseGeocode).toHaveBeenCalledTimes(1);
+
+    expect(savedQuote?.destinationAddress).toBe('Destino seleccionado en el mapa');
+
+    expect(result.destination.address).toBe('Destino seleccionado en el mapa');
   });
 
   it('destino manual + falla el reverse geocoding: usa fallback "Destino seleccionado" sin bloquear la cotización', async () => {

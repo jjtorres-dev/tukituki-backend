@@ -36,13 +36,21 @@ import {
 const FARE_QUOTE_TTL_MS = 5 * 60 * 1000;
 
 /*
- * Literal exacto que Passenger (home_screen.dart) escribe cuando el
- * destino se elige tocando el mapa, sin pasar por autocomplete. No
- * existe (todavía) un flag explícito en EstimateFareDto que
- * distinga selección manual de autocomplete (Fase 3, G4B-R4) — este
- * es el único punto de la app que produce este literal, así que
- * compararlo es seguro y no depende de heurística sobre texto
- * arbitrario del usuario.
+ * LEGACY FALLBACK (G4B-CONTRACT-R1) — ya NO es la señal principal.
+ *
+ * Literal exacto que versiones de Passenger anteriores a
+ * `EstimateFareDto.destination.isManualSelection` escriben cuando el
+ * destino se elige tocando el mapa. Se conserva únicamente para que
+ * esa única instalación anterior (un APK de prueba en el celular
+ * físico de JuanJo — sin distribución pública, ver
+ * `docs/contexto/App-passenger/errores-conocidos.md`) siga
+ * funcionando mientras no se reinstale con una versión que ya manda
+ * la bandera explícita.
+ *
+ * RETIRAR este bloque (la constante, su uso en `requiresDestinationGeocoding`
+ * más abajo, y el test que lo cubre en fares.service.spec.ts) en cuanto
+ * se confirme que ese APK fue reinstalado — no depende de una fecha,
+ * depende de ese reinstall.
  */
 const MANUAL_DESTINATION_PLACEHOLDER = 'Destino seleccionado en el mapa';
 
@@ -73,11 +81,21 @@ export class FaresService {
      * origin: SIEMPRE se resuelve por reverse geocoding — el cliente
      * nunca manda una dirección real para origin (GPS puro).
      *
-     * destination (G4B-R4): solo se resuelve por reverse geocoding
-     * cuando el cliente manda el placeholder de selección manual en
-     * el mapa. Si ya viene de autocomplete (dirección real), NO se
+     * destination (G4B-R4, señal desde G4B-CONTRACT-R1):
+     * `isManualSelection === true` es la señal real de que el cliente
+     * eligió el punto tocando el mapa — dispara reverse geocoding sin
+     * importar qué texto traiga `address`. Si ya viene de autocomplete
+     * (`isManualSelection` ausente o `false`, dirección real), NO se
      * reemplaza — evita una llamada innecesaria y respeta la
      * dirección que el propio Passenger vio y confirmó.
+     *
+     * Fallback LEGACY: solo cuando `isManualSelection` viene ausente
+     * (cliente anterior a este campo) se recurre a comparar `address`
+     * contra el placeholder histórico — ver el comentario de
+     * `MANUAL_DESTINATION_PLACEHOLDER` arriba para cuándo retirarlo.
+     * Un cliente nuevo que mande `isManualSelection: false` de forma
+     * explícita NUNCA cae en este fallback, aunque su `address`
+     * coincida por casualidad con el literal legado.
      *
      * Promise.all: ambas llamadas son independientes entre sí, así
      * que se ejecutan concurrentemente en vez de sumar su latencia.
@@ -85,7 +103,9 @@ export class FaresService {
     const destinationAddressFromClient = dto.destination.address.trim();
 
     const requiresDestinationGeocoding =
-      destinationAddressFromClient === MANUAL_DESTINATION_PLACEHOLDER;
+      dto.destination.isManualSelection === true ||
+      (dto.destination.isManualSelection === undefined &&
+        destinationAddressFromClient === MANUAL_DESTINATION_PLACEHOLDER);
 
     const [originAddress, destinationAddress] = await Promise.all([
       this.googleGeocodingService.reverseGeocode(
