@@ -3,10 +3,16 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { Test, TestingModule } from '@nestjs/testing';
 import type { DeepPartial, FindOneOptions } from 'typeorm';
 
+import { AvatarUrlResolverService } from '../storage/avatar-url-resolver.service';
 import { DriversService } from './drivers.service';
 import { DriverProfile } from './entities/driver-profile.entity';
 import { DriverStatus } from './enums/driver-status.enum';
 import { IdentityDocumentType } from './enums/identity-document-type.enum';
+
+interface AvatarResolverMock {
+  resolveDriverAvatarUrl: jest.Mock;
+  resolvePassengerAvatarUrl: jest.Mock;
+}
 
 type RepositoryMock = {
   findOne: jest.Mock<
@@ -22,6 +28,7 @@ type RepositoryMock = {
 describe('DriversService', () => {
   let service: DriversService;
   let repository: RepositoryMock;
+  let avatarResolver: AvatarResolverMock;
 
   const userId = 'f544d52a-39e0-4da3-8861-6010355c5dba';
 
@@ -61,6 +68,15 @@ describe('DriversService', () => {
       ),
     };
 
+    const avatarResolverMock: AvatarResolverMock = {
+      resolveDriverAvatarUrl: jest.fn(
+        () => 'https://resolved.example/avatar.jpg',
+      ),
+      resolvePassengerAvatarUrl: jest.fn(
+        () => 'https://resolved.example/avatar.jpg',
+      ),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         DriversService,
@@ -68,12 +84,18 @@ describe('DriversService', () => {
           provide: getRepositoryToken(DriverProfile),
           useValue: repositoryMock,
         },
+        {
+          provide: AvatarUrlResolverService,
+          useValue: avatarResolverMock,
+        },
       ],
     }).compile();
 
     service = module.get<DriversService>(DriversService);
 
     repository = module.get<RepositoryMock>(getRepositoryToken(DriverProfile));
+
+    avatarResolver = module.get<AvatarResolverMock>(AvatarUrlResolverService);
   });
 
   it('debe estar definido', () => {
@@ -95,6 +117,39 @@ describe('DriversService', () => {
     expect(result.status).toBe(DriverStatus.DRAFT);
 
     expect(repository.save).toHaveBeenCalledTimes(1);
+  });
+
+  it('debe crear una solicitud sin address (DRIVER-ONBOARDING-R2)', async () => {
+    repository.findOne.mockResolvedValue(null);
+
+    const result = await service.createMyProfile(userId, {
+      firstName: 'Juan José',
+      lastName: 'Torres Solano',
+      documentType: IdentityDocumentType.DNI,
+      documentNumber: '12345678',
+      birthDate: '1995-06-15',
+    });
+
+    expect(result.address).toBeNull();
+  });
+
+  it('debe crear una solicitud con email y devolverlo en toProfileResponse', async () => {
+    repository.findOne.mockResolvedValue(null);
+
+    const result = await service.createMyProfile(userId, {
+      firstName: 'Juan José',
+      lastName: 'Torres Solano',
+      documentType: IdentityDocumentType.DNI,
+      documentNumber: '12345678',
+      birthDate: '1995-06-15',
+      email: 'juan.torres@example.com',
+    });
+
+    expect(result.email).toBe('juan.torres@example.com');
+
+    expect(service.toProfileResponse(result).email).toBe(
+      'juan.torres@example.com',
+    );
   });
 
   it('debe rechazar una segunda solicitud', async () => {
@@ -139,5 +194,79 @@ describe('DriversService', () => {
     expect(result.status).toBe(DriverStatus.DRAFT);
 
     expect(result.rejectionReason).toBeNull();
+  });
+
+  describe('STORAGE-R2: assertProfilePhotoUploadAllowed / completeProfilePhotoUpload', () => {
+    it('assertProfilePhotoUploadAllowed permite subir foto con perfil en DRAFT', async () => {
+      repository.findOne.mockResolvedValue({ ...profile });
+
+      await expect(
+        service.assertProfilePhotoUploadAllowed(userId),
+      ).resolves.toMatchObject({ id: profile.id });
+    });
+
+    it('assertProfilePhotoUploadAllowed rechaza si el perfil está PENDING_REVIEW', async () => {
+      repository.findOne.mockResolvedValue({
+        ...profile,
+        status: DriverStatus.PENDING_REVIEW,
+      });
+
+      await expect(
+        service.assertProfilePhotoUploadAllowed(userId),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('completeProfilePhotoUpload persiste únicamente el objectKey (photoUrl legacy no se toca)', async () => {
+      repository.findOne.mockResolvedValue({
+        ...profile,
+        photoUrl: 'https://cdn.tukituki.pe/legacy.jpg',
+        photoObjectKey: 'drivers/profile/old.jpg',
+      });
+
+      const { profile: saved, previousObjectKey } =
+        await service.completeProfilePhotoUpload(
+          userId,
+          'drivers/profile/new.jpg',
+        );
+
+      expect(saved.photoObjectKey).toBe('drivers/profile/new.jpg');
+      /*
+       * STORAGE-R2.1: photoUrl NUNCA se escribe aquí — se resuelve al
+       * vuelo en cada lectura (toProfileResponse), no en la escritura.
+       */
+      expect(saved.photoUrl).toBe('https://cdn.tukituki.pe/legacy.jpg');
+      expect(previousObjectKey).toBe('drivers/profile/old.jpg');
+    });
+
+    it('completeProfilePhotoUpload en el primer upload devuelve previousObjectKey null', async () => {
+      repository.findOne.mockResolvedValue({
+        ...profile,
+        photoObjectKey: null,
+      });
+
+      const { previousObjectKey } = await service.completeProfilePhotoUpload(
+        userId,
+        'drivers/profile/first.jpg',
+      );
+
+      expect(previousObjectKey).toBeNull();
+    });
+  });
+
+  describe('STORAGE-R2.1: toProfileResponse', () => {
+    it('resuelve photoUrl a través de AvatarUrlResolverService y nunca expone photoObjectKey', () => {
+      const response = service.toProfileResponse({
+        ...profile,
+        photoObjectKey: 'drivers/profile/1.jpg',
+      });
+
+      expect(avatarResolver.resolveDriverAvatarUrl).toHaveBeenCalledWith(
+        expect.objectContaining({ photoObjectKey: 'drivers/profile/1.jpg' }),
+      );
+      expect(response.photoUrl).toBe('https://resolved.example/avatar.jpg');
+      expect(
+        Object.prototype.hasOwnProperty.call(response, 'photoObjectKey'),
+      ).toBe(false);
+    });
   });
 });

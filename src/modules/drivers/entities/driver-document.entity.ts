@@ -51,12 +51,32 @@ export class DriverDocument {
   })
   type!: DriverDocumentType;
 
+  /*
+   * Legacy: URL arbitraria enviada por el cliente (sin subida real
+   * validada por el Backend). Nullable desde STORAGE-R2: un
+   * documento puede existir únicamente con fileObjectKey.
+   */
   @Column({
     name: 'file_url',
     type: 'varchar',
     length: 2048,
+    nullable: true,
   })
-  fileUrl!: string;
+  fileUrl!: string | null;
+
+  /*
+   * objectKey canónico en Railway Storage Buckets (STORAGE-R2),
+   * validado mediante presigned upload + HeadObject antes de
+   * persistirse. Es el mecanismo preferido; fileUrl queda como
+   * fallback legacy temporal (ver modules/storage).
+   */
+  @Column({
+    name: 'file_object_key',
+    type: 'varchar',
+    length: 1024,
+    nullable: true,
+  })
+  fileObjectKey!: string | null;
 
   @Column({
     name: 'document_number',

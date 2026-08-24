@@ -18,6 +18,10 @@ import { FareQuote } from './entities/fare-quote.entity';
 import { FareRule } from './entities/fare-rule.entity';
 import { FareQuoteStatus } from './enums/fare-quote-status.enum';
 import { FareRuleStatus } from './enums/fare-rule-status.enum';
+import {
+  FALLBACK_DESTINATION_ADDRESS,
+  GoogleGeocodingService,
+} from './google-geocoding.service';
 import { GoogleRoutesService, RouteMetrics } from './google-routes.service';
 import {
   applyMultiplierToCents,
@@ -31,19 +35,72 @@ import {
 
 const FARE_QUOTE_TTL_MS = 5 * 60 * 1000;
 
+/*
+ * Literal exacto que Passenger (home_screen.dart) escribe cuando el
+ * destino se elige tocando el mapa, sin pasar por autocomplete. No
+ * existe (todavía) un flag explícito en EstimateFareDto que
+ * distinga selección manual de autocomplete (Fase 3, G4B-R4) — este
+ * es el único punto de la app que produce este literal, así que
+ * compararlo es seguro y no depende de heurística sobre texto
+ * arbitrario del usuario.
+ */
+const MANUAL_DESTINATION_PLACEHOLDER = 'Destino seleccionado en el mapa';
+
 @Injectable()
 export class FaresService {
   constructor(
     private readonly dataSource: DataSource,
 
     private readonly googleRoutesService: GoogleRoutesService,
+
+    private readonly googleGeocodingService: GoogleGeocodingService,
   ) {}
 
-  estimate(
+  async estimate(
     passengerUserId: string,
     dto: EstimateFareDto,
   ): Promise<FareEstimateResponseDto> {
     this.assertDifferentPoints(dto);
+
+    /*
+     * Reverse geocoding ANTES de la transacción: son llamadas
+     * externas (hasta ~6s cada una) que no dependen de ningún lock,
+     * así que no tiene sentido mantenerlas abiertas mientras se
+     * sostienen los pessimistic_read de User/ServiceZone/FareRule.
+     * Nunca lanzan (Fase 13): ante cualquier fallo devuelven el
+     * fallback honesto y la cotización sigue su curso normal.
+     *
+     * origin: SIEMPRE se resuelve por reverse geocoding — el cliente
+     * nunca manda una dirección real para origin (GPS puro).
+     *
+     * destination (G4B-R4): solo se resuelve por reverse geocoding
+     * cuando el cliente manda el placeholder de selección manual en
+     * el mapa. Si ya viene de autocomplete (dirección real), NO se
+     * reemplaza — evita una llamada innecesaria y respeta la
+     * dirección que el propio Passenger vio y confirmó.
+     *
+     * Promise.all: ambas llamadas son independientes entre sí, así
+     * que se ejecutan concurrentemente en vez de sumar su latencia.
+     */
+    const destinationAddressFromClient = dto.destination.address.trim();
+
+    const requiresDestinationGeocoding =
+      destinationAddressFromClient === MANUAL_DESTINATION_PLACEHOLDER;
+
+    const [originAddress, destinationAddress] = await Promise.all([
+      this.googleGeocodingService.reverseGeocode(
+        dto.origin.latitude,
+        dto.origin.longitude,
+      ),
+
+      requiresDestinationGeocoding
+        ? this.googleGeocodingService.reverseGeocode(
+            dto.destination.latitude,
+            dto.destination.longitude,
+            FALLBACK_DESTINATION_ADDRESS,
+          )
+        : Promise.resolve(destinationAddressFromClient),
+    ]);
 
     return this.dataSource.transaction(async (manager) => {
       const passenger = await this.lockPassenger(manager, passengerUserId);
@@ -136,9 +193,18 @@ export class FaresService {
           coordinates: [dto.destination.longitude, dto.destination.latitude],
         },
 
-        originAddress: dto.origin.address.trim(),
+        /*
+         * origin: siempre resuelto por reverse geocoding — ya NO
+         * confiamos en el literal que manda el cliente (p.ej.
+         * "Ubicación actual del pasajero").
+         *
+         * destination: dirección real de autocomplete si el cliente
+         * ya la mandó, o resuelta por reverse geocoding si el
+         * cliente mandó el placeholder de selección manual.
+         */
+        originAddress,
 
-        destinationAddress: dto.destination.address.trim(),
+        destinationAddress,
 
         /*
          * Métricas verificadas por

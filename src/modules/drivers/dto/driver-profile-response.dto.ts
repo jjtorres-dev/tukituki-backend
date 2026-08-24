@@ -39,8 +39,15 @@ export class DriverProfileResponseDto {
   })
   birthDate!: string;
 
-  @ApiProperty()
-  address!: string;
+  @ApiPropertyOptional({
+    nullable: true,
+  })
+  address!: string | null;
+
+  @ApiPropertyOptional({
+    nullable: true,
+  })
+  email!: string | null;
 
   @ApiPropertyOptional({
     nullable: true,

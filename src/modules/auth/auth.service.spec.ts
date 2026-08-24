@@ -146,21 +146,101 @@ describe('AuthService', () => {
 
   it.each<[string, UserRole[]]>([
     ['Driver', [UserRole.DRIVER]],
-    ['Admin', [UserRole.ADMIN]],
-    ['Super Admin', [UserRole.SUPER_ADMIN]],
     ['Passenger + Driver', [UserRole.PASSENGER, UserRole.DRIVER]],
-  ])('rechaza login a %s ACTIVE no verificado', async (_label, roles) => {
-    usersService.findByPhoneE164WithPassword.mockResolvedValue(user({ roles }));
+  ])(
+    'permite login a %s ACTIVE no verificado durante MVP (isPhoneVerified no gatea consumidor)',
+    async (_label, roles) => {
+      usersService.findByPhoneE164WithPassword.mockResolvedValue(
+        user({ roles }),
+      );
 
-    await expect(
-      service.login(
+      const result = await service.login(
         { phoneE164, password: 'Password123!' },
         { ipAddress: null, userAgent: null },
-      ),
-    ).rejects.toBeInstanceOf(ForbiddenException);
+      );
 
-    expect(authSessionsService.create).not.toHaveBeenCalled();
+      expect(result.accessToken).toBe('access-token');
+      expect(result.user.isPhoneVerified).toBe(false);
+      expect(authSessionsService.create).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it.each<[string, UserRole[]]>([
+    ['Admin', [UserRole.ADMIN]],
+    ['Super Admin', [UserRole.SUPER_ADMIN]],
+  ])(
+    'rechaza login genérico a %s ACTIVE no verificado (seguridad administrativa preservada)',
+    async (_label, roles) => {
+      usersService.findByPhoneE164WithPassword.mockResolvedValue(
+        user({ roles, isPhoneVerified: false }),
+      );
+
+      await expect(
+        service.login(
+          { phoneE164, password: 'Password123!' },
+          { ipAddress: null, userAgent: null },
+        ),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+
+      expect(authSessionsService.create).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each<[string, UserRole[]]>([
+    ['Passenger + Admin', [UserRole.PASSENGER, UserRole.ADMIN]],
+    ['Driver + Super Admin', [UserRole.DRIVER, UserRole.SUPER_ADMIN]],
+  ])(
+    'rechaza login genérico a %s ACTIVE no verificado (el rol administrativo gana)',
+    async (_label, roles) => {
+      usersService.findByPhoneE164WithPassword.mockResolvedValue(
+        user({ roles, isPhoneVerified: false }),
+      );
+
+      await expect(
+        service.login(
+          { phoneE164, password: 'Password123!' },
+          { ipAddress: null, userAgent: null },
+        ),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+
+      expect(authSessionsService.create).not.toHaveBeenCalled();
+    },
+  );
+
+  it('permite login genérico a Admin ACTIVE verificado', async () => {
+    usersService.findByPhoneE164WithPassword.mockResolvedValue(
+      user({ roles: [UserRole.ADMIN], isPhoneVerified: true }),
+    );
+
+    const result = await service.login(
+      { phoneE164, password: 'Password123!' },
+      { ipAddress: null, userAgent: null },
+    );
+
+    expect(result.accessToken).toBe('access-token');
+    expect(authSessionsService.create).toHaveBeenCalledTimes(1);
   });
+
+  it.each<[string, UserStatus]>([
+    ['SUSPENDED', UserStatus.SUSPENDED],
+    ['BLOCKED', UserStatus.BLOCKED],
+  ])(
+    'rechaza login a Driver %s aunque isPhoneVerified sea true',
+    async (_label, status) => {
+      usersService.findByPhoneE164WithPassword.mockResolvedValue(
+        user({ roles: [UserRole.DRIVER], status, isPhoneVerified: true }),
+      );
+
+      await expect(
+        service.login(
+          { phoneE164, password: 'Password123!' },
+          { ipAddress: null, userAgent: null },
+        ),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+
+      expect(authSessionsService.create).not.toHaveBeenCalled();
+    },
+  );
 
   it('usa una comparación bcrypt ficticia cuando el usuario no existe', async () => {
     usersService.findByPhoneE164WithPassword.mockResolvedValue(null);
@@ -227,5 +307,140 @@ describe('AuthService', () => {
       '203.0.113.10',
     );
     expect(authSessionsService.create).not.toHaveBeenCalled();
+  });
+
+  it('permite el endpoint administrativo a SUPER_ADMIN elegible', async () => {
+    usersService.findByPhoneE164WithPassword.mockResolvedValue(
+      user({
+        roles: [UserRole.SUPER_ADMIN],
+        isPhoneVerified: true,
+      }),
+    );
+
+    const result = await service.loginAdmin(
+      { phoneE164, password: 'Password123!' },
+      { ipAddress: '203.0.113.10', userAgent: 'Dashboard' },
+    );
+
+    expect(result.accessToken).toBe('access-token');
+    expect(result.user.roles).toEqual([UserRole.SUPER_ADMIN]);
+    expect(adminLoginSecurityService.registerFailure).not.toHaveBeenCalled();
+  });
+
+  it('rechaza el endpoint administrativo para DRIVER aunque las credenciales sean válidas', async () => {
+    usersService.findByPhoneE164WithPassword.mockResolvedValue(
+      user({
+        roles: [UserRole.DRIVER],
+        isPhoneVerified: true,
+      }),
+    );
+
+    await expect(
+      service.loginAdmin(
+        { phoneE164, password: 'Password123!' },
+        { ipAddress: '203.0.113.10', userAgent: 'Dashboard' },
+      ),
+    ).rejects.toMatchObject({
+      message: 'Teléfono o contraseña incorrectos',
+    });
+
+    expect(adminLoginSecurityService.registerFailure).toHaveBeenCalledWith(
+      phoneE164,
+      '203.0.113.10',
+    );
+    expect(authSessionsService.create).not.toHaveBeenCalled();
+  });
+
+  it('rechaza el login admin con contraseña incorrecta', async () => {
+    usersService.findByPhoneE164WithPassword.mockResolvedValue(
+      user({ roles: [UserRole.ADMIN], isPhoneVerified: true }),
+    );
+    passwordService.verifyWithFallback.mockResolvedValue(false);
+
+    await expect(
+      service.loginAdmin(
+        { phoneE164, password: 'wrong-password' },
+        { ipAddress: '203.0.113.10', userAgent: 'Dashboard' },
+      ),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
+
+    expect(adminLoginSecurityService.registerFailure).toHaveBeenCalledWith(
+      phoneE164,
+      '203.0.113.10',
+    );
+  });
+
+  it('rechaza el login admin para un usuario inexistente, ejecutando igualmente el chequeo de rate limit', async () => {
+    usersService.findByPhoneE164WithPassword.mockResolvedValue(null);
+    passwordService.verifyWithFallback.mockResolvedValue(false);
+
+    await expect(
+      service.loginAdmin(
+        { phoneE164, password: 'Password123!' },
+        { ipAddress: '203.0.113.10', userAgent: 'Dashboard' },
+      ),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
+
+    expect(adminLoginSecurityService.assertAllowed).toHaveBeenCalledWith(
+      phoneE164,
+      '203.0.113.10',
+    );
+    expect(adminLoginSecurityService.registerFailure).toHaveBeenCalledWith(
+      phoneE164,
+      '203.0.113.10',
+    );
+    expect(authSessionsService.create).not.toHaveBeenCalled();
+  });
+
+  it.each<[string, UserStatus]>([
+    ['SUSPENDED', UserStatus.SUSPENDED],
+    ['BLOCKED', UserStatus.BLOCKED],
+    ['PENDING', UserStatus.PENDING],
+  ])(
+    'rechaza el login admin cuando el status del usuario es %s',
+    async (_label, status) => {
+      usersService.findByPhoneE164WithPassword.mockResolvedValue(
+        user({ roles: [UserRole.ADMIN], isPhoneVerified: true, status }),
+      );
+
+      await expect(
+        service.loginAdmin(
+          { phoneE164, password: 'Password123!' },
+          { ipAddress: '203.0.113.10', userAgent: 'Dashboard' },
+        ),
+      ).rejects.toBeInstanceOf(UnauthorizedException);
+
+      expect(authSessionsService.create).not.toHaveBeenCalled();
+    },
+  );
+
+  it('rechaza el login admin si el teléfono no está verificado', async () => {
+    usersService.findByPhoneE164WithPassword.mockResolvedValue(
+      user({ roles: [UserRole.ADMIN], isPhoneVerified: false }),
+    );
+
+    await expect(
+      service.loginAdmin(
+        { phoneE164, password: 'Password123!' },
+        { ipAddress: '203.0.113.10', userAgent: 'Dashboard' },
+      ),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
+
+    expect(authSessionsService.create).not.toHaveBeenCalled();
+  });
+
+  it('la respuesta del login admin no expone password ni passwordHash', async () => {
+    usersService.findByPhoneE164WithPassword.mockResolvedValue(
+      user({ roles: [UserRole.ADMIN], isPhoneVerified: true }),
+    );
+
+    const result = await service.loginAdmin(
+      { phoneE164, password: 'Password123!' },
+      { ipAddress: '203.0.113.10', userAgent: 'Dashboard' },
+    );
+
+    expect(result.user).not.toHaveProperty('password');
+    expect(result.user).not.toHaveProperty('passwordHash');
+    expect(JSON.stringify(result)).not.toContain('password-hash');
   });
 });

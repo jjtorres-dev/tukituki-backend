@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { DataSource, EntityManager } from 'typeorm';
 
+import { REQUIRED_DRIVER_APPLICATION_DOCUMENT_TYPES } from './driver-application.constants';
 import { DriverDocument } from './entities/driver-document.entity';
 import { DriverProfile } from './entities/driver-profile.entity';
 import { DriverVehicle } from './entities/driver-vehicle.entity';
@@ -13,15 +14,6 @@ import { DriverDocumentStatus } from './enums/driver-document-status.enum';
 import { DriverDocumentType } from './enums/driver-document-type.enum';
 import { DriverStatus } from './enums/driver-status.enum';
 import { VehicleStatus } from './enums/vehicle-status.enum';
-
-const REQUIRED_DOCUMENT_TYPES: readonly DriverDocumentType[] = [
-  DriverDocumentType.DNI_FRONT,
-  DriverDocumentType.DNI_BACK,
-  DriverDocumentType.DRIVER_LICENSE,
-  DriverDocumentType.VEHICLE_REGISTRATION,
-  DriverDocumentType.SOAT,
-  DriverDocumentType.PROFILE_PHOTO,
-];
 
 @Injectable()
 export class DriverApplicationSubmissionService {
@@ -80,7 +72,11 @@ export class DriverApplicationSubmissionService {
       .orderBy('document.created_at', 'ASC')
       .getMany();
 
-    const missingRequirements = this.getMissingRequirements(vehicle, documents);
+    const missingRequirements = this.getMissingRequirements(
+      profile,
+      vehicle,
+      documents,
+    );
 
     if (missingRequirements.length > 0) {
       this.throwValidationError(
@@ -151,10 +147,21 @@ export class DriverApplicationSubmissionService {
   }
 
   private getMissingRequirements(
+    profile: DriverProfile,
     vehicle: DriverVehicle | null,
     documents: DriverDocument[],
   ): string[] {
     const missingRequirements: string[] = [];
+
+    /*
+     * DRIVER-ONBOARDING-R2: la foto de perfil es obligatoria antes de
+     * enviar la solicitud, pero es DriverProfile.photoObjectKey/
+     * photoUrl, no un DriverDocument — nunca exigir
+     * DriverDocumentType.PROFILE_PHOTO aquí.
+     */
+    if (!profile.photoObjectKey && !profile.photoUrl) {
+      missingRequirements.push('DRIVER_PROFILE_PHOTO');
+    }
 
     if (!vehicle) {
       missingRequirements.push('DRIVER_VEHICLE');
@@ -164,7 +171,7 @@ export class DriverApplicationSubmissionService {
       documents.map((document) => document.type),
     );
 
-    for (const requiredType of REQUIRED_DOCUMENT_TYPES) {
+    for (const requiredType of REQUIRED_DRIVER_APPLICATION_DOCUMENT_TYPES) {
       if (!registeredDocumentTypes.has(requiredType)) {
         missingRequirements.push(requiredType);
       }
@@ -208,7 +215,12 @@ export class DriverApplicationSubmissionService {
       invalidRequirements.push(`${document.type}_STATUS_${document.status}`);
     }
 
-    if (!document.fileUrl) {
+    /*
+     * STORAGE-R2: un documento es válido si tiene la URL legacy
+     * (fileUrl) o el objectKey canónico de Railway Storage
+     * (fileObjectKey) — nunca ambos ausentes.
+     */
+    if (!document.fileUrl && !document.fileObjectKey) {
       invalidRequirements.push(`${document.type}_FILE_MISSING`);
     }
 

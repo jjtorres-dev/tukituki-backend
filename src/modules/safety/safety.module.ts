@@ -10,6 +10,7 @@ import { OutboxModule } from '../outbox/outbox.module';
 import { PassengerProfile } from '../passengers/entities/passenger-profile.entity';
 import { Ride } from '../rides/entities/ride.entity';
 import { RideRealtimeModule } from '../rides/realtime/ride-realtime.module';
+import { AvatarModule } from '../storage/avatar.module';
 import { User } from '../users/entities/user.entity';
 import { AdminSafetyIncidentsController } from './admin-safety-incidents.controller';
 import { EmergencyContactsController } from './emergency-contacts.controller';
@@ -43,6 +44,7 @@ import { RideShareLinksService } from './ride-share-links.service';
     ]),
     AuthModule,
     AuthorizationModule,
+    AvatarModule,
     OutboxModule,
     RideRealtimeModule,
     SafetyRealtimeModule,

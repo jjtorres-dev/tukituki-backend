@@ -5,6 +5,7 @@ import { DriverOperationalState } from '../driver-operations/entities/driver-ope
 import { DriverOperationalStatus } from '../driver-operations/enums/driver-operational-status.enum';
 import { DriverProfile } from '../drivers/entities/driver-profile.entity';
 import { DriverStatus } from '../drivers/enums/driver-status.enum';
+import { PassengerProfile } from '../passengers/entities/passenger-profile.entity';
 import { DriverRideOffersService } from './driver-ride-offers.service';
 import { RideOffer } from './entities/ride-offer.entity';
 import { Ride } from './entities/ride.entity';
@@ -137,6 +138,18 @@ describe('DriverRideOffersService', () => {
       ),
     };
 
+    const passengerProfileRepository = {
+      find: jest.fn(() =>
+        Promise.resolve([
+          {
+            userId: ride.passengerUserId,
+            firstName: 'Carlos',
+            lastName: 'Mendoza',
+          },
+        ]),
+      ),
+    };
+
     const managerMock = {
       getRepository: jest.fn((entity: unknown): unknown => {
         if (entity === DriverProfile) {
@@ -164,6 +177,11 @@ describe('DriverRideOffersService', () => {
         <T>(work: (manager: EntityManager) => Promise<T>): Promise<T> =>
           work(managerMock as unknown as EntityManager),
       ),
+
+      getRepository: jest.fn((entity: unknown): unknown => {
+        if (entity === PassengerProfile) return passengerProfileRepository;
+        throw new Error('Repositorio inesperado');
+      }),
     };
 
     const dispatchService = {
@@ -243,6 +261,307 @@ describe('DriverRideOffersService', () => {
       expect(context.state.status).toBe(DriverOperationalStatus.AVAILABLE);
     },
   );
+
+  it('debe aceptar el precio aunque hayan pasado más de 60s desde offeredAt (G3B1)', async () => {
+    const context = createContext();
+    context.offer.offeredAt = new Date(Date.now() - 90_000);
+    context.offer.expiresAt = context.ride.searchExpiresAt;
+
+    const result = await context.service.acceptOffer(userId, offerId);
+
+    expect(result.status).toBe(RideOfferStatus.PROPOSED);
+    expect(context.offer.expiresAt).toBe(context.ride.searchExpiresAt);
+  });
+
+  it('debe aceptar una contraoferta aunque hayan pasado más de 60s desde offeredAt (G3B1)', async () => {
+    const context = createContext();
+    context.offer.offeredAt = new Date(Date.now() - 90_000);
+    context.offer.expiresAt = context.ride.searchExpiresAt;
+
+    const result = await context.service.counterOffer(userId, offerId, {
+      proposedFare: '6.50',
+    });
+
+    expect(result.status).toBe(RideOfferStatus.PROPOSED);
+    expect(result.proposedFare).toBe('6.50');
+  });
+
+  it('debe rechazar la solicitud aunque hayan pasado más de 60s, sin "offer expired" (G3B1)', async () => {
+    const context = createContext();
+    context.offer.offeredAt = new Date(Date.now() - 90_000);
+    context.offer.expiresAt = context.ride.searchExpiresAt;
+
+    const result = await context.service.rejectOffer(userId, offerId, {});
+
+    expect(result.status).toBe(RideOfferStatus.REJECTED);
+    expect(context.offer.rejectedAt).toBeInstanceOf(Date);
+  });
+});
+
+describe('DriverRideOffersService - getActiveOffers (G3B1)', () => {
+  const userIdA = 'f544d52a-39e0-4da3-8861-6010355c5dba';
+  const driverProfileIdA = '72b81eb5-c53f-4de2-bd9f-11f33d64da64';
+  const rideIdA = '3dbb6cbc-aee8-43f0-8247-e13d8e197b71';
+  const offerIdA = '0847d580-6282-4a15-a967-95cb93650d36';
+
+  function createActiveOffersContext(
+    offers: RideOffer[],
+    driverStatus: DriverOperationalStatus = DriverOperationalStatus.AVAILABLE,
+    passengerIdentities?: Map<string, { firstName: string; lastName: string }>,
+  ) {
+    /*
+     * Por defecto, cada passengerUserId presente en las Offers
+     * "tiene" un PassengerProfile real (firstName: 'Carlos',
+     * lastName: 'Mendoza' -> lastNameInitial 'M.'). Pasar un Map
+     * explícito (incluso vacío) permite simular un PassengerProfile
+     * faltante para probar el camino null-safe.
+     */
+    const knownIdentities =
+      passengerIdentities ??
+      new Map(
+        offers.map((offer) => [
+          offer.ride.passengerUserId,
+          { firstName: 'Carlos', lastName: 'Mendoza' },
+        ]),
+      );
+
+    const profile = {
+      id: driverProfileIdA,
+      userId: userIdA,
+      status: DriverStatus.APPROVED,
+    } as DriverProfile;
+
+    const state = {
+      driverProfileId: driverProfileIdA,
+      status: driverStatus,
+    } as DriverOperationalState;
+
+    const profileRepository = {
+      findOne: jest.fn(() => Promise.resolve(profile)),
+    };
+
+    const stateRepository = {
+      findOne: jest.fn(() => Promise.resolve(state)),
+    };
+
+    const offerRepository = {
+      update: jest.fn(() => Promise.resolve({ affected: 0 })),
+      find: jest.fn((options: { where: { expiresAt: { value: Date } } }) =>
+        Promise.resolve(
+          offers.filter(
+            (offer) =>
+              offer.expiresAt.getTime() >
+              options.where.expiresAt.value.getTime(),
+          ),
+        ),
+      ),
+    };
+
+    const passengerProfileRepository = {
+      find: jest.fn((options: { where: { userId: { value: string[] } } }) => {
+        const requestedIds = options.where.userId.value;
+
+        return Promise.resolve(
+          requestedIds
+            .filter((id) => knownIdentities.has(id))
+            .map((id) => {
+              const identity = knownIdentities.get(id)!;
+
+              return {
+                userId: id,
+                firstName: identity.firstName,
+                lastName: identity.lastName,
+              };
+            }),
+        );
+      }),
+    };
+
+    const dataSourceMock = {
+      getRepository: jest.fn((entity: unknown): unknown => {
+        if (entity === DriverProfile) return profileRepository;
+        if (entity === DriverOperationalState) return stateRepository;
+        if (entity === RideOffer) return offerRepository;
+        if (entity === PassengerProfile) return passengerProfileRepository;
+        throw new Error('Repositorio inesperado');
+      }),
+      transaction: jest.fn(),
+    };
+
+    const dispatchService = {
+      dispatchRide: jest.fn(() => Promise.resolve([])),
+    };
+
+    const transitionsService = {
+      expireWithinTransaction: jest.fn(() => Promise.resolve()),
+    };
+
+    const service = new DriverRideOffersService(
+      dataSourceMock as unknown as DataSource,
+      dispatchService as unknown as RideDispatchService,
+      transitionsService as unknown as RideTransitionsService,
+    );
+
+    return { service, offerRepository, passengerProfileRepository };
+  }
+
+  it('incluye firstName + lastNameInitial real del Passenger en cada Offer, vía UNA sola query batch (sin N+1)', async () => {
+    const rideA = {
+      id: rideIdA,
+      passengerUserId: 'passenger-a',
+      status: RideStatus.SEARCHING_DRIVER,
+      searchExpiresAt: new Date(Date.now() + 120_000),
+      originPosition: { type: 'Point', coordinates: [-76.3599, -6.4877] },
+      destinationPosition: { type: 'Point', coordinates: [-76.3655, -6.4812] },
+      originAddress: 'Jr. Lima 250, Tarapoto',
+      destinationAddress: 'Plaza de Armas de Morales',
+      estimatedFare: '5.00',
+      passengerOfferFare: '7.00',
+      currency: 'PEN',
+      passengerNotes: null,
+    } as Ride;
+
+    const rideB = {
+      ...rideA,
+      id: 'ride-b',
+      passengerUserId: 'passenger-b',
+    };
+
+    const offerA = {
+      id: offerIdA,
+      rideId: rideA.id,
+      driverProfileId: driverProfileIdA,
+      status: RideOfferStatus.OFFERED,
+      distanceToOriginMeters: 300,
+      dispatchRound: 1,
+      searchRadiusMeters: 1000,
+      offeredAt: new Date(Date.now() - 60_000),
+      expiresAt: rideA.searchExpiresAt,
+      proposedFare: null,
+      rejectionReason: null,
+      ride: rideA,
+    } as RideOffer;
+
+    const offerB = {
+      ...offerA,
+      id: 'offer-b',
+      rideId: rideB.id,
+      ride: rideB,
+    };
+
+    const context = createActiveOffersContext([offerA, offerB]);
+
+    const result = await context.service.getActiveOffers(userIdA);
+
+    expect(result).toHaveLength(2);
+    expect(result.find((o) => o.id === offerIdA)?.ride.passenger).toEqual({
+      firstName: 'Carlos',
+      lastNameInitial: 'M.',
+    });
+    expect(result.find((o) => o.id === 'offer-b')?.ride.passenger).toEqual({
+      firstName: 'Carlos',
+      lastNameInitial: 'M.',
+    });
+
+    // Batch real: UNA sola query para las 2 Offers de 2 passengers
+    // distintos, nunca una query por Offer.
+    expect(context.passengerProfileRepository.find).toHaveBeenCalledTimes(1);
+  });
+
+  it('PassengerProfile faltante para un passengerUserId: passenger queda null, sin crash', async () => {
+    const ride = {
+      id: rideIdA,
+      passengerUserId: 'passenger-sin-perfil',
+      status: RideStatus.SEARCHING_DRIVER,
+      searchExpiresAt: new Date(Date.now() + 120_000),
+      originPosition: { type: 'Point', coordinates: [-76.3599, -6.4877] },
+      destinationPosition: { type: 'Point', coordinates: [-76.3655, -6.4812] },
+      originAddress: 'Jr. Lima 250, Tarapoto',
+      destinationAddress: 'Plaza de Armas de Morales',
+      estimatedFare: '5.00',
+      passengerOfferFare: '7.00',
+      currency: 'PEN',
+      passengerNotes: null,
+    } as Ride;
+
+    const offer = {
+      id: offerIdA,
+      rideId: rideIdA,
+      driverProfileId: driverProfileIdA,
+      status: RideOfferStatus.OFFERED,
+      distanceToOriginMeters: 300,
+      dispatchRound: 1,
+      searchRadiusMeters: 1000,
+      offeredAt: new Date(Date.now() - 60_000),
+      expiresAt: ride.searchExpiresAt,
+      proposedFare: null,
+      rejectionReason: null,
+      ride,
+    } as RideOffer;
+
+    const context = createActiveOffersContext(
+      [offer],
+      DriverOperationalStatus.AVAILABLE,
+      new Map(),
+    );
+
+    const result = await context.service.getActiveOffers(userIdA);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].ride.passenger).toBeNull();
+  });
+
+  it('sigue devolviendo la Offer más de 60s después de creada, si el Ride sigue vigente', async () => {
+    const ride = {
+      id: rideIdA,
+      status: RideStatus.SEARCHING_DRIVER,
+      searchExpiresAt: new Date(Date.now() + 120_000),
+      originPosition: { type: 'Point', coordinates: [-76.3599, -6.4877] },
+      destinationPosition: { type: 'Point', coordinates: [-76.3655, -6.4812] },
+      originAddress: 'Jr. Lima 250, Tarapoto',
+      destinationAddress: 'Plaza de Armas de Morales',
+      estimatedFare: '5.00',
+      passengerOfferFare: '7.00',
+      currency: 'PEN',
+      passengerNotes: null,
+    } as Ride;
+
+    const offer = {
+      id: offerIdA,
+      rideId: rideIdA,
+      driverProfileId: driverProfileIdA,
+      status: RideOfferStatus.OFFERED,
+      distanceToOriginMeters: 420,
+      dispatchRound: 1,
+      searchRadiusMeters: 1000,
+      offeredAt: new Date(Date.now() - 90_000),
+      expiresAt: ride.searchExpiresAt,
+      proposedFare: null,
+      rejectionReason: null,
+      ride,
+    } as RideOffer;
+
+    const context = createActiveOffersContext([offer]);
+
+    const result = await context.service.getActiveOffers(userIdA);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe(offerIdA);
+    expect(result[0].status).toBe(RideOfferStatus.OFFERED);
+  });
+
+  it('no expone la Offer mientras el Driver no está AVAILABLE (p.ej. OFFLINE) (G3B1)', async () => {
+    const context = createActiveOffersContext(
+      [],
+      DriverOperationalStatus.OFFLINE,
+    );
+
+    await expect(context.service.getActiveOffers(userIdA)).rejects.toThrow(
+      'El conductor debe estar AVAILABLE',
+    );
+
+    expect(context.offerRepository.find).not.toHaveBeenCalled();
+  });
 });
 
 describe('DriverRideOffersService - getPendingProposals', () => {

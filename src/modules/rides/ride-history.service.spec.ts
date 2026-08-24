@@ -3,8 +3,14 @@ import { DataSource } from 'typeorm';
 
 import { DriverProfile } from '../drivers/entities/driver-profile.entity';
 import { VehicleType } from '../drivers/enums/vehicle-type.enum';
+import { AvatarUrlResolverService } from '../storage/avatar-url-resolver.service';
 import { RideStatus } from './enums/ride-status.enum';
 import { RideHistoryService } from './ride-history.service';
+
+const avatarResolverMock = {
+  resolveDriverAvatarUrl: jest.fn(() => null),
+  resolvePassengerAvatarUrl: jest.fn(() => null),
+} as unknown as AvatarUrlResolverService;
 
 describe('RideHistoryService', () => {
   it('debe devolver el historial paginado del pasajero', async () => {
@@ -41,7 +47,10 @@ describe('RideHistoryService', () => {
         },
       ]);
     const dataSource = { query };
-    const service = new RideHistoryService(dataSource as unknown as DataSource);
+    const service = new RideHistoryService(
+      dataSource as unknown as DataSource,
+      avatarResolverMock,
+    );
 
     const result = await service.getPassengerHistory(
       'f544d52a-39e0-4da3-8861-6010355c5dba',
@@ -91,7 +100,10 @@ describe('RideHistoryService', () => {
       })),
       query,
     };
-    const service = new RideHistoryService(dataSource as unknown as DataSource);
+    const service = new RideHistoryService(
+      dataSource as unknown as DataSource,
+      avatarResolverMock,
+    );
 
     const result = await service.getDriverHistory(profile.userId, {});
 
@@ -101,7 +113,10 @@ describe('RideHistoryService', () => {
   });
 
   it('debe rechazar un rango de fechas invertido', async () => {
-    const service = new RideHistoryService({} as DataSource);
+    const service = new RideHistoryService(
+      {} as DataSource,
+      avatarResolverMock,
+    );
 
     await expect(
       service.getPassengerHistory('passenger-id', {
@@ -117,7 +132,10 @@ describe('RideHistoryService', () => {
         findOne: jest.fn(() => Promise.resolve(null)),
       })),
     };
-    const service = new RideHistoryService(dataSource as unknown as DataSource);
+    const service = new RideHistoryService(
+      dataSource as unknown as DataSource,
+      avatarResolverMock,
+    );
 
     await expect(
       service.getDriverHistory('driver-id', {}),

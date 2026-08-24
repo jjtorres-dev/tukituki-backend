@@ -16,6 +16,12 @@ export class RideAssignedPassengerResponseDto {
   @ApiProperty()
   firstName!: string;
 
+  /*
+   * "Pérez" -> "P.". Nunca el apellido completo.
+   */
+  @ApiProperty({ example: 'L.' })
+  lastNameInitial!: string;
+
   @ApiPropertyOptional({ nullable: true })
   photoUrl!: string | null;
 

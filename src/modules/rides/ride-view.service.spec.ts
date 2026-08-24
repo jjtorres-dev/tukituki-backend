@@ -5,9 +5,30 @@ import { DriverProfile } from '../drivers/entities/driver-profile.entity';
 import { DriverVehicle } from '../drivers/entities/driver-vehicle.entity';
 import { VehicleType } from '../drivers/enums/vehicle-type.enum';
 import { PassengerProfile } from '../passengers/entities/passenger-profile.entity';
+import { AvatarUrlResolverService } from '../storage/avatar-url-resolver.service';
 import { Ride } from './entities/ride.entity';
 import { RideStatus } from './enums/ride-status.enum';
 import { RideViewService } from './ride-view.service';
+
+interface AvatarProfileLike {
+  photoObjectKey?: string | null;
+  photoUrl: string | null;
+}
+
+const avatarResolverMock = {
+  resolveDriverAvatarUrl: jest.fn(
+    (profile: AvatarProfileLike | null) =>
+      (profile?.photoObjectKey
+        ? 'https://resolved.example/avatar.jpg'
+        : profile?.photoUrl) ?? null,
+  ),
+  resolvePassengerAvatarUrl: jest.fn(
+    (profile: AvatarProfileLike | null) =>
+      (profile?.photoObjectKey
+        ? 'https://resolved.example/avatar.jpg'
+        : profile?.photoUrl) ?? null,
+  ),
+} as unknown as AvatarUrlResolverService;
 
 describe('RideViewService', () => {
   const driverProfileId = '72b81eb5-c53f-4de2-bd9f-11f33d64da64';
@@ -54,6 +75,7 @@ describe('RideViewService', () => {
     const profile = {
       id: driverProfileId,
       firstName: 'Carlos',
+      lastName: 'Landeo',
       photoUrl: 'https://cdn.tukituki.pe/carlos.jpg',
       ratingAverage: '4.92',
       ratingCount: 128,
@@ -88,12 +110,14 @@ describe('RideViewService', () => {
     };
     const service = new RideViewService(
       dataSourceMock as unknown as DataSource,
+      avatarResolverMock,
     );
 
     const result = await service.toPassengerResponse(ride);
 
     expect(result.driver?.profileId).toBe(driverProfileId);
     expect(result.driver?.firstName).toBe('Carlos');
+    expect(result.driver?.lastNameInitial).toBe('L.');
     expect(result.driver?.photoUrl).toBe('https://cdn.tukituki.pe/carlos.jpg');
     expect(result.driver?.ratingAverage).toBe('4.92');
     expect(result.driver?.ratingCount).toBe(128);
@@ -109,6 +133,7 @@ describe('RideViewService', () => {
     const profile = {
       id: driverProfileId,
       firstName: 'Carlos',
+      lastName: 'Landeo',
       photoUrl: null,
       ratingAverage: '0.00',
       ratingCount: 0,
@@ -134,6 +159,7 @@ describe('RideViewService', () => {
     };
     const service = new RideViewService(
       dataSourceMock as unknown as DataSource,
+      avatarResolverMock,
     );
 
     const result = await service.toPassengerResponse(ride);
@@ -148,6 +174,7 @@ describe('RideViewService', () => {
     };
     const service = new RideViewService(
       dataSourceMock as unknown as DataSource,
+      avatarResolverMock,
     );
 
     const result = await service.toPassengerResponse({
@@ -184,6 +211,7 @@ describe('RideViewService', () => {
     };
     const service = new RideViewService(
       dataSourceMock as unknown as DataSource,
+      avatarResolverMock,
     );
 
     const result = await service.toDriverResponse(ride, 650);
@@ -191,6 +219,7 @@ describe('RideViewService', () => {
     expect(result.passenger).not.toBeNull();
     expect(result.passenger?.profileId).toBe(passengerProfileId);
     expect(result.passenger?.firstName).toBe('María');
+    expect(result.passenger?.lastNameInitial).toBe('F.');
     expect(result.passenger?.photoUrl).toBe(
       'https://cdn.tukituki.pe/maria.jpg',
     );
@@ -229,6 +258,7 @@ describe('RideViewService', () => {
     };
     const service = new RideViewService(
       dataSourceMock as unknown as DataSource,
+      avatarResolverMock,
     );
 
     const result = await service.toDriverResponse(ride, null);
@@ -236,6 +266,38 @@ describe('RideViewService', () => {
     expect(result.passenger?.photoUrl).toBeNull();
     expect(result.passenger?.ratingAverage).toBe('0.00');
     expect(result.passenger?.ratingCount).toBe(0);
+  });
+
+  it('legacy: lastName vacío/solo espacios no produce crash y lastNameInitial queda vacío', async () => {
+    const passengerProfile = {
+      id: passengerProfileId,
+      userId: passengerUserId,
+      firstName: 'María',
+      lastName: '   ',
+      photoUrl: null,
+      ratingAverage: '0.00',
+      ratingCount: 0,
+    } as PassengerProfile;
+
+    const dataSourceMock = {
+      getRepository: jest.fn((entity: unknown): unknown => ({
+        findOne: jest.fn(() => {
+          if (entity === PassengerProfile) {
+            return Promise.resolve(passengerProfile);
+          }
+          return Promise.resolve(null);
+        }),
+      })),
+    };
+    const service = new RideViewService(
+      dataSourceMock as unknown as DataSource,
+      avatarResolverMock,
+    );
+
+    const result = await service.toDriverResponse(ride, null);
+
+    expect(result.passenger?.firstName).toBe('María');
+    expect(result.passenger?.lastNameInitial).toBe('');
   });
 
   it('debe devolver passenger null si el perfil no existe', async () => {
@@ -246,6 +308,7 @@ describe('RideViewService', () => {
     };
     const service = new RideViewService(
       dataSourceMock as unknown as DataSource,
+      avatarResolverMock,
     );
 
     const result = await service.toDriverResponse(ride, null);

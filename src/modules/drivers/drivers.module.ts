@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { AuthModule } from '../auth/auth.module';
 import { AuthorizationModule } from '../authorization/authorization.module';
+import { AvatarModule } from '../storage/avatar.module';
 import { DriverDocumentsController } from './driver-documents.controller';
 import { DriverDocumentsService } from './driver-documents.service';
 import { DriverVehiclesController } from './driver-vehicles.controller';
@@ -19,6 +20,7 @@ import { DriverApplicationSubmissionService } from './driver-application-submiss
     TypeOrmModule.forFeature([DriverProfile, DriverVehicle, DriverDocument]),
     AuthModule,
     AuthorizationModule,
+    AvatarModule,
   ],
   controllers: [
     DriversController,

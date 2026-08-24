@@ -17,6 +17,7 @@ import { DriverOperationalState } from '../driver-operations/entities/driver-ope
 import { DriverOperationalStatus } from '../driver-operations/enums/driver-operational-status.enum';
 import { DriverProfile } from '../drivers/entities/driver-profile.entity';
 import { DriverStatus } from '../drivers/enums/driver-status.enum';
+import { PassengerProfile } from '../passengers/entities/passenger-profile.entity';
 import { CounterRideOfferDto } from './dto/counter-ride-offer.dto';
 import { DriverPendingProposalResponseDto } from './dto/driver-pending-proposal-response.dto';
 import { DriverRideOfferResponseDto } from './dto/driver-ride-offer-response.dto';
@@ -28,6 +29,12 @@ import { RideStatus } from './enums/ride-status.enum';
 import { ACTIVE_DRIVER_RIDE_STATUSES } from './ride-matching.constants';
 import { RideDispatchService } from './ride-dispatch.service';
 import { RideTransitionsService } from './ride-transitions.service';
+import { deriveLastNameInitial } from './utils/last-name-initial.util';
+
+interface PassengerIdentitySummary {
+  firstName: string;
+  lastNameInitial: string;
+}
 
 interface ProposedOutcome {
   kind: 'proposed';
@@ -96,7 +103,13 @@ export class DriverRideOffersService {
       },
     });
 
-    return offers.map((offer) => this.mapOffer(offer));
+    const passengerIdentitiesByUserId = await this.getPassengerIdentities(
+      offers.map((offer) => offer.ride.passengerUserId),
+    );
+
+    return offers.map((offer) =>
+      this.mapOffer(offer, passengerIdentitiesByUserId),
+    );
   }
 
   async getOffer(
@@ -119,7 +132,46 @@ export class DriverRideOffersService {
       throw new NotFoundException('La oferta no existe');
     }
 
-    return this.mapOffer(offer);
+    const passengerIdentitiesByUserId = await this.getPassengerIdentities([
+      offer.ride.passengerUserId,
+    ]);
+
+    return this.mapOffer(offer, passengerIdentitiesByUserId);
+  }
+
+  /*
+   * Batch lookup de identidad compactable (firstName + lastNameInitial)
+   * por passengerUserId: UNA sola query para todas las Offers de la
+   * respuesta (nunca una query por Offer, ni siquiera con 20-50 Offers
+   * simultáneas). No hay relación TypeORM declarada entre Ride y
+   * PassengerProfile (ver ride-view.service.ts para el mismo patrón ya
+   * usado post-asignación), así que se resuelve con un IN explícito.
+   */
+  private async getPassengerIdentities(
+    passengerUserIds: string[],
+  ): Promise<Map<string, PassengerIdentitySummary>> {
+    const uniqueUserIds = [...new Set(passengerUserIds)];
+
+    if (uniqueUserIds.length === 0) {
+      return new Map();
+    }
+
+    const profiles = await this.dataSource
+      .getRepository(PassengerProfile)
+      .find({
+        where: { userId: In(uniqueUserIds) },
+        select: { userId: true, firstName: true, lastName: true },
+      });
+
+    return new Map(
+      profiles.map((profile) => [
+        profile.userId,
+        {
+          firstName: profile.firstName,
+          lastNameInitial: deriveLastNameInitial(profile.lastName),
+        },
+      ]),
+    );
   }
 
   /*
@@ -200,7 +252,11 @@ export class DriverRideOffersService {
 
     this.assertProposalOutcome(outcome);
 
-    return this.mapOffer(outcome.offer);
+    const passengerIdentitiesByUserId = await this.getPassengerIdentities([
+      outcome.offer.ride.passengerUserId,
+    ]);
+
+    return this.mapOffer(outcome.offer, passengerIdentitiesByUserId);
   }
 
   /*
@@ -219,7 +275,11 @@ export class DriverRideOffersService {
 
     this.assertProposalOutcome(outcome);
 
-    return this.mapOffer(outcome.offer);
+    const passengerIdentitiesByUserId = await this.getPassengerIdentities([
+      outcome.offer.ride.passengerUserId,
+    ]);
+
+    return this.mapOffer(outcome.offer, passengerIdentitiesByUserId);
   }
 
   async rejectOffer(
@@ -245,7 +305,11 @@ export class DriverRideOffersService {
         );
       });
 
-    return this.mapOffer(outcome.offer);
+    const passengerIdentitiesByUserId = await this.getPassengerIdentities([
+      outcome.offer.ride.passengerUserId,
+    ]);
+
+    return this.mapOffer(outcome.offer, passengerIdentitiesByUserId);
   }
 
   private async proposeWithinTransaction(
@@ -721,8 +785,21 @@ export class DriverRideOffersService {
     };
   }
 
-  private mapOffer(offer: RideOffer): DriverRideOfferResponseDto {
+  private mapOffer(
+    offer: RideOffer,
+    passengerIdentitiesByUserId: Map<string, PassengerIdentitySummary>,
+  ): DriverRideOfferResponseDto {
     const ride = offer.ride;
+
+    /*
+     * Null-safe a propósito: si por inconsistencia no existe un
+     * PassengerProfile para este passengerUserId (no debería pasar
+     * en operación normal, pero la integridad referencial entre
+     * User y PassengerProfile no está garantizada a nivel de FK),
+     * el Driver simplemente no ve nombre — nunca "Pasajero" inventado.
+     */
+    const passengerIdentity =
+      passengerIdentitiesByUserId.get(ride.passengerUserId) ?? null;
 
     return {
       id: offer.id,
@@ -749,6 +826,14 @@ export class DriverRideOffersService {
 
       ride: {
         id: ride.id,
+
+        passenger:
+          passengerIdentity === null
+            ? null
+            : {
+                firstName: passengerIdentity.firstName,
+                lastNameInitial: passengerIdentity.lastNameInitial,
+              },
 
         origin: {
           latitude: ride.originPosition.coordinates[1],

@@ -181,6 +181,106 @@ export class DriverDocumentsService {
     return this.driverDocumentsRepository.save(document);
   }
 
+  /*
+   * STORAGE-R2: valida que el usuario pueda subir un documento
+   * (perfil propio, solicitud editable, vehículo ya registrado) SIN
+   * crear todavía ninguna fila. Reutilizado por modules/storage para
+   * decidir el prefijo del objectKey antes de presignar.
+   */
+  async assertDocumentUploadAllowed(userId: string): Promise<DriverProfile> {
+    const profile = await this.getDriverProfileOrFail(userId);
+
+    this.assertApplicationEditable(profile);
+    await this.assertVehicleExists(profile.id);
+
+    return profile;
+  }
+
+  /*
+   * STORAGE-R2: crea o reemplaza el documento de este tipo con un
+   * objectKey ya validado (HeadObject) por modules/storage. Reutiliza
+   * las mismas reglas de edición/propiedad que el flujo legacy
+   * (createMyDocument/updateMyDocument) en vez de duplicarlas.
+   *
+   * Devuelve el objectKey anterior (si existía) para que el llamador
+   * pueda borrarlo del bucket en modo best-effort DESPUÉS de que esta
+   * escritura en DB haya confirmado — nunca antes.
+   */
+  async completeDocumentUpload(
+    userId: string,
+    type: DriverDocumentType,
+    objectKey: string,
+  ): Promise<{ document: DriverDocument; previousObjectKey: string | null }> {
+    const profile = await this.assertDocumentUploadAllowed(userId);
+
+    const existingDocument = await this.driverDocumentsRepository.findOne({
+      where: {
+        driverProfileId: profile.id,
+        type,
+      },
+    });
+
+    if (existingDocument) {
+      this.assertDocumentEditable(existingDocument);
+
+      const previousObjectKey = existingDocument.fileObjectKey;
+
+      existingDocument.fileObjectKey = objectKey;
+
+      if (existingDocument.status === DriverDocumentStatus.REJECTED) {
+        existingDocument.status = DriverDocumentStatus.DRAFT;
+        existingDocument.rejectionReason = null;
+        existingDocument.reviewedAt = null;
+        existingDocument.reviewedByUserId = null;
+      }
+
+      const document =
+        await this.driverDocumentsRepository.save(existingDocument);
+
+      return { document, previousObjectKey };
+    }
+
+    const document = this.driverDocumentsRepository.create({
+      driverProfileId: profile.id,
+      type,
+      fileUrl: null,
+      fileObjectKey: objectKey,
+      documentNumber: null,
+      issuedAt: null,
+      expiresAt: null,
+      status: DriverDocumentStatus.DRAFT,
+      rejectionReason: null,
+      reviewedAt: null,
+      reviewedByUserId: null,
+    });
+
+    try {
+      const saved = await this.driverDocumentsRepository.save(document);
+
+      return { document: saved, previousObjectKey: null };
+    } catch (error: unknown) {
+      if (this.isUniqueConstraintViolation(error)) {
+        throw new ConflictException('Ya registraste este tipo de documento');
+      }
+
+      throw error;
+    }
+  }
+
+  /*
+   * STORAGE-R2: usado por el endpoint de descarga privada del propio
+   * conductor. Reutiliza getDocumentByProfileOrFail para no duplicar
+   * la verificación de propiedad.
+   */
+  async getMyDocumentForDownload(
+    userId: string,
+    documentId: string,
+  ): Promise<DriverDocument> {
+    const profile = await this.getDriverProfileOrFail(userId);
+
+    return this.getDocumentByProfileOrFail(profile.id, documentId);
+  }
+
   async deleteMyDocument(userId: string, documentId: string): Promise<void> {
     const profile = await this.getDriverProfileOrFail(userId);
 

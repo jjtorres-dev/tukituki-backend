@@ -88,8 +88,21 @@ export class DriverProfile {
   @Column({
     type: 'varchar',
     length: 255,
+    nullable: true,
   })
-  address!: string;
+  address!: string | null;
+
+  /*
+   * Opcional (DRIVER-ONBOARDING-R2): el paso 2 del onboarding nuevo
+   * ("Sobre ti") no exige correo. Nullable, sin unicidad — no hay
+   * decisión de producto que la requiera todavía.
+   */
+  @Column({
+    type: 'varchar',
+    length: 255,
+    nullable: true,
+  })
+  email!: string | null;
 
   @Column({
     name: 'photo_url',
@@ -98,6 +111,21 @@ export class DriverProfile {
     nullable: true,
   })
   photoUrl!: string | null;
+
+  /*
+   * objectKey canónico en Railway Storage Buckets (STORAGE-R2).
+   * Cuando está presente, photoUrl es la URL estable del Backend
+   * que redirige a una presigned GET fresca (ver
+   * modules/storage/avatar-url.util.ts). Nullable: perfiles creados
+   * antes de STORAGE-R2 solo tienen photoUrl legacy.
+   */
+  @Column({
+    name: 'photo_object_key',
+    type: 'varchar',
+    length: 1024,
+    nullable: true,
+  })
+  photoObjectKey!: string | null;
 
   @Column({
     name: 'rating_average',

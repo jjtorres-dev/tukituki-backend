@@ -97,8 +97,11 @@ export class AuthController {
   @ApiTooManyRequestsResponse({
     description: 'Debe esperar antes de solicitar otro código',
   })
-  requestPhoneOtp(@Body() dto: RequestPhoneOtpDto) {
-    return this.otpService.requestPhoneVerification(dto.phoneE164);
+  requestPhoneOtp(@Body() dto: RequestPhoneOtpDto, @Req() request: Request) {
+    return this.otpService.requestPhoneVerification(
+      dto.phoneE164,
+      request.ip ?? null,
+    );
   }
 
   @Post('otp/verify')

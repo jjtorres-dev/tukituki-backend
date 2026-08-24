@@ -17,6 +17,7 @@ import { Ride } from '../rides/entities/ride.entity';
 import { RideStatusActor } from '../rides/enums/ride-status-actor.enum';
 import { RideStatus } from '../rides/enums/ride-status.enum';
 import { RideRealtimeService } from '../rides/realtime/ride-realtime.service';
+import { AvatarUrlResolverService } from '../storage/avatar-url-resolver.service';
 import { AdminSafetyIncidentQueryDto } from './dto/admin-safety-incident-query.dto';
 import { CreateSafetyIncidentDto } from './dto/create-safety-incident.dto';
 import { ResolveSafetyIncidentDto } from './dto/resolve-safety-incident.dto';
@@ -52,6 +53,7 @@ export class RideSafetyService {
     private readonly configService: ConfigService,
     private readonly outboxService: OutboxService,
     private readonly realtimeService: RideRealtimeService,
+    private readonly avatarResolver: AvatarUrlResolverService,
   ) {
     this.recentRideGraceSeconds = this.configService.get<number>(
       'SAFETY_INCIDENT_RECENT_RIDE_GRACE_SECONDS',
@@ -109,11 +111,19 @@ export class RideSafetyService {
         accuracy: dto.accuracy ?? null,
         description: dto.description?.trim() || null,
         rideStatusSnapshot: ride.status,
+        /*
+         * STORAGE-R2.1: se guarda photoObjectKey (referencia estable)
+         * además de photoUrl legacy. photoUrl se resuelve de nuevo en
+         * cada lectura (ver map()) para que el capability token nunca
+         * quede vencido en un incidente revisado mucho después.
+         */
         passengerSnapshot: {
           userId: ride.passengerUserId,
+          profileId: passengerProfile?.id ?? null,
           firstName: passengerProfile?.firstName ?? null,
           lastName: passengerProfile?.lastName ?? null,
           photoUrl: passengerProfile?.photoUrl ?? null,
+          photoObjectKey: passengerProfile?.photoObjectKey ?? null,
         },
         driverSnapshot: ride.driverProfile
           ? {
@@ -122,6 +132,7 @@ export class RideSafetyService {
               firstName: ride.driverProfile.firstName,
               lastName: ride.driverProfile.lastName,
               photoUrl: ride.driverProfile.photoUrl,
+              photoObjectKey: ride.driverProfile.photoObjectKey,
             }
           : null,
         vehicleSnapshot: vehicle
@@ -445,8 +456,13 @@ export class RideSafetyService {
       accuracy: incident.accuracy,
       description: incident.description,
       rideStatusSnapshot: incident.rideStatusSnapshot,
-      passengerSnapshot: incident.passengerSnapshot,
-      driverSnapshot: incident.driverSnapshot,
+      passengerSnapshot: this.resolveSnapshotPhoto(
+        incident.passengerSnapshot,
+        'passenger',
+      ),
+      driverSnapshot: incident.driverSnapshot
+        ? this.resolveSnapshotPhoto(incident.driverSnapshot, 'driver')
+        : null,
       vehicleSnapshot: incident.vehicleSnapshot,
       acknowledgedByUserId: incident.acknowledgedByUserId,
       acknowledgedAt: incident.acknowledgedAt,
@@ -456,5 +472,48 @@ export class RideSafetyService {
       createdAt: incident.createdAt,
       updatedAt: incident.updatedAt,
     };
+  }
+
+  /*
+   * STORAGE-R2.1: resuelve photoUrl al vuelo a partir de
+   * profileId/photoObjectKey guardados en el snapshot, en vez de
+   * confiar en una URL congelada al momento del incidente (que podría
+   * haber vencido si el incidente se revisa mucho después).
+   */
+  private resolveSnapshotPhoto(
+    snapshot: Record<string, unknown>,
+    kind: 'passenger' | 'driver',
+  ): Record<string, unknown> {
+    const profileId = this.readSnapshotString(snapshot, 'profileId');
+    const photoObjectKey = this.readSnapshotString(snapshot, 'photoObjectKey');
+    const legacyPhotoUrl = this.readSnapshotString(snapshot, 'photoUrl');
+
+    if (!profileId) {
+      return snapshot;
+    }
+
+    const resolvedPhotoUrl =
+      kind === 'passenger'
+        ? this.avatarResolver.resolvePassengerAvatarUrl({
+            id: profileId,
+            photoObjectKey,
+            photoUrl: legacyPhotoUrl,
+          })
+        : this.avatarResolver.resolveDriverAvatarUrl({
+            id: profileId,
+            photoObjectKey,
+            photoUrl: legacyPhotoUrl,
+          });
+
+    return { ...snapshot, photoUrl: resolvedPhotoUrl };
+  }
+
+  private readSnapshotString(
+    snapshot: Record<string, unknown>,
+    key: string,
+  ): string | null {
+    const value = snapshot[key];
+
+    return typeof value === 'string' ? value : null;
   }
 }

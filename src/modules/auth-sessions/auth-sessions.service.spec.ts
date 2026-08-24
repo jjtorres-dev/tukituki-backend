@@ -197,16 +197,80 @@ describe('AuthSessionsService.rotate', () => {
 
   it.each<[string, UserRole[]]>([
     ['Driver', [UserRole.DRIVER]],
+    ['Passenger + Driver', [UserRole.PASSENGER, UserRole.DRIVER]],
+  ])(
+    'permite refresh a %s ACTIVE no verificado durante MVP (isPhoneVerified no gatea consumidor)',
+    async (_label, roles) => {
+      const { service, transactionalRepository } = buildService(roles);
+
+      const result = await service.rotate(refreshToken);
+
+      expect(result.user.isPhoneVerified).toBe(false);
+      expect(transactionalRepository.save).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it.each<[string, UserRole[]]>([
     ['Admin', [UserRole.ADMIN]],
     ['Super Admin', [UserRole.SUPER_ADMIN]],
-    ['Passenger + Driver', [UserRole.PASSENGER, UserRole.DRIVER]],
-  ])('rechaza refresh a %s ACTIVE no verificado', async (_label, roles) => {
-    const { service, transactionalRepository } = buildService(roles);
+  ])(
+    'rechaza refresh a %s ACTIVE no verificado (seguridad administrativa preservada)',
+    async (_label, roles) => {
+      const { service, transactionalRepository } = buildService(roles, false);
 
-    await expect(service.rotate(refreshToken)).rejects.toBeInstanceOf(
-      UnauthorizedException,
+      await expect(service.rotate(refreshToken)).rejects.toBeInstanceOf(
+        UnauthorizedException,
+      );
+
+      expect(transactionalRepository.save).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each<[string, UserRole[]]>([
+    ['Passenger + Admin', [UserRole.PASSENGER, UserRole.ADMIN]],
+    ['Driver + Super Admin', [UserRole.DRIVER, UserRole.SUPER_ADMIN]],
+  ])(
+    'rechaza refresh a %s ACTIVE no verificado (el rol administrativo gana)',
+    async (_label, roles) => {
+      const { service, transactionalRepository } = buildService(roles, false);
+
+      await expect(service.rotate(refreshToken)).rejects.toBeInstanceOf(
+        UnauthorizedException,
+      );
+
+      expect(transactionalRepository.save).not.toHaveBeenCalled();
+    },
+  );
+
+  it('permite refresh a Admin ACTIVE verificado', async () => {
+    const { service, transactionalRepository } = buildService(
+      [UserRole.ADMIN],
+      true,
     );
 
-    expect(transactionalRepository.save).not.toHaveBeenCalled();
+    const result = await service.rotate(refreshToken);
+
+    expect(result.user.isPhoneVerified).toBe(true);
+    expect(transactionalRepository.save).toHaveBeenCalledTimes(1);
   });
+
+  it.each<[string, UserStatus]>([
+    ['SUSPENDED', UserStatus.SUSPENDED],
+    ['BLOCKED', UserStatus.BLOCKED],
+  ])(
+    'rechaza refresh a Driver %s aunque isPhoneVerified sea true',
+    async (_label, status) => {
+      const { service, transactionalRepository } = buildService(
+        [UserRole.DRIVER],
+        true,
+        status,
+      );
+
+      await expect(service.rotate(refreshToken)).rejects.toBeInstanceOf(
+        UnauthorizedException,
+      );
+
+      expect(transactionalRepository.save).not.toHaveBeenCalled();
+    },
+  );
 });

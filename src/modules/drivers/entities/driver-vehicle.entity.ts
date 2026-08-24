@@ -11,6 +11,7 @@ import {
 import type { Relation } from 'typeorm';
 
 import { DriverProfile } from './driver-profile.entity';
+import { VehicleOwnership } from '../enums/vehicle-ownership.enum';
 import { VehicleStatus } from '../enums/vehicle-status.enum';
 import { VehicleType } from '../enums/vehicle-type.enum';
 
@@ -78,19 +79,45 @@ export class DriverVehicle {
   })
   color!: string;
 
+  /*
+   * Opcional (DRIVER-ONBOARDING-R2): el onboarding nuevo ya no pide
+   * motor manualmente. Nullable en DB; expedientes legacy conservan
+   * su valor.
+   */
   @Column({
     name: 'engine_number',
     type: 'varchar',
     length: 80,
+    nullable: true,
   })
-  engineNumber!: string;
+  engineNumber!: string | null;
 
+  /*
+   * Opcional (DRIVER-ONBOARDING-R2): el onboarding nuevo ya no pide
+   * chasis manualmente. Nullable en DB; expedientes legacy conservan
+   * su valor.
+   */
   @Column({
     name: 'chassis_number',
     type: 'varchar',
     length: 80,
+    nullable: true,
   })
-  chassisNumber!: string;
+  chassisNumber!: string | null;
+
+  /*
+   * Nullable en DB por compatibilidad con vehículos existentes en
+   * STAGING (creados antes de DRIVER-ONBOARDING-R2, sin ownership
+   * conocido — no se inventa un valor para ellos). El DTO de creación
+   * sí lo exige para vehículos nuevos.
+   */
+  @Column({
+    type: 'enum',
+    enum: VehicleOwnership,
+    enumName: 'vehicle_ownership_enum',
+    nullable: true,
+  })
+  ownership!: VehicleOwnership | null;
 
   @Column({
     name: 'vehicle_type',

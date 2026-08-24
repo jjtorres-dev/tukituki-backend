@@ -165,6 +165,10 @@ describe('PassengerRidesService', () => {
     expect(savedRide?.status).toBe(RideStatus.SEARCHING_DRIVER);
     expect(savedRide?.stateVersion).toBe(0);
     expect(savedRide?.driverArrivingAt).toBeNull();
+    // Ride hereda el snapshot de FareQuote tal cual (G4B-R4): nunca
+    // se vuelve a resolver la dirección al crear el Ride.
+    expect(savedRide?.originAddress).toBe('Jr. Lima 250, Tarapoto');
+    expect(savedRide?.destinationAddress).toBe('Plaza de Armas de Morales');
     expect(
       savedRide!.searchExpiresAt.getTime() - savedRide!.requestedAt.getTime(),
     ).toBe(RIDE_SEARCH_TTL_MS);

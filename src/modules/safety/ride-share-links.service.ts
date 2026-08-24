@@ -16,6 +16,7 @@ import { OutboxEventType } from '../outbox/enums/outbox-event-type.enum';
 import { OutboxService } from '../outbox/outbox.service';
 import { Ride } from '../rides/entities/ride.entity';
 import { RideStatus } from '../rides/enums/ride-status.enum';
+import { AvatarUrlResolverService } from '../storage/avatar-url-resolver.service';
 import { CreateRideShareLinkDto } from './dto/create-ride-share-link.dto';
 import { PublicSharedRideResponseDto } from './dto/public-shared-ride-response.dto';
 import { RideShareLinkResponseDto } from './dto/ride-share-link-response.dto';
@@ -64,6 +65,7 @@ export class RideShareLinksService {
     private readonly dataSource: DataSource,
     private readonly configService: ConfigService,
     private readonly outboxService: OutboxService,
+    private readonly avatarResolver: AvatarUrlResolverService,
   ) {
     this.publicAppOrigin = this.configService
       .get<string>('PUBLIC_APP_ORIGIN', 'http://localhost:3000')
@@ -227,7 +229,9 @@ export class RideShareLinksService {
       driver: ride.driverProfile
         ? {
             firstName: ride.driverProfile.firstName,
-            photoUrl: ride.driverProfile.photoUrl,
+            photoUrl: this.avatarResolver.resolveDriverAvatarUrl(
+              ride.driverProfile,
+            ),
             vehicle: vehicle
               ? {
                   plate: vehicle.plate,

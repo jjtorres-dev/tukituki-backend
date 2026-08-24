@@ -65,11 +65,13 @@ export class DriversController {
   @ApiForbiddenResponse({
     description: 'La cuenta no posee un rol permitido',
   })
-  createMyProfile(
+  async createMyProfile(
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: CreateDriverProfileDto,
   ): Promise<DriverProfileResponseDto> {
-    return this.driversService.createMyProfile(user.id, dto);
+    const profile = await this.driversService.createMyProfile(user.id, dto);
+
+    return this.driversService.toProfileResponse(profile);
   }
 
   @Get('me')
@@ -82,10 +84,12 @@ export class DriversController {
   @ApiNotFoundResponse({
     description: 'La solicitud todavía no existe',
   })
-  getMyProfile(
+  async getMyProfile(
     @CurrentUser() user: AuthenticatedUser,
   ): Promise<DriverProfileResponseDto> {
-    return this.driversService.getMyProfile(user.id);
+    const profile = await this.driversService.getMyProfile(user.id);
+
+    return this.driversService.toProfileResponse(profile);
   }
 
   @Patch('me')
@@ -102,11 +106,13 @@ export class DriversController {
   @ApiNotFoundResponse({
     description: 'La solicitud todavía no existe',
   })
-  updateMyProfile(
+  async updateMyProfile(
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: UpdateDriverProfileDto,
   ): Promise<DriverProfileResponseDto> {
-    return this.driversService.updateMyProfile(user.id, dto);
+    const profile = await this.driversService.updateMyProfile(user.id, dto);
+
+    return this.driversService.toProfileResponse(profile);
   }
 
   @Post('me/submit')
@@ -125,9 +131,11 @@ export class DriversController {
   @ApiNotFoundResponse({
     description: 'La solicitud del conductor todavía no existe',
   })
-  submitMyProfile(
+  async submitMyProfile(
     @CurrentUser() user: AuthenticatedUser,
   ): Promise<DriverProfileResponseDto> {
-    return this.submissionService.submit(user.id);
+    const profile = await this.submissionService.submit(user.id);
+
+    return this.driversService.toProfileResponse(profile);
   }
 }

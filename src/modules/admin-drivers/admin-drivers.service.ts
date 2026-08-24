@@ -9,6 +9,7 @@ import { DriverDocument } from '../drivers/entities/driver-document.entity';
 import { DriverProfile } from '../drivers/entities/driver-profile.entity';
 import { DriverVehicle } from '../drivers/entities/driver-vehicle.entity';
 import { DriverStatus } from '../drivers/enums/driver-status.enum';
+import { AvatarUrlResolverService } from '../storage/avatar-url-resolver.service';
 import { AdminDriverDetailResponseDto } from './dto/admin-driver-detail-response.dto';
 import {
   AdminDriverListItemDto,
@@ -41,6 +42,8 @@ export class AdminDriversService {
 
     @InjectRepository(DriverDocument)
     private readonly driverDocumentsRepository: Repository<DriverDocument>,
+
+    private readonly avatarResolver: AvatarUrlResolverService,
   ) {}
 
   async list(query: AdminDriverQueryDto): Promise<AdminDriverListResponseDto> {
@@ -204,7 +207,8 @@ export class AdminDriversService {
       documentNumber: profile.documentNumber,
       birthDate: profile.birthDate,
       address: profile.address,
-      photoUrl: profile.photoUrl,
+      email: profile.email,
+      photoUrl: this.avatarResolver.resolveDriverAvatarUrl(profile),
       ratingAverage: profile.ratingAverage,
       ratingCount: profile.ratingCount,
       status: profile.status,
@@ -233,6 +237,7 @@ export class AdminDriversService {
       color: vehicle.color,
       engineNumber: vehicle.engineNumber,
       chassisNumber: vehicle.chassisNumber,
+      ownership: vehicle.ownership,
       vehicleType: vehicle.vehicleType,
       status: vehicle.status,
       rejectionReason: vehicle.rejectionReason,
@@ -247,6 +252,7 @@ export class AdminDriversService {
       driverProfileId: document.driverProfileId,
       type: document.type,
       fileUrl: document.fileUrl,
+      fileObjectKey: document.fileObjectKey,
       documentNumber: document.documentNumber,
       issuedAt: document.issuedAt,
       expiresAt: document.expiresAt,

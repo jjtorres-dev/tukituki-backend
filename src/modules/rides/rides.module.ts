@@ -17,6 +17,7 @@ import { ServiceZone } from '../service-zones/entities/service-zone.entity';
 import { User } from '../users/entities/user.entity';
 import { OutboxModule } from '../outbox/outbox.module';
 import { PromotionsModule } from '../promotions/promotions.module';
+import { AvatarModule } from '../storage/avatar.module';
 import { DriverRideOffersController } from './driver-ride-offers.controller';
 import { AdminRideCancellationsController } from './admin-ride-cancellations.controller';
 import { RidePayment } from '../payments/entities/ride-payment.entity';
@@ -85,6 +86,7 @@ import { RideViewService } from './ride-view.service';
     ]),
     AuthModule,
     AuthorizationModule,
+    AvatarModule,
     RideRealtimeModule,
     DriverOperationsModule,
     OutboxModule,

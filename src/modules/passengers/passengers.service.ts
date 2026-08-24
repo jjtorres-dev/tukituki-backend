@@ -6,7 +6,9 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { QueryFailedError, Repository } from 'typeorm';
 
+import { AvatarUrlResolverService } from '../storage/avatar-url-resolver.service';
 import { CreatePassengerProfileDto } from './dto/create-passenger-profile.dto';
+import { PassengerProfileResponseDto } from './dto/passenger-profile-response.dto';
 import { UpdatePassengerProfileDto } from './dto/update-passenger-profile.dto';
 import { PassengerProfile } from './entities/passenger-profile.entity';
 
@@ -15,7 +17,29 @@ export class PassengersService {
   constructor(
     @InjectRepository(PassengerProfile)
     private readonly passengerProfilesRepository: Repository<PassengerProfile>,
+
+    private readonly avatarResolver: AvatarUrlResolverService,
   ) {}
+
+  /*
+   * STORAGE-R2.1: única forma de exponer el perfil del pasajero hacia
+   * afuera. Nunca devolver la entidad ni photoObjectKey directamente.
+   */
+  toProfileResponse(profile: PassengerProfile): PassengerProfileResponseDto {
+    return {
+      id: profile.id,
+      userId: profile.userId,
+      firstName: profile.firstName,
+      lastName: profile.lastName,
+      photoUrl: this.avatarResolver.resolvePassengerAvatarUrl(profile),
+      emergencyContactName: profile.emergencyContactName,
+      emergencyContactPhoneE164: profile.emergencyContactPhoneE164,
+      ratingAverage: profile.ratingAverage,
+      ratingCount: profile.ratingCount,
+      createdAt: profile.createdAt,
+      updatedAt: profile.updatedAt,
+    };
+  }
 
   findByUserId(userId: string): Promise<PassengerProfile | null> {
     return this.passengerProfilesRepository.findOne({
@@ -96,6 +120,36 @@ export class PassengersService {
     }
 
     return this.passengerProfilesRepository.save(profile);
+  }
+
+  /*
+   * STORAGE-R2: valida que el usuario pueda subir su foto de perfil
+   * (perfil propio ya creado). El perfil de pasajero no tiene un
+   * estado que bloquee edición (a diferencia de DriverProfile), por
+   * eso no hay una comprobación adicional además de la propiedad.
+   */
+  assertProfilePhotoUploadAllowed(userId: string): Promise<PassengerProfile> {
+    return this.getMyProfile(userId);
+  }
+
+  /*
+   * STORAGE-R2.1: persiste únicamente el objectKey ya validado
+   * (HeadObject). Ya NO se escribe una URL resuelta en photoUrl (ver
+   * el mismo comentario en DriversService.completeProfilePhotoUpload).
+   */
+  async completeProfilePhotoUpload(
+    userId: string,
+    objectKey: string,
+  ): Promise<{ profile: PassengerProfile; previousObjectKey: string | null }> {
+    const profile = await this.assertProfilePhotoUploadAllowed(userId);
+
+    const previousObjectKey = profile.photoObjectKey;
+
+    profile.photoObjectKey = objectKey;
+
+    const saved = await this.passengerProfilesRepository.save(profile);
+
+    return { profile: saved, previousObjectKey };
   }
 
   private isUniqueConstraintViolation(error: unknown): boolean {

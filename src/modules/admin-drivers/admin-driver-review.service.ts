@@ -9,6 +9,7 @@ import { DataSource, EntityManager, Repository } from 'typeorm';
 import { DriverAvailabilityRedisService } from '../../infrastructure/redis/driver-availability-redis.service';
 import { DriverOperationalState } from '../driver-operations/entities/driver-operational-state.entity';
 import { DriverOperationalStatus } from '../driver-operations/enums/driver-operational-status.enum';
+import { REQUIRED_DRIVER_APPLICATION_DOCUMENT_TYPES } from '../drivers/driver-application.constants';
 import { DriverDocument } from '../drivers/entities/driver-document.entity';
 import { DriverProfile } from '../drivers/entities/driver-profile.entity';
 import { DriverVehicle } from '../drivers/entities/driver-vehicle.entity';
@@ -18,17 +19,8 @@ import { DriverStatus } from '../drivers/enums/driver-status.enum';
 import { VehicleStatus } from '../drivers/enums/vehicle-status.enum';
 import { User } from '../users/entities/user.entity';
 import { UserRole } from '../users/enums/user-role.enum';
-import { UserStatus } from '../users/enums/user-status.enum';
+import { isUserOperationallyEnabled } from '../users/utils/user-auth-policy.util';
 import { RejectDriverApplicationDto } from './dto/reject-driver-application.dto';
-
-const REQUIRED_DOCUMENT_TYPES: readonly DriverDocumentType[] = [
-  DriverDocumentType.DNI_FRONT,
-  DriverDocumentType.DNI_BACK,
-  DriverDocumentType.DRIVER_LICENSE,
-  DriverDocumentType.VEHICLE_REGISTRATION,
-  DriverDocumentType.SOAT,
-  DriverDocumentType.PROFILE_PHOTO,
-];
 
 @Injectable()
 export class AdminDriverReviewService {
@@ -105,7 +97,7 @@ export class AdminDriverReviewService {
     const user = await this.lockUser(userRepository, profile.userId);
 
     this.assertUserCanBecomeDriver(user);
-    this.assertApprovalRequirements(vehicle, documents);
+    this.assertApprovalRequirements(profile, vehicle, documents);
 
     const operationalState = await this.getOrCreateOperationalState(
       operationalStateRepository,
@@ -366,7 +358,7 @@ export class AdminDriverReviewService {
   }
 
   private assertUserCanBecomeDriver(user: User): void {
-    if (user.status !== UserStatus.ACTIVE || !user.isPhoneVerified) {
+    if (!isUserOperationallyEnabled(user)) {
       throw new BadRequestException(
         'La cuenta del solicitante no está habilitada',
       );
@@ -374,10 +366,21 @@ export class AdminDriverReviewService {
   }
 
   private assertApprovalRequirements(
+    profile: DriverProfile,
     vehicle: DriverVehicle,
     documents: DriverDocument[],
   ): void {
     const invalidRequirements: string[] = [];
+
+    /*
+     * La foto de perfil ya debería estar presente desde que el
+     * conductor envió su solicitud (DriverApplicationSubmissionService
+     * la exige antes de permitir el submit), pero se revalida aquí
+     * como última barrera antes de aprobar.
+     */
+    if (!profile.photoObjectKey && !profile.photoUrl) {
+      invalidRequirements.push('DRIVER_PROFILE_PHOTO_MISSING');
+    }
 
     if (vehicle.status !== VehicleStatus.PENDING_REVIEW) {
       invalidRequirements.push(`DRIVER_VEHICLE_STATUS_${vehicle.status}`);
@@ -387,7 +390,7 @@ export class AdminDriverReviewService {
       documents.map((document) => [document.type, document]),
     );
 
-    for (const requiredType of REQUIRED_DOCUMENT_TYPES) {
+    for (const requiredType of REQUIRED_DRIVER_APPLICATION_DOCUMENT_TYPES) {
       const document = documentsByType.get(requiredType);
 
       if (!document) {

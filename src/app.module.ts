@@ -28,6 +28,7 @@ import { RidesModule } from './modules/rides/rides.module';
 import { SafetyModule } from './modules/safety/safety.module';
 import { ServiceZonesModule } from './modules/service-zones/service-zones.module';
 import { SettlementsModule } from './modules/settlements/settlements.module';
+import { StorageModule } from './modules/storage/storage.module';
 import { UsersModule } from './modules/users/users.module';
 
 @Module({
@@ -106,6 +107,7 @@ import { UsersModule } from './modules/users/users.module';
     SettlementsModule,
     RidesModule,
     SafetyModule,
+    StorageModule,
   ],
 
   providers: [

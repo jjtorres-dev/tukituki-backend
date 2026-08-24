@@ -5,6 +5,8 @@ import { DriverLocation } from '../driver-operations/entities/driver-location.en
 import { DriverProfile } from '../drivers/entities/driver-profile.entity';
 import { DriverVehicle } from '../drivers/entities/driver-vehicle.entity';
 import { PassengerProfile } from '../passengers/entities/passenger-profile.entity';
+import { AvatarUrlResolverService } from '../storage/avatar-url-resolver.service';
+import { deriveLastNameInitial } from './utils/last-name-initial.util';
 import {
   DriverActiveRideResponseDto,
   RideAssignedPassengerResponseDto,
@@ -14,7 +16,10 @@ import { Ride } from './entities/ride.entity';
 
 @Injectable()
 export class RideViewService {
-  constructor(private readonly dataSource: DataSource) {}
+  constructor(
+    private readonly dataSource: DataSource,
+    private readonly avatarResolver: AvatarUrlResolverService,
+  ) {}
 
   async toPassengerResponse(ride: Ride): Promise<PassengerRideResponseDto> {
     let driver: PassengerRideResponseDto['driver'] = null;
@@ -37,7 +42,8 @@ export class RideViewService {
         driver = {
           profileId: profile.id,
           firstName: profile.firstName,
-          photoUrl: profile.photoUrl,
+          lastNameInitial: deriveLastNameInitial(profile.lastName),
+          photoUrl: this.avatarResolver.resolveDriverAvatarUrl(profile),
           ratingAverage: profile.ratingAverage,
           ratingCount: profile.ratingCount,
           vehicle: {
@@ -104,9 +110,10 @@ export class RideViewService {
   }
 
   /**
-   * Resumen mínimo del Passenger, sin apellido/teléfono/email/documento.
-   * Degrada a null si el perfil no existe (nunca inventa "Pasajero" ni
-   * un rating por defecto que no venga del propio perfil).
+   * Resumen mínimo del Passenger: firstName + lastNameInitial (nunca
+   * apellido completo/teléfono/email/documento). Degrada a null si el
+   * perfil no existe (nunca inventa "Pasajero" ni un rating por
+   * defecto que no venga del propio perfil).
    */
   private passengerSummary(
     profile: PassengerProfile | null,
@@ -118,7 +125,8 @@ export class RideViewService {
     return {
       profileId: profile.id,
       firstName: profile.firstName,
-      photoUrl: profile.photoUrl,
+      lastNameInitial: deriveLastNameInitial(profile.lastName),
+      photoUrl: this.avatarResolver.resolvePassengerAvatarUrl(profile),
       ratingAverage: profile.ratingAverage,
       ratingCount: profile.ratingCount,
     };

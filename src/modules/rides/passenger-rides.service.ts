@@ -59,6 +59,8 @@ import {
   ACTIVE_DRIVER_RIDE_STATUSES,
   calculateRideSearchExpiresAt,
 } from './ride-matching.constants';
+import { AvatarUrlResolverService } from '../storage/avatar-url-resolver.service';
+import { deriveLastNameInitial } from './utils/last-name-initial.util';
 
 export const ACTIVE_RIDE_STATUSES: readonly RideStatus[] = [
   RideStatus.SEARCHING_DRIVER,
@@ -92,6 +94,7 @@ export class PassengerRidesService {
     private readonly availabilityRedisService?: DriverAvailabilityRedisService,
     @Optional()
     private readonly realtimeService?: RideRealtimeService,
+    @Optional() private readonly avatarResolver?: AvatarUrlResolverService,
   ) {}
 
   async createRide(
@@ -505,10 +508,9 @@ export class PassengerRidesService {
 
       const proposedCents = parseScaledDecimal(offer.proposedFare, 2);
 
-      const lastName = offer.driverProfile.lastName.trim();
-
-      const lastNameInitial =
-        lastName.length > 0 ? `${lastName.charAt(0).toUpperCase()}.` : '';
+      const lastNameInitial = deriveLastNameInitial(
+        offer.driverProfile.lastName,
+      );
 
       return {
         offerId: offer.id,
@@ -522,7 +524,9 @@ export class PassengerRidesService {
 
           lastNameInitial,
 
-          photoUrl: offer.driverProfile.photoUrl,
+          photoUrl:
+            this.avatarResolver?.resolveDriverAvatarUrl(offer.driverProfile) ??
+            offer.driverProfile.photoUrl,
 
           ratingAverage: offer.driverProfile.ratingAverage,
 

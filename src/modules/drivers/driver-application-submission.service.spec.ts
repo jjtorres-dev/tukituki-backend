@@ -105,7 +105,9 @@ describe('DriverApplicationSubmissionService', () => {
 
     address: 'Jr. Los Jardines 245, Tarapoto',
 
-    photoUrl: null,
+    photoUrl: 'https://cdn.tukituki.pe/drivers/photo.jpg',
+
+    photoObjectKey: null,
 
     status: DriverStatus.DRAFT,
 
@@ -380,6 +382,46 @@ describe('DriverApplicationSubmissionService', () => {
     expect(profileRepository.save).not.toHaveBeenCalled();
   });
 
+  it('STORAGE-R2: acepta un documento subido vía Storage (fileObjectKey) sin fileUrl legacy', async () => {
+    /*
+     * submitWithinTransaction muta los documentos recibidos en el
+     * lugar (status/rejectionReason/...). Cada test debe pasarle
+     * copias propias, nunca las referencias compartidas de
+     * completeDocuments, o contamina los demás tests del archivo.
+     */
+    const documentsWithStorageSoat = completeDocuments.map((document) =>
+      document.type === DriverDocumentType.SOAT
+        ? {
+            ...document,
+            fileUrl: null,
+            fileObjectKey: 'drivers/profile-1/documents/soat/1.jpg',
+          }
+        : { ...document },
+    );
+
+    documentQueryBuilder.getMany.mockResolvedValue(documentsWithStorageSoat);
+
+    const result = await service.submit(userId);
+
+    expect(result.status).toBe(DriverStatus.PENDING_REVIEW);
+  });
+
+  it('STORAGE-R2: rechaza un documento sin fileUrl NI fileObjectKey', async () => {
+    const documentsWithoutFile = completeDocuments.map((document) =>
+      document.type === DriverDocumentType.SOAT
+        ? { ...document, fileUrl: null, fileObjectKey: null }
+        : { ...document },
+    );
+
+    documentQueryBuilder.getMany.mockResolvedValue(documentsWithoutFile);
+
+    await expect(service.submit(userId)).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+
+    expect(profileRepository.save).not.toHaveBeenCalled();
+  });
+
   it('debe rechazar un SOAT vencido', async () => {
     documentQueryBuilder.getMany.mockResolvedValue(
       completeDocuments.map((document) =>
@@ -416,6 +458,105 @@ describe('DriverApplicationSubmissionService', () => {
     expect(vehicleQueryBuilder.getOne).not.toHaveBeenCalled();
 
     expect(profileRepository.save).not.toHaveBeenCalled();
+  });
+
+  describe('DRIVER-ONBOARDING-R2: 3 documentos target + foto obligatoria', () => {
+    const targetOnlyDocuments = [
+      createDocument(DriverDocumentType.DRIVER_LICENSE),
+      createDocument(DriverDocumentType.SOAT),
+      createDocument(DriverDocumentType.VEHICLE_REGISTRATION),
+    ];
+
+    it('acepta el envío solo con los 3 documentos target (sin DNI_FRONT/DNI_BACK/PROFILE_PHOTO)', async () => {
+      documentQueryBuilder.getMany.mockResolvedValue(
+        targetOnlyDocuments.map((document) => ({ ...document })),
+      );
+
+      const result = await service.submit(userId);
+
+      expect(result.status).toBe(DriverStatus.PENDING_REVIEW);
+    });
+
+    it('rechaza si falta DRIVER_LICENSE', async () => {
+      documentQueryBuilder.getMany.mockResolvedValue(
+        targetOnlyDocuments
+          .filter(
+            (document) => document.type !== DriverDocumentType.DRIVER_LICENSE,
+          )
+          .map((document) => ({ ...document })),
+      );
+
+      await expect(service.submit(userId)).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+
+      expect(profileRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('rechaza si falta SOAT', async () => {
+      documentQueryBuilder.getMany.mockResolvedValue(
+        targetOnlyDocuments
+          .filter((document) => document.type !== DriverDocumentType.SOAT)
+          .map((document) => ({ ...document })),
+      );
+
+      await expect(service.submit(userId)).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+
+      expect(profileRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('rechaza si falta VEHICLE_REGISTRATION', async () => {
+      documentQueryBuilder.getMany.mockResolvedValue(
+        targetOnlyDocuments
+          .filter(
+            (document) =>
+              document.type !== DriverDocumentType.VEHICLE_REGISTRATION,
+          )
+          .map((document) => ({ ...document })),
+      );
+
+      await expect(service.submit(userId)).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+
+      expect(profileRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('rechaza el envío sin foto de perfil (ni photoUrl ni photoObjectKey)', async () => {
+      profileQueryBuilder.getOne.mockResolvedValue({
+        ...profile,
+        photoUrl: null,
+        photoObjectKey: null,
+      });
+
+      documentQueryBuilder.getMany.mockResolvedValue(
+        targetOnlyDocuments.map((document) => ({ ...document })),
+      );
+
+      await expect(service.submit(userId)).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+
+      expect(profileRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('acepta el envío con foto vía photoObjectKey (Storage) sin photoUrl legacy', async () => {
+      profileQueryBuilder.getOne.mockResolvedValue({
+        ...profile,
+        photoUrl: null,
+        photoObjectKey: 'drivers/profile/1.jpg',
+      });
+
+      documentQueryBuilder.getMany.mockResolvedValue(
+        targetOnlyDocuments.map((document) => ({ ...document })),
+      );
+
+      const result = await service.submit(userId);
+
+      expect(result.status).toBe(DriverStatus.PENDING_REVIEW);
+    });
   });
 
   it('debe propagar un error durante el guardado', async () => {

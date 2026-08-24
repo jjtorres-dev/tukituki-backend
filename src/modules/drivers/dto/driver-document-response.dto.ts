@@ -19,10 +19,20 @@ export class DriverDocumentResponseDto {
   })
   type!: DriverDocumentType;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     example: 'https://cdn.tukituki.pe/documents/license.jpg',
+    nullable: true,
+    description:
+      'Legacy: URL enviada por el cliente. Nullable desde STORAGE-R2.',
   })
-  fileUrl!: string;
+  fileUrl!: string | null;
+
+  @ApiPropertyOptional({
+    nullable: true,
+    description:
+      'objectKey canónico en Railway Storage Buckets, si el documento fue subido mediante STORAGE-R2.',
+  })
+  fileObjectKey!: string | null;
 
   @ApiPropertyOptional({
     nullable: true,

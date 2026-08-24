@@ -87,7 +87,49 @@ export const envValidationSchema = Joi.object({
 
   OTP_HASH_SECRET: Joi.string().min(32).required(),
 
-  OTP_DEBUG_ENABLED: Joi.boolean().truthy('true').falsy('false').default(false),
+  /*
+   * OTP-R2: en producción es estructuralmente imposible dejar
+   * OTP_DEBUG_ENABLED=true (el Backend no arranca), en vez de
+   * depender de que nadie olvide apagarlo manualmente en Railway.
+   */
+  OTP_DEBUG_ENABLED: Joi.when('NODE_ENV', {
+    is: 'production',
+    then: Joi.boolean()
+      .truthy('true')
+      .falsy('false')
+      .valid(false)
+      .default(false)
+      .messages({
+        'any.only':
+          'OTP_DEBUG_ENABLED debe ser false cuando NODE_ENV=production',
+      }),
+    otherwise: Joi.boolean().truthy('true').falsy('false').default(false),
+  }),
+
+  /*
+   * OTP-R2: protección de costo dedicada a POST /auth/otp/request,
+   * independiente del throttle global (RATE_LIMIT_*). El cooldown
+   * (OTP_RESEND_COOLDOWN_SECONDS) ya limita a ~1 solicitud/minuto/
+   * teléfono; estos límites acotan además el total de solicitudes
+   * por IP y por teléfono dentro de una ventana larga, para que un
+   * teléfono no pueda recibir SMS indefinidamente solo esperando el
+   * cooldown entre solicitudes.
+   */
+  OTP_REQUEST_IP_LIMIT: Joi.number().integer().min(1).max(1000).default(20),
+
+  OTP_REQUEST_IP_WINDOW_SECONDS: Joi.number()
+    .integer()
+    .min(60)
+    .max(86400)
+    .default(3600),
+
+  OTP_REQUEST_PHONE_LIMIT: Joi.number().integer().min(1).max(100).default(5),
+
+  OTP_REQUEST_PHONE_WINDOW_SECONDS: Joi.number()
+    .integer()
+    .min(60)
+    .max(86400)
+    .default(3600),
 
   JWT_ACCESS_SECRET: Joi.string().min(64).required(),
 
@@ -326,6 +368,88 @@ export const envValidationSchema = Joi.object({
     then: Joi.string().min(100).required(),
     otherwise: Joi.string().allow('').optional(),
   }),
+
+  /*
+   * STORAGE-R2: Railway Storage Buckets (compatible S3).
+   *
+   * Deshabilitado por defecto: el Backend debe poder arrancar y
+   * ejecutar tests sin credenciales reales. Cuando STORAGE_ENABLED
+   * es true, el bucket/credenciales/región/endpoint pasan a ser
+   * obligatorios.
+   */
+  STORAGE_ENABLED: Joi.boolean().default(false),
+
+  STORAGE_BUCKET: Joi.when('STORAGE_ENABLED', {
+    is: true,
+    then: Joi.string().min(3).max(255).required(),
+    otherwise: Joi.string().allow('').optional(),
+  }),
+
+  STORAGE_ACCESS_KEY_ID: Joi.when('STORAGE_ENABLED', {
+    is: true,
+    then: Joi.string().min(1).max(500).required(),
+    otherwise: Joi.string().allow('').optional(),
+  }),
+
+  STORAGE_SECRET_ACCESS_KEY: Joi.when('STORAGE_ENABLED', {
+    is: true,
+    then: Joi.string().min(1).max(500).required(),
+    otherwise: Joi.string().allow('').optional(),
+  }),
+
+  STORAGE_REGION: Joi.when('STORAGE_ENABLED', {
+    is: true,
+    then: Joi.string().min(1).max(100).required(),
+    otherwise: Joi.string().allow('').default('auto'),
+  }),
+
+  STORAGE_ENDPOINT: Joi.when('STORAGE_ENABLED', {
+    is: true,
+    then: Joi.string().uri().required(),
+    otherwise: Joi.string().allow('').optional(),
+  }),
+
+  STORAGE_UPLOAD_URL_TTL_SECONDS: Joi.number()
+    .integer()
+    .min(60)
+    .max(3600)
+    .default(300),
+
+  STORAGE_DOWNLOAD_URL_TTL_SECONDS: Joi.number()
+    .integer()
+    .min(60)
+    .max(3600)
+    .default(900),
+
+  STORAGE_MAX_IMAGE_SIZE_BYTES: Joi.number()
+    .integer()
+    .min(1024)
+    .max(52428800)
+    .default(8388608),
+
+  STORAGE_MAX_PDF_SIZE_BYTES: Joi.number()
+    .integer()
+    .min(1024)
+    .max(52428800)
+    .default(10485760),
+
+  /*
+   * STORAGE-R2.1: secreto para firmar los capability tokens de
+   * avatares (ver src/modules/storage/avatar-url.util.ts). Solo
+   * obligatorio cuando STORAGE_ENABLED es true, porque solo ahí puede
+   * llegar a existir un photoObjectKey que necesite un token.
+   */
+  STORAGE_AVATAR_TOKEN_SECRET: Joi.when('STORAGE_ENABLED', {
+    is: true,
+    then: Joi.string().min(32).required(),
+    otherwise: Joi.string().allow('').optional(),
+  }),
+
+  STORAGE_AVATAR_TOKEN_TTL_SECONDS: Joi.number()
+    .integer()
+    .min(60)
+    .max(3600)
+    .default(900),
 });
 
 function validateCorsOrigins(

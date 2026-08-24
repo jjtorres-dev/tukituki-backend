@@ -8,6 +8,7 @@ import { PassengerProfile } from '../passengers/entities/passenger-profile.entit
 import { Ride } from '../rides/entities/ride.entity';
 import { RideStatus } from '../rides/enums/ride-status.enum';
 import { RideRealtimeService } from '../rides/realtime/ride-realtime.service';
+import { AvatarUrlResolverService } from '../storage/avatar-url-resolver.service';
 import { RideSafetyIncident } from './entities/ride-safety-incident.entity';
 import { SafetyIncidentType } from './enums/safety-incident-type.enum';
 import { RideSafetyService } from './ride-safety.service';
@@ -90,11 +91,16 @@ describe('RideSafetyService', () => {
     const realtimeService = {
       emitSafetyIncidentCreated,
     } as unknown as RideRealtimeService;
+    const avatarResolver = {
+      resolveDriverAvatarUrl: jest.fn(() => null),
+      resolvePassengerAvatarUrl: jest.fn(() => null),
+    } as unknown as AvatarUrlResolverService;
     const service = new RideSafetyService(
       dataSource,
       configService,
       outboxService,
       realtimeService,
+      avatarResolver,
     );
 
     const result = await service.createIncident(reporterUserId, ride.id, {

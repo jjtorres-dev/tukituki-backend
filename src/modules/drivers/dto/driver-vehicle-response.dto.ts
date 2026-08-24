@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
+import { VehicleOwnership } from '../enums/vehicle-ownership.enum';
 import { VehicleStatus } from '../enums/vehicle-status.enum';
 import { VehicleType } from '../enums/vehicle-type.enum';
 
@@ -39,15 +40,23 @@ export class DriverVehicleResponseDto {
   })
   color!: string;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     example: 'ENG123456789',
+    nullable: true,
   })
-  engineNumber!: string;
+  engineNumber!: string | null;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     example: 'CHS123456789',
+    nullable: true,
   })
-  chassisNumber!: string;
+  chassisNumber!: string | null;
+
+  @ApiPropertyOptional({
+    enum: VehicleOwnership,
+    nullable: true,
+  })
+  ownership!: VehicleOwnership | null;
 
   @ApiProperty({
     enum: VehicleType,

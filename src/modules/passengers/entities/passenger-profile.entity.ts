@@ -56,6 +56,21 @@ export class PassengerProfile {
   })
   photoUrl!: string | null;
 
+  /*
+   * objectKey canónico en Railway Storage Buckets (STORAGE-R2).
+   * Cuando está presente, photoUrl es la URL estable del Backend
+   * que redirige a una presigned GET fresca (ver
+   * modules/storage/avatar-url.util.ts). Nullable: perfiles creados
+   * antes de STORAGE-R2 solo tienen photoUrl legacy.
+   */
+  @Column({
+    name: 'photo_object_key',
+    type: 'varchar',
+    length: 1024,
+    nullable: true,
+  })
+  photoObjectKey!: string | null;
+
   @Column({
     name: 'emergency_contact_name',
     type: 'varchar',

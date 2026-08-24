@@ -105,6 +105,7 @@ describe('DriverLocationsService', () => {
       [number, number, number, number]
     >;
     removeDriverAvailability: jest.Mock<Promise<void>, [string]>;
+    registerDiscoverableTransition: jest.Mock<Promise<boolean>, [string]>;
   };
 
   const userId = 'f544d52a-39e0-4da3-8861-6010355c5dba';
@@ -271,6 +272,10 @@ describe('DriverLocationsService', () => {
 
       removeDriverAvailability: jest.fn<Promise<void>, [string]>(() =>
         Promise.resolve(),
+      ),
+
+      registerDiscoverableTransition: jest.fn<Promise<boolean>, [string]>(() =>
+        Promise.resolve(true),
       ),
     };
 
@@ -639,6 +644,46 @@ describe('DriverLocationsService', () => {
     expect(
       availabilityRedisService.removeDriverAvailability,
     ).toHaveBeenCalledWith(otherDriverId);
+  });
+
+  it('debe evaluar la transición discoverable en cada publicación AVAILABLE (G3A)', async () => {
+    await service.updateMyLocation(userId, {
+      latitude: -6.4877,
+      longitude: -76.3599,
+    });
+
+    expect(
+      availabilityRedisService.registerDiscoverableTransition,
+    ).toHaveBeenCalledWith(profile.id);
+  });
+
+  it('no debe evaluar la transición discoverable mientras el conductor está BUSY (G3A)', async () => {
+    stateQueryBuilder.getOne.mockResolvedValue({
+      ...availableState,
+      status: DriverOperationalStatus.BUSY,
+    });
+
+    await service.updateMyLocation(userId, {
+      latitude: -6.4877,
+      longitude: -76.3599,
+    });
+
+    expect(
+      availabilityRedisService.registerDiscoverableTransition,
+    ).not.toHaveBeenCalled();
+  });
+
+  it('no debe fallar la actualización si la detección de late-join falla (best-effort) (G3A)', async () => {
+    availabilityRedisService.registerDiscoverableTransition.mockRejectedValue(
+      new Error('Redis no disponible'),
+    );
+
+    const result = await service.updateMyLocation(userId, {
+      latitude: -6.4877,
+      longitude: -76.3599,
+    });
+
+    expect(result.latitude).toBe(-6.4877);
   });
 
   it('no debe consultar PostgreSQL si Redis excluye presence vencida', async () => {

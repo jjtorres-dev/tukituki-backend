@@ -13,11 +13,35 @@ export class DriverRideOfferLocationDto {
   address!: string;
 }
 
+export class DriverRideOfferPassengerDto {
+  /*
+   * Deliberadamente firstName + lastNameInitial (nunca lastName
+   * completo, phone, email, documento, rating ni foto): mismo
+   * contrato mínimo ya usado en PassengerRideOfferDriverDto
+   * (Passenger viendo propuestas de Driver) y en
+   * RideAssignedPassengerResponseDto (post-asignación).
+   */
+  @ApiProperty()
+  firstName!: string;
+
+  /*
+   * "Pérez" -> "P.". Nunca el apellido completo.
+   */
+  @ApiProperty({ example: 'L.' })
+  lastNameInitial!: string;
+}
+
 export class DriverRideOfferRideDto {
   @ApiProperty({
     format: 'uuid',
   })
   id!: string;
+
+  @ApiPropertyOptional({
+    type: DriverRideOfferPassengerDto,
+    nullable: true,
+  })
+  passenger!: DriverRideOfferPassengerDto | null;
 
   @ApiProperty({
     type: DriverRideOfferLocationDto,
