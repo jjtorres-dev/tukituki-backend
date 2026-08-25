@@ -14,6 +14,7 @@ import { FaresController } from './fares.controller';
 import { FaresService } from './fares.service';
 import { GoogleGeocodingService } from './google-geocoding.service';
 import { GoogleRoutesService } from './google-routes.service';
+import { OriginAddressService } from './origin-address.service';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { GoogleRoutesService } from './google-routes.service';
     GoogleRoutesService,
     GoogleGeocodingService,
     FaresService,
+    OriginAddressService,
   ],
 
   exports: [FareRulesService, FaresService],

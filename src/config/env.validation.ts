@@ -315,6 +315,27 @@ export const envValidationSchema = Joi.object({
 
   GOOGLE_PLACES_API_KEY: Joi.string().min(20).max(500).allow('').optional(),
 
+  /*
+   * ORIGIN-ADDRESS-R1: protección de costo dedicada a
+   * GET /fares/origin-address, independiente del throttle global
+   * (RATE_LIMIT_*) — mismo patrón que OTP_REQUEST_IP_LIMIT/
+   * OTP_REQUEST_PHONE_LIMIT (ver otp.service.ts), pero por `userId`
+   * en vez de IP/teléfono: el endpoint ya exige JWT, así que el
+   * usuario autenticado es una key más confiable que la IP (varios
+   * pasajeros pueden compartir NAT/red móvil).
+   */
+  ORIGIN_ADDRESS_RATE_LIMIT_MAX: Joi.number()
+    .integer()
+    .min(1)
+    .max(1000)
+    .default(30),
+
+  ORIGIN_ADDRESS_RATE_LIMIT_WINDOW_SECONDS: Joi.number()
+    .integer()
+    .min(60)
+    .max(86400)
+    .default(3600),
+
   IZIPAY_ENABLED: Joi.boolean().default(false),
 
   IZIPAY_MERCHANT_CODE: Joi.when('IZIPAY_ENABLED', {
