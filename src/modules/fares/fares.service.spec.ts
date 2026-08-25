@@ -506,7 +506,9 @@ describe('FaresService', () => {
     // nunca dispara geocoding, sin importar su texto.
     expect(googleGeocodingServiceMock.reverseGeocode).toHaveBeenCalledTimes(1);
 
-    expect(savedQuote?.destinationAddress).toBe('Destino seleccionado en el mapa');
+    expect(savedQuote?.destinationAddress).toBe(
+      'Destino seleccionado en el mapa',
+    );
 
     expect(result.destination.address).toBe('Destino seleccionado en el mapa');
   });
