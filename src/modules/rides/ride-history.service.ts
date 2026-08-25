@@ -28,6 +28,8 @@ interface PassengerHistoryRow {
   status: RideStatus;
   originAddress: string;
   destinationAddress: string;
+  destinationLatitude: number | string | null;
+  destinationLongitude: number | string | null;
   requestedAt: Date | string;
   startedAt: Date | string | null;
   completedAt: Date | string | null;
@@ -110,6 +112,8 @@ export class RideHistoryService {
          ride.status AS "status",
          ride.origin_address AS "originAddress",
          ride.destination_address AS "destinationAddress",
+         ST_Y(ride.destination_position::geometry) AS "destinationLatitude",
+         ST_X(ride.destination_position::geometry) AS "destinationLongitude",
          ride.requested_at AS "requestedAt",
          ride.started_at AS "startedAt",
          ride.completed_at AS "completedAt",
@@ -154,6 +158,8 @@ export class RideHistoryService {
         status: row.status,
         originAddress: row.originAddress,
         destinationAddress: row.destinationAddress,
+        destinationLatitude: this.nullableNumber(row.destinationLatitude),
+        destinationLongitude: this.nullableNumber(row.destinationLongitude),
         requestedAt: this.date(row.requestedAt),
         startedAt: this.nullableDate(row.startedAt),
         completedAt: this.nullableDate(row.completedAt),

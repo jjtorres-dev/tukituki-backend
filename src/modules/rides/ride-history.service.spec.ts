@@ -24,6 +24,8 @@ describe('RideHistoryService', () => {
           status: RideStatus.COMPLETED,
           originAddress: 'Jr. Lima 250, Tarapoto',
           destinationAddress: 'Plaza de Armas de Morales',
+          destinationLatitude: '-6.4877',
+          destinationLongitude: '-76.3599',
           requestedAt,
           startedAt: new Date('2026-07-23T15:05:00.000Z'),
           completedAt: new Date('2026-07-23T15:20:00.000Z'),
@@ -62,6 +64,60 @@ describe('RideHistoryService', () => {
     expect(result.items[0]?.canRate).toBe(true);
     expect(result.pagination.totalItems).toBe(1);
     expect(result.pagination.totalPages).toBe(1);
+    // SUGGESTED-DESTINATIONS-R1: ST_Y/ST_X llegan como string desde el
+    // driver de Postgres — deben convertirse a number, igual que
+    // actualDistanceMeters/actualDurationSeconds.
+    expect(result.items[0]?.destinationLatitude).toBe(-6.4877);
+    expect(result.items[0]?.destinationLongitude).toBe(-76.3599);
+  });
+
+  it('SUGGESTED-DESTINATIONS-R1: destinationLatitude/destinationLongitude nulas no rompen el mapeo (defensivo — Ride.destinationPosition es NOT NULL en la base, esta fila no ocurre hoy)', async () => {
+    const query = jest
+      .fn<Promise<unknown>, [string, unknown[]?]>()
+      .mockResolvedValueOnce([{ total: 1 }])
+      .mockResolvedValueOnce([
+        {
+          rideId: '3dbb6cbc-aee8-43f0-8247-e13d8e197b71',
+          status: RideStatus.COMPLETED,
+          originAddress: 'Jr. Lima 250, Tarapoto',
+          destinationAddress: 'Plaza de Armas de Morales',
+          destinationLatitude: null,
+          destinationLongitude: null,
+          requestedAt: new Date('2026-07-23T15:00:00.000Z'),
+          startedAt: null,
+          completedAt: null,
+          cancelledAt: null,
+          actualDistanceMeters: null,
+          actualDurationSeconds: null,
+          estimatedFare: '7.40',
+          finalFare: null,
+          currency: 'PEN',
+          driverProfileId: null,
+          driverFirstName: null,
+          driverPhotoUrl: null,
+          driverRatingAverage: null,
+          driverRatingCount: null,
+          vehiclePlate: null,
+          vehicleBrand: null,
+          vehicleModel: null,
+          vehicleColor: null,
+          vehicleType: null,
+          ratingSubmitted: false,
+        },
+      ]);
+    const dataSource = { query };
+    const service = new RideHistoryService(
+      dataSource as unknown as DataSource,
+      avatarResolverMock,
+    );
+
+    const result = await service.getPassengerHistory(
+      'f544d52a-39e0-4da3-8861-6010355c5dba',
+      { page: 1, limit: 20 },
+    );
+
+    expect(result.items[0]?.destinationLatitude).toBeNull();
+    expect(result.items[0]?.destinationLongitude).toBeNull();
   });
 
   it('debe devolver el historial del conductor', async () => {
