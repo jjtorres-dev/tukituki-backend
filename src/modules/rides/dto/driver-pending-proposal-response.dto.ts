@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 
+import { PaymentMethod } from '../../payments/enums/payment-method.enum';
 import { RideOfferStatus } from '../enums/ride-offer-status.enum';
 import { DriverRideOfferLocationDto } from './driver-ride-offer-response.dto';
 
@@ -46,6 +47,15 @@ export class DriverPendingProposalResponseDto {
     example: 'PEN',
   })
   currency!: string;
+
+  /*
+   * Puramente referencial -- TukiTuki no procesa el cobro, el
+   * pasajero le paga directo al conductor. Con varias propuestas
+   * pendientes a la vez, ayuda al conductor a priorizar cuál
+   * conviene esperar.
+   */
+  @ApiProperty({ enum: PaymentMethod })
+  paymentMethod!: PaymentMethod;
 
   @ApiProperty({
     type: String,

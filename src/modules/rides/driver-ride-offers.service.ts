@@ -763,6 +763,8 @@ export class DriverRideOffersService {
 
       currency: ride.currency,
 
+      paymentMethod: ride.paymentMethod,
+
       expiresAt: offer.expiresAt,
 
       distanceToOriginMeters: offer.distanceToOriginMeters,
@@ -856,6 +858,8 @@ export class DriverRideOffersService {
         passengerOfferFare: ride.passengerOfferFare ?? ride.estimatedFare,
 
         currency: ride.currency,
+
+        paymentMethod: ride.paymentMethod,
 
         passengerNotes: ride.passengerNotes,
       },

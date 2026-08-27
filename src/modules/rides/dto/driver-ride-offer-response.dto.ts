@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
+import { PaymentMethod } from '../../payments/enums/payment-method.enum';
 import { RideOfferStatus } from '../enums/ride-offer-status.enum';
 
 export class DriverRideOfferLocationDto {
@@ -75,6 +76,15 @@ export class DriverRideOfferRideDto {
     example: 'PEN',
   })
   currency!: string;
+
+  /*
+   * Puramente referencial -- TukiTuki no procesa el cobro, el
+   * pasajero le paga directo al conductor. Se expone acá (antes de
+   * aceptar/contraofertar) para que el conductor pueda declinar si
+   * no maneja ese método, en vez de enterarse recién al completar.
+   */
+  @ApiProperty({ enum: PaymentMethod })
+  paymentMethod!: PaymentMethod;
 
   @ApiPropertyOptional({
     nullable: true,
