@@ -42,7 +42,7 @@ describe('NotificationEventHandler settlements', () => {
       expect.objectContaining({
         userId: DRIVER_USER_ID,
         data: {
-          route: 'driver-settlement',
+          screen: 'driver-settlement',
           settlementId: SETTLEMENT_ID,
           status: 'APPROVED',
           direction: 'PLATFORM_TO_DRIVER',

@@ -265,7 +265,7 @@ export class NotificationEventHandler {
       title: 'Nueva solicitud de viaje',
       body: `Destino: ${offer.ride.destinationAddress}`,
       data: {
-        route: 'ride-offer',
+        screen: 'ride-offer',
         offerId: offer.id,
         rideId: offer.rideId,
         expiresAt: offer.expiresAt.toISOString(),
@@ -283,7 +283,7 @@ export class NotificationEventHandler {
         title: 'Viaje completado',
         body: `El viaje finalizó. Tarifa: ${ride.currency} ${ride.finalFare ?? ride.estimatedFare}.`,
         data: {
-          route: 'ride-receipt',
+          screen: 'ride-receipt',
           rideId: ride.id,
           status: ride.status,
         },
@@ -294,7 +294,7 @@ export class NotificationEventHandler {
         type: NotificationType.RATING_REQUEST,
         title: 'Califica tu viaje',
         body: 'Tu opinión ayuda a mantener una comunidad segura y confiable.',
-        data: { route: 'ride-rating', rideId: ride.id },
+        data: { screen: 'ride-rating', rideId: ride.id },
         dedupeKey: `${event.id}:${userId}:rating-request`,
       });
     }
@@ -388,7 +388,7 @@ export class NotificationEventHandler {
             ? 'Registramos tu alerta y notificamos al equipo de soporte.'
             : `Se registró un incidente ${incident.severity} durante un viaje.`,
         data: {
-          route: 'safety-incident',
+          screen: 'safety-incident',
           incidentId: incident.id,
           rideId: incident.rideId,
           severity: incident.severity,
@@ -449,7 +449,7 @@ export class NotificationEventHandler {
           title: 'Alerta de un contacto de emergencia',
           body: `${contact.name} fue registrado como contacto de emergencia y se activó una alerta durante un viaje.`,
           data: {
-            route: 'emergency-contact-alert',
+            screen: 'emergency-contact-alert',
             incidentId: incident.id,
             rideId: incident.rideId,
           },
@@ -479,7 +479,7 @@ export class NotificationEventHandler {
       title,
       body,
       data: {
-        route: 'driver-settlement',
+        screen: 'driver-settlement',
         settlementId,
         status: this.payloadString(event.payload, 'status') ?? '',
         direction: this.payloadString(event.payload, 'direction') ?? '',
@@ -504,7 +504,7 @@ export class NotificationEventHandler {
       title,
       body,
       data: {
-        route: 'ride-share-links',
+        screen: 'ride-share-links',
         rideId,
         shareLinkId: event.aggregateId,
       },
@@ -526,7 +526,7 @@ export class NotificationEventHandler {
         title,
         body,
         data: {
-          route: 'safety-incident',
+          screen: 'safety-incident',
           incidentId: incident.id,
           rideId: incident.rideId,
           status: incident.status,
@@ -613,7 +613,7 @@ export class NotificationEventHandler {
       title,
       body,
       data: {
-        route: 'ride-detail',
+        screen: 'ride-detail',
         rideId: event.aggregateId,
         eventType: event.eventType,
       },
@@ -634,7 +634,7 @@ export class NotificationEventHandler {
       title,
       body,
       data: {
-        route: 'ride-detail',
+        screen: 'ride-detail',
         rideId: event.aggregateId,
         eventType: event.eventType,
       },
