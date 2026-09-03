@@ -1,6 +1,7 @@
 import { Transform } from 'class-transformer';
 import type { TransformFnParams } from 'class-transformer';
 import {
+  IsEmail,
   IsNotEmpty,
   IsOptional,
   IsString,
@@ -13,6 +14,16 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 function trimString({ value }: TransformFnParams): unknown {
   return typeof value === 'string' ? value.trim() : value;
+}
+
+function normalizeEmail({ value }: TransformFnParams): unknown {
+  if (typeof value !== 'string') {
+    return value;
+  }
+
+  const normalized = value.trim().toLowerCase();
+
+  return normalized.length > 0 ? normalized : null;
 }
 
 export class CreatePassengerProfileDto {
@@ -39,6 +50,16 @@ export class CreatePassengerProfileDto {
   @MinLength(2)
   @MaxLength(80)
   lastName!: string;
+
+  @ApiPropertyOptional({
+    example: 'juan@example.com',
+    maxLength: 255,
+  })
+  @Transform(normalizeEmail)
+  @IsOptional()
+  @IsEmail()
+  @MaxLength(255)
+  email?: string;
 
   @ApiPropertyOptional({
     example: 'https://cdn.tukituki.pe/passengers/profile.jpg',

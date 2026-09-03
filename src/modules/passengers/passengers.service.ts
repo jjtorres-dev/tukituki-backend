@@ -25,12 +25,17 @@ export class PassengersService {
    * STORAGE-R2.1: única forma de exponer el perfil del pasajero hacia
    * afuera. Nunca devolver la entidad ni photoObjectKey directamente.
    */
-  toProfileResponse(profile: PassengerProfile): PassengerProfileResponseDto {
+  toProfileResponse(
+    profile: PassengerProfile,
+    phoneE164: string,
+  ): PassengerProfileResponseDto {
     return {
       id: profile.id,
       userId: profile.userId,
       firstName: profile.firstName,
       lastName: profile.lastName,
+      email: profile.email,
+      phoneE164,
       photoUrl: this.avatarResolver.resolvePassengerAvatarUrl(profile),
       emergencyContactName: profile.emergencyContactName,
       emergencyContactPhoneE164: profile.emergencyContactPhoneE164,
@@ -63,6 +68,7 @@ export class PassengersService {
       userId,
       firstName: dto.firstName,
       lastName: dto.lastName,
+      email: dto.email ?? null,
       photoUrl: dto.photoUrl ?? null,
       emergencyContactName: dto.emergencyContactName ?? null,
       emergencyContactPhoneE164: dto.emergencyContactPhoneE164 ?? null,
@@ -105,6 +111,10 @@ export class PassengersService {
 
     if (dto.lastName !== undefined) {
       profile.lastName = dto.lastName;
+    }
+
+    if (dto.email !== undefined) {
+      profile.email = dto.email;
     }
 
     if (dto.photoUrl !== undefined) {

@@ -24,6 +24,16 @@ export class PassengerProfileResponseDto {
   @ApiPropertyOptional({
     nullable: true,
   })
+  email!: string | null;
+
+  @ApiProperty({
+    example: '+51987654321',
+  })
+  phoneE164!: string;
+
+  @ApiPropertyOptional({
+    nullable: true,
+  })
   photoUrl!: string | null;
 
   @ApiPropertyOptional({

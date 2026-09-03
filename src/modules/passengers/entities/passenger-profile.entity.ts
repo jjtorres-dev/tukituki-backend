@@ -49,6 +49,14 @@ export class PassengerProfile {
   lastName!: string;
 
   @Column({
+    name: 'email',
+    type: 'varchar',
+    length: 255,
+    nullable: true,
+  })
+  email!: string | null;
+
+  @Column({
     name: 'photo_url',
     type: 'varchar',
     length: 2048,

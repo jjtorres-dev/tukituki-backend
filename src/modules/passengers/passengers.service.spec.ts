@@ -4,6 +4,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import type { DeepPartial, FindOneOptions } from 'typeorm';
 
 import { AvatarUrlResolverService } from '../storage/avatar-url-resolver.service';
+import { UpdatePassengerProfileDto } from './dto/update-passenger-profile.dto';
 import { PassengerProfile } from './entities/passenger-profile.entity';
 import { PassengersService } from './passengers.service';
 
@@ -35,6 +36,7 @@ describe('PassengersService', () => {
     userId,
     firstName: 'Juan José',
     lastName: 'Torres Solano',
+    email: null,
     photoUrl: null,
     emergencyContactName: null,
     emergencyContactPhoneE164: null,
@@ -107,6 +109,7 @@ describe('PassengersService', () => {
       userId,
       firstName: 'Juan José',
       lastName: 'Torres Solano',
+      email: null,
       photoUrl: null,
       emergencyContactName: null,
       emergencyContactPhoneE164: null,
@@ -147,6 +150,57 @@ describe('PassengersService', () => {
 
     expect(result.firstName).toBe('Juan');
     expect(repository.save).toHaveBeenCalledTimes(1);
+  });
+
+  it('createMyProfile pasa el email tal cual cuando el DTO lo trae', async () => {
+    repository.findOne.mockResolvedValue(null);
+
+    await service.createMyProfile(userId, {
+      firstName: 'Juan José',
+      lastName: 'Torres Solano',
+      email: 'juan@example.com',
+    });
+
+    expect(repository.create).toHaveBeenCalledWith(
+      expect.objectContaining({ email: 'juan@example.com' }),
+    );
+  });
+
+  it('updateMyProfile actualiza el email cuando el DTO lo trae', async () => {
+    repository.findOne.mockResolvedValue({ ...profile });
+
+    const result = await service.updateMyProfile(userId, {
+      email: 'nuevo@x.com',
+    });
+
+    expect(result.email).toBe('nuevo@x.com');
+    expect(repository.save).toHaveBeenCalledTimes(1);
+  });
+
+  it('updateMyProfile borra el email con un null explícito del DTO', async () => {
+    repository.findOne.mockResolvedValue({
+      ...profile,
+      email: 'viejo@x.com',
+    });
+
+    const result = await service.updateMyProfile(userId, {
+      email: null,
+    } as unknown as UpdatePassengerProfileDto);
+
+    expect(result.email).toBeNull();
+  });
+
+  it('updateMyProfile no toca el email si el DTO no trae la clave', async () => {
+    repository.findOne.mockResolvedValue({
+      ...profile,
+      email: 'viejo@x.com',
+    });
+
+    const result = await service.updateMyProfile(userId, {
+      firstName: 'Juan',
+    });
+
+    expect(result.email).toBe('viejo@x.com');
   });
 
   describe('STORAGE-R2: assertProfilePhotoUploadAllowed / completeProfilePhotoUpload', () => {
@@ -202,10 +256,13 @@ describe('PassengersService', () => {
 
   describe('STORAGE-R2.1: toProfileResponse', () => {
     it('resuelve photoUrl a través de AvatarUrlResolverService y nunca expone photoObjectKey', () => {
-      const response = service.toProfileResponse({
-        ...profile,
-        photoObjectKey: 'passengers/profile/1.jpg',
-      });
+      const response = service.toProfileResponse(
+        {
+          ...profile,
+          photoObjectKey: 'passengers/profile/1.jpg',
+        },
+        '+51987654321',
+      );
 
       expect(avatarResolver.resolvePassengerAvatarUrl).toHaveBeenCalledWith(
         expect.objectContaining({ photoObjectKey: 'passengers/profile/1.jpg' }),
@@ -214,6 +271,26 @@ describe('PassengersService', () => {
       expect(
         Object.prototype.hasOwnProperty.call(response, 'photoObjectKey'),
       ).toBe(false);
+    });
+
+    it('devuelve phoneE164 tal cual el argumento recibido', () => {
+      expect(
+        service.toProfileResponse({ ...profile }, '+51987654321').phoneE164,
+      ).toBe('+51987654321');
+    });
+
+    it('refleja el email de la entidad en la respuesta (incluido null)', () => {
+      expect(
+        service.toProfileResponse(
+          { ...profile, email: 'juan@example.com' },
+          '+51999999999',
+        ).email,
+      ).toBe('juan@example.com');
+
+      expect(
+        service.toProfileResponse({ ...profile, email: null }, '+51999999999')
+          .email,
+      ).toBeNull();
     });
   });
 });

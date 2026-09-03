@@ -53,7 +53,7 @@ export class PassengersController {
   ): Promise<PassengerProfileResponseDto> {
     const profile = await this.passengersService.createMyProfile(user.id, dto);
 
-    return this.passengersService.toProfileResponse(profile);
+    return this.passengersService.toProfileResponse(profile, user.phoneE164);
   }
 
   @Get('me')
@@ -71,7 +71,7 @@ export class PassengersController {
   ): Promise<PassengerProfileResponseDto> {
     const profile = await this.passengersService.getMyProfile(user.id);
 
-    return this.passengersService.toProfileResponse(profile);
+    return this.passengersService.toProfileResponse(profile, user.phoneE164);
   }
 
   @Patch('me')
@@ -91,6 +91,6 @@ export class PassengersController {
   ): Promise<PassengerProfileResponseDto> {
     const profile = await this.passengersService.updateMyProfile(user.id, dto);
 
-    return this.passengersService.toProfileResponse(profile);
+    return this.passengersService.toProfileResponse(profile, user.phoneE164);
   }
 }
