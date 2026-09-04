@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Patch, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Patch,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiConflictResponse,
@@ -90,6 +98,25 @@ export class PassengersController {
     @Body() dto: UpdatePassengerProfileDto,
   ): Promise<PassengerProfileResponseDto> {
     const profile = await this.passengersService.updateMyProfile(user.id, dto);
+
+    return this.passengersService.toProfileResponse(profile, user.phoneE164);
+  }
+
+  @Delete('me/photo')
+  @ApiOperation({
+    summary: 'Quitar la foto de perfil del pasajero autenticado',
+  })
+  @ApiOkResponse({
+    description: 'Foto de perfil eliminada correctamente',
+    type: PassengerProfileResponseDto,
+  })
+  @ApiNotFoundResponse({
+    description: 'El perfil todavía no existe',
+  })
+  async deleteMyPhoto(
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<PassengerProfileResponseDto> {
+    const profile = await this.passengersService.removeProfilePhoto(user.id);
 
     return this.passengersService.toProfileResponse(profile, user.phoneE164);
   }

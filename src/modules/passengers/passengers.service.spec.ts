@@ -239,6 +239,39 @@ describe('PassengersService', () => {
     });
   });
 
+  describe('PASSENGER-PROFILE-PHOTO 2a: removeProfilePhoto', () => {
+    it('pone photoObjectKey y photoUrl en null y devuelve la entidad actualizada', async () => {
+      repository.findOne.mockResolvedValue({
+        ...profile,
+        photoUrl: 'https://cdn.tukituki.pe/passenger.jpg',
+        photoObjectKey: 'passengers/profile/current.jpg',
+      });
+
+      const result = await service.removeProfilePhoto(userId);
+
+      expect(result.photoObjectKey).toBeNull();
+      expect(result.photoUrl).toBeNull();
+      expect(repository.save).toHaveBeenCalledTimes(1);
+      expect(repository.save).toHaveBeenCalledWith(
+        expect.objectContaining({ photoObjectKey: null, photoUrl: null }),
+      );
+    });
+
+    it('es idempotente: un perfil que ya estaba sin foto no lanza y se devuelve igual', async () => {
+      repository.findOne.mockResolvedValue({
+        ...profile,
+        photoUrl: null,
+        photoObjectKey: null,
+      });
+
+      const result = await service.removeProfilePhoto(userId);
+
+      expect(result.photoObjectKey).toBeNull();
+      expect(result.photoUrl).toBeNull();
+      expect(repository.save).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe('LEGACY: un perfil con photoUrl y sin photoObjectKey sigue siendo representable', () => {
     it('getMyProfile devuelve tal cual un perfil legacy (photoUrl set, photoObjectKey null)', async () => {
       repository.findOne.mockResolvedValue({

@@ -162,6 +162,22 @@ export class PassengersService {
     return { profile: saved, previousObjectKey };
   }
 
+  /*
+   * PASSENGER-PROFILE-PHOTO 2a: desvincula la foto de perfil del
+   * pasajero. Solo toca la DB (photoObjectKey + photoUrl a null),
+   * mismo patrón que deleteMyDocument — el objeto del bucket NO se
+   * borra en esta etapa. Idempotente: si el perfil ya estaba sin
+   * foto, igual guarda y devuelve sin lanzar.
+   */
+  async removeProfilePhoto(userId: string): Promise<PassengerProfile> {
+    const profile = await this.getMyProfile(userId);
+
+    profile.photoObjectKey = null;
+    profile.photoUrl = null;
+
+    return this.passengerProfilesRepository.save(profile);
+  }
+
   private isUniqueConstraintViolation(error: unknown): boolean {
     if (!(error instanceof QueryFailedError)) {
       return false;
